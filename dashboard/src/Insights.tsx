@@ -16,8 +16,14 @@ import {
 } from "./components";
 import { DECISION_LABELS, duration, money, percent } from "./format";
 import { usePoll } from "./hooks";
+import { Timeline } from "./Timeline";
 
 const DECISIONS: DecisionKind[] = ["approve", "decline", "refer"];
+
+const DECISION_TONES = DECISIONS.map((decision) => ({
+  tone: decision,
+  label: DECISION_LABELS[decision],
+}));
 
 export interface Segment {
   tone: string;
@@ -232,13 +238,14 @@ function Report({ insights }: Readonly<{ insights: Insights }>) {
     <>
       <Stats totals={insights.totals} />
       <Money totals={insights.totals} />
+      {insights.claims.length > 0 && (
+        <Panel title="The latest run">
+          <Legend items={DECISION_TONES} />
+          <Timeline claims={insights.claims} />
+        </Panel>
+      )}
       <Panel title="The agent's decisions by claim type">
-        <Legend
-          items={DECISIONS.map((decision) => ({
-            tone: decision,
-            label: DECISION_LABELS[decision],
-          }))}
-        />
+        <Legend items={DECISION_TONES} />
         <Bars rows={byType} label="Decisions by claim type" />
       </Panel>
       <div className="insights-grid">

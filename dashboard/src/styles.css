@@ -1346,3 +1346,44 @@ main {
     grid-row: 2;
   }
 }
+
+.tone--none {
+  --tone: var(--ink-soft);
+  --tone-text: var(--panel);
+}
+
+.timeline__summary {
+  margin: 0 0 12px;
+  color: var(--ink-soft);
+}
+
+.timeline__rows {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline__rows li {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) 9ch;
+  align-items: center;
+  gap: 12px;
+}
+
+.timeline__track {
+  position: relative;
+  height: 16px;
+  border-radius: 6px;
+  background: var(--panel-soft);
+}
+
+.timeline__bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 4px;
+  border-radius: 6px;
+  background: var(--tone);
+}
