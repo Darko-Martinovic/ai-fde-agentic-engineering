@@ -140,6 +140,61 @@ export interface AgentState {
   claim_id: string | null;
 }
 
+export interface InsightTotals {
+  claims: number;
+  decided: number;
+  straight_through: number;
+  sign_offs: number;
+  referred: number;
+  waiting_for_handler: number;
+  tool_calls: number;
+  refused: number;
+  median_seconds: number | null;
+  longest_seconds: number | null;
+  claimed: number;
+  approved: number;
+  paid: number;
+  held: number;
+}
+
+export interface TypeMix {
+  claim_type: string;
+  approve: number;
+  decline: number;
+  refer: number;
+}
+
+export interface ToolUse {
+  tool: string;
+  calls: number;
+  refused: number;
+}
+
+export interface SectionCount {
+  section: string;
+  claims: number;
+}
+
+export interface ClaimWork {
+  claim_id: string;
+  claim_type: string;
+  status: ClaimStatus;
+  decision: DecisionKind | null;
+  started_at: string;
+  finished_at: string;
+  seconds: number;
+  tool_calls: number;
+  refused: number;
+}
+
+export interface Insights {
+  totals: InsightTotals;
+  by_type: TypeMix[];
+  tools: ToolUse[];
+  sections: SectionCount[];
+  claims: ClaimWork[];
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -198,6 +253,8 @@ export const api = {
   policyWording: (signal?: AbortSignal) =>
     getText("/api/policy-wording", signal),
   agent: (signal?: AbortSignal) => getJson<AgentState>("/api/agent", signal),
+  insights: (signal?: AbortSignal) =>
+    getJson<Insights>("/api/insights", signal),
   health: (signal?: AbortSignal) =>
     getJson<{ status: string }>("/api/health", signal),
   runClaim: (id: string) => post<AgentState>(`/api/agent/claims/${id}`),

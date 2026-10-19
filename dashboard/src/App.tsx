@@ -2,6 +2,7 @@ import { api } from "./api";
 import { ClaimPage } from "./ClaimPage";
 import { Logo } from "./components";
 import { usePoll, useRoute, useTheme, type Route, type Theme } from "./hooks";
+import { InsightsPage } from "./Insights";
 import { InstructionsPage } from "./Instructions";
 import { QueuePage } from "./Queue";
 
@@ -17,6 +18,8 @@ function Page({ route }: Readonly<{ route: Route }>) {
       return <ClaimPage key={route.claimId} claimId={route.claimId} />;
     case "instructions":
       return <InstructionsPage />;
+    case "insights":
+      return <InsightsPage />;
     case "queue":
       return <QueuePage />;
   }
@@ -58,6 +61,12 @@ export function App() {
             aria-current={route.page === "queue" ? "page" : undefined}
           >
             Queue
+          </a>
+          <a
+            href="#/insights"
+            aria-current={route.page === "insights" ? "page" : undefined}
+          >
+            Insights
           </a>
           <a
             href="#/instructions"
