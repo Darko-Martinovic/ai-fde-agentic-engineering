@@ -86,13 +86,13 @@ Every operation has an `operation_id`, a one-line docstring and no optional inpu
 
 **Success criteria**
 
-- [ ] Tests cover every transition in the state table and every 409 above
-- [ ] A test refers a claim, then resolves it as `HND-02` with an approval of $1,350: the claim is `decided`, the payment is recorded against `HND-02`, and both the agent's and the handler's reasons are kept
-- [ ] A test approves a claim with a $1,150 payout, calls `pay_claim` with $1,150 and gets 409, with no payment recorded; after `sign_off_claim` with `HND-01` the claim is `decided` and one payment of $1,150 is recorded against `HND-01`
-- [ ] A test approves a $420 claim and pays it; a second `pay_claim` returns 409
-- [ ] A test checks that exactly $1,000.00 pays without sign-off and $1,000.01 needs it
-- [ ] Steps come back from `list_steps` in the order they were recorded
-- [ ] `npm run check:python` passes
+- [x] Tests cover every transition in the state table and every 409 above
+- [x] A test refers a claim, then resolves it as `HND-02` with an approval of $1,350: the claim is `decided`, the payment is recorded against `HND-02`, and both the agent's and the handler's reasons are kept
+- [x] A test approves a claim with a $1,150 payout, calls `pay_claim` with $1,150 and gets 409, with no payment recorded; after `sign_off_claim` with `HND-01` the claim is `decided` and one payment of $1,150 is recorded against `HND-01`
+- [x] A test approves a $420 claim and pays it; a second `pay_claim` returns 409
+- [x] A test checks that exactly $1,000.00 pays without sign-off and $1,000.01 needs it
+- [x] Steps come back from `list_steps` in the order they were recorded
+- [x] `npm run check:python` passes
 
 ## Phase 3: The UnderCover Agent
 

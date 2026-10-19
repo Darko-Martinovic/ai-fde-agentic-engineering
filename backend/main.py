@@ -1,49 +1,20 @@
 """The UnderCover backend."""
 
 import json
-import sqlite3
-from collections.abc import Iterator
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
 
-from backend import db
+from backend import workflow
+from backend.api import Db, find, load_claim, setting
 from backend.models import Claim, ClaimSummary, Customer, Handler, Policy
-from backend.seed import ensure_seeded
 
 INSTRUCTIONS = Path(__file__).parent / "instructions.md"
 
 app = FastAPI(title="UnderCover")
-
-
-def database() -> Iterator[sqlite3.Connection]:
-    """Open the database for one request, seeding it on first use."""
-    conn = db.connect()
-    ensure_seeded(conn)
-    try:
-        yield conn
-    finally:
-        conn.close()
-
-
-Db = Annotated[sqlite3.Connection, Depends(database)]
-
-
-def find(conn: sqlite3.Connection, sql: str, key: str, label: str) -> sqlite3.Row:
-    """Return the one row the query finds for the key, or raise a 404."""
-    row = conn.execute(sql, (key,)).fetchone()
-    if row is None:
-        raise HTTPException(404, f"{label} {key} not found")
-    return row
-
-
-def setting(conn: sqlite3.Connection, name: str) -> str:
-    """Return one stored setting."""
-    return conn.execute(
-        "SELECT value FROM settings WHERE name = ?", (name,)
-    ).fetchone()[0]
+app.include_router(workflow.router)
 
 
 @app.get("/api/health", operation_id="health")
@@ -73,14 +44,8 @@ def list_claims(conn: Db) -> list[ClaimSummary]:
 
 @app.get("/api/claims/{claim_id}", operation_id="get_claim")
 def get_claim(claim_id: str, conn: Db) -> Claim:
-    """Get one claim in full: the story, the items and the documents."""
-    row = find(
-        conn,
-        "SELECT data, status FROM claims WHERE claim_id = ?",
-        claim_id,
-        "Claim",
-    )
-    return Claim.model_validate(json.loads(row["data"]) | {"status": row["status"]})
+    """Get one claim in full: the story, the items, the documents and the decisions."""
+    return load_claim(conn, claim_id)
 
 
 @app.get("/api/policies/{policy_id}", operation_id="get_policy")

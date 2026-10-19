@@ -23,7 +23,8 @@ def test_get_claim(client):
     assert claim["story"].startswith("My flight home from Rome")
     assert len(claim["items"]) == 3
     assert len(claim["documents"]) == 4
-    assert "decision" not in claim
+    assert claim["decisions"] == []
+    assert claim["payment"] is None
 
 
 def test_get_policy(client):
@@ -85,5 +86,12 @@ def test_operations_are_documented(client):
         "get_policy_wording",
         "get_instructions",
         "list_handlers",
+        "start_claim",
+        "record_step",
+        "list_steps",
+        "decide_claim",
+        "pay_claim",
+        "sign_off_claim",
+        "resolve_referral",
     }
     assert all(op["summary"] and op["description"] for op in operations)

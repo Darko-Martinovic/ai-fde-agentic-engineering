@@ -33,7 +33,7 @@ The pre-commit hook runs `check:python` when `backend/` or `agent/` files are st
 
 The product is three parts that talk only over HTTP, plus e2e tests:
 
-- `backend/main.py`: FastAPI app (`backend.main:app`). Every route under `/api` has an `operation_id`, a one-line docstring and no optional inputs (`docs/TECH_STACK.md`), because the agent's tools are built against this API. SQLite is the store until Week 2 Day 3 moves to Supabase.
+- `backend/main.py`: FastAPI app (`backend.main:app`). Every route under `/api` has an `operation_id`, a one-line docstring and no optional inputs (`docs/TECH_STACK.md`), because the agent's tools are built against this API. SQLite is the store until Week 2 Day 3 moves to Supabase. `backend/workflow.py` holds the claim states and the $1,000 sign-off rule: the backend enforces them, so the agent can't bypass them. `backend/api.py` has what routes share (the per-request database, `load_claim`).
 - `agent/main.py`: the UnderCover Agent, LangChain `create_agent` on OpenRouter via `ChatOpenAI` with `base_url` set to OpenRouter. The single entry point is `run(claim_id, thread_id, llm=None)`. The agent reaches claims and its instructions only through the backend API (`backend()` returns an `httpx.Client` on `localhost:8000`), never by reading `data/` or the database directly. The model is `MODEL_NAME` from `.env` if set (for example `openrouter/free`), otherwise `openai/gpt-6-luna` with low reasoning effort.
 - `dashboard/`: React + Vite + TypeScript (strict, no `any`). Vite proxies `/api` to `127.0.0.1:8000`, so the dashboard calls relative `/api/...` URLs.
 - `e2e/`: Playwright against `localhost:5173`; `playwright.config.ts` launches both servers.

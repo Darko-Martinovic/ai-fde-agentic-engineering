@@ -1,13 +1,79 @@
 """The shapes of UnderCover's records in the API."""
 
-from datetime import date
-from typing import Literal
+from datetime import date, datetime
+from typing import Literal, Self
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 ClaimStatus = Literal[
     "waiting", "in_progress", "awaiting_sign_off", "referred", "decided"
 ]
+StepKind = Literal["tool_call", "tool_result", "reply"]
+
+
+class StepIn(BaseModel):
+    thread_id: str = Field(min_length=1)
+    kind: StepKind
+    text: str
+
+
+class Step(StepIn):
+    recorded_at: datetime
+
+
+def check_payout(decision: str, payout: float) -> None:
+    """An approval pays something, and a decline or a referral pays nothing."""
+    if (decision == "approve") != (payout > 0):
+        raise ValueError(
+            "An approval pays more than $0.00, and a decline or a referral pays $0.00"
+        )
+
+
+class DecisionIn(BaseModel):
+    decision: Literal["approve", "decline", "refer"]
+    payout: float = Field(ge=0)
+    reasons: str = Field(min_length=1)
+    policy_section: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def payout_fits_decision(self) -> Self:
+        check_payout(self.decision, self.payout)
+        return self
+
+
+class ResolutionIn(BaseModel):
+    handler_id: str
+    decision: Literal["approve", "decline"]
+    payout: float = Field(ge=0)
+    reasons: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def payout_fits_decision(self) -> Self:
+        check_payout(self.decision, self.payout)
+        return self
+
+
+class Decision(BaseModel):
+    decided_by: str
+    decision: Literal["approve", "decline", "refer"]
+    payout: float
+    reasons: str
+    policy_section: str | None
+    decided_at: datetime
+
+
+class PaymentIn(BaseModel):
+    amount: float = Field(gt=0)
+
+
+class Payment(BaseModel):
+    amount: float
+    authorized_by: str
+    paid_at: datetime
+
+
+class SignOffIn(BaseModel):
+    handler_id: str
 
 
 class Item(BaseModel):
@@ -45,6 +111,8 @@ class Claim(BaseModel):
     amount_claimed: float
     documents: list[Document]
     status: ClaimStatus
+    decisions: list[Decision]
+    payment: Payment | None
 
 
 class Plan(BaseModel):

@@ -1,13 +1,15 @@
 # Status
 
-The pilot is being built from `docs/PLAN.md`. Phase 1 of 6 is done.
+The pilot is being built from `docs/PLAN.md`. Phases 1 and 2 of 6 are done.
 
 ## Built
 
-- `backend/`: UnderCover's records in SQLite, seeded from `data/` on first use, with read operations for the claims queue, one claim, a policy with its plan and add-ons, a customer with their claim history, the policy wording, the agent's instructions (`backend/instructions.md`) and the handlers. Every claim starts `waiting`. The backend never reads `data/evals/` or `data/security/`.
+- `backend/`: UnderCover's records in SQLite, seeded from `data/` on first use, with read operations for the claims queue, one claim, a policy with its plan and add-ons, a customer with their claim history, the policy wording, the agent's instructions (`backend/instructions.md`) and the handlers. The backend never reads `data/evals/` or `data/security/`.
+- The claim workflow (`backend/workflow.py`): `start_claim`, `record_step`, `list_steps`, `decide_claim`, `pay_claim`, `sign_off_claim` and `resolve_referral`. A claim moves from `waiting` to `in_progress`, then to `awaiting_sign_off` (approved over $1,000), `referred` or `decided`. A payment over $1,000 is refused until a handler signs off, and a referral waits for a handler to approve or decline it. Payments are recorded, not made.
 - `agent/`: still the hello-world skeleton, with one tool that calls the health route.
 - `dashboard/`: still one page that shows whether the backend is up.
 - `e2e/`: one test of that page.
+- `postman/`: a Postman collection and environment for the API, including a run through the workflow.
 
 ## Running it
 
