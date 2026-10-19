@@ -2,7 +2,7 @@
 
 ## UnderCover Agent: the Travel Insurance Platform
 
-![An alien in disguise joins a line of travelers](assets/undercover.jpg)
+![A boarding pass for the course: Week 1 AI Engineer, Week 2 AI Architect, Week 3 AI FDE, carrying the UnderCover Agent to production on AWS](assets/undercover-boarding-pass.svg)
 
 Welcome to the most substantive commercial project I've ever made on any course! We will work on this project throughout the 3-week journey, culminating in a capstone that is truly enterprise grade.
 
