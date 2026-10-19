@@ -172,11 +172,11 @@ Every operation has an `operation_id`, a one-line docstring and no optional inpu
 
 **Success criteria**
 
-- [ ] `npm run e2e` passes, and passes again on a second run (the database starts fresh each time)
-- [ ] With `npm run dev` running, Run on CLM-1001 in the dashboard runs the agent on the real model. The claim page shows each step as it arrives, then a decision with two or three sentences of reasons and a policy section
-- [ ] `uv run -m agent CLM-1003` (claimed $3,800) ends in a state that follows the rules: `awaiting_sign_off` with no payment if approved over $1,000, `referred` if referred, otherwise `decided`
-- [ ] `docs/STATUS.md` is up to date
-- [ ] `npm run check` passes
+- [x] `npm run e2e` passes, and passes again on a second run (the database starts fresh each time)
+- [x] With `npm run dev` running, Run on CLM-1001 in the dashboard runs the agent on the real model. The claim page shows each step as it arrives, then a decision with two or three sentences of reasons and a policy section
+- [x] `uv run -m agent CLM-1003` (claimed $3,800) ends in a state that follows the rules: `awaiting_sign_off` with no payment if approved over $1,000, `referred` if referred, otherwise `decided`
+- [x] `docs/STATUS.md` is up to date
+- [x] `npm run check` passes
 
 The two live runs call the model in `MODEL_NAME`, or `openai/gpt-6-luna` by default, and cost a few cents. With `MODEL_NAME=openrouter/free` in `.env` they are free.
 
