@@ -13,6 +13,20 @@ from backend.models import Claim, ClaimSummary, Customer, Handler, Policy
 
 INSTRUCTIONS = Path(__file__).parent / "instructions.md"
 
+LIST_CLAIMS = """
+WITH latest AS (
+    SELECT claim_id, decision, payout FROM decisions
+    WHERE decision_id IN (SELECT MAX(decision_id) FROM decisions GROUP BY claim_id)
+)
+SELECT claims.data, claims.status, customers.data AS customer,
+    latest.decision, latest.payout, payments.amount AS paid
+FROM claims
+JOIN customers USING (customer_id)
+LEFT JOIN latest USING (claim_id)
+LEFT JOIN payments USING (claim_id)
+ORDER BY claim_id
+"""
+
 app = FastAPI(title="UnderCover")
 app.include_router(workflow.router)
 app.include_router(runner.router)
@@ -26,17 +40,17 @@ def health() -> dict[str, str]:
 
 @app.get("/api/claims", operation_id="list_claims")
 def list_claims(conn: Db) -> list[ClaimSummary]:
-    """List the claims queue with the state of each claim."""
-    rows = conn.execute(
-        "SELECT claims.data, claims.status, customers.data AS customer FROM claims"
-        " JOIN customers USING (customer_id) ORDER BY claim_id"
-    ).fetchall()
+    """List the claims queue with the state, latest decision and payment of each."""
+    rows = conn.execute(LIST_CLAIMS).fetchall()
     return [
         ClaimSummary.model_validate(
             json.loads(row["data"])
             | {
                 "status": row["status"],
                 "customer_name": json.loads(row["customer"])["name"],
+                "decision": row["decision"],
+                "payout": row["payout"],
+                "paid": row["paid"],
             }
         )
         for row in rows

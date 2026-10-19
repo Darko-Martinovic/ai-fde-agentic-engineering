@@ -123,7 +123,9 @@ Every operation has an `operation_id`, a one-line docstring and no optional inpu
 
 **Builds:** the dashboard's layout in the brand (Instrument Sans, Instrument Serif and JetBrains Mono from Google Fonts; the palette and surfaces in `docs/BRAND.md`, in light and dark mode), the queue page and the instructions page. Navigation uses the URL hash (`#/`, `#/claims/CLM-1001`, `#/instructions`), so no router library is needed.
 
-- **Queue:** a count for each state, then a table of claims with id, type, customer, amount claimed, submitted date and a state badge. The five states use Sea Green, Marigold, Coral, Cerulean and Raspberry in the brand's order, darkened for text on light backgrounds as the brand asks. It refreshes every few seconds so a running agent shows up. Each row opens the claim.
+- **Queue:** a tile for each state with its count, which filters the table when pressed; totals for the amount claimed, paid out and held for sign-off; search by claim, customer or type and a filter by type; then a sortable table of claims with id, type (with an icon), customer, submitted date, amount claimed, payout or decision, and a state badge. The five states each take one of the brand's five colors by meaning: Cerulean for waiting (information), Marigold for in progress, Coral for awaiting sign-off, Raspberry for referred (needs a handler) and Sea Green for decided, darkened for text on light backgrounds as the brand asks. It refreshes every few seconds so a running agent shows up. Each row opens the claim.
+- **Queue API:** `list_claims` also returns each claim's latest decision, payout and payment, for the payout column and the totals.
+- **Layout:** a top bar with the logo, the pages, whether the backend is up, and an Auto, Light or Dark theme switch that the browser remembers.
 - **Run queue and Stop:** above the table, a Run queue button starts the agent on every waiting claim and a Stop button ends the run. While the agent runs, the bar says which claim it is working on, and Run is disabled.
 - **Instructions:** the agent's instructions, read only, with the policy wording below them in a collapsed section.
 
@@ -131,12 +133,12 @@ Every operation has an `operation_id`, a one-line docstring and no optional inpu
 
 **Success criteria**
 
-- [ ] Vitest tests, with `fetch` stubbed, cover the counts, the table rows, the state badges, the empty and error states, Run queue and Stop, and the instructions page
-- [ ] In the browser through the Playwright MCP server, with `npm run dev` running: the queue shows 25 claims, all Waiting, and the instructions page shows the text from `backend/instructions.md`
-- [ ] In the browser: Run queue starts the agent and the bar names the claim being worked; Stop ends it, and that claim shows Waiting again
-- [ ] Screenshots in light and dark mode match the brand: fonts, page background, rounded panels with no outline, no one-edge borders, amounts like $1,150.00
-- [ ] The page works at phone width without scrolling sideways
-- [ ] `npm run check:ts` passes
+- [x] Vitest tests, with `fetch` stubbed, cover the counts, the table rows, the state badges, the empty and error states, Run queue and Stop, and the instructions page
+- [x] In the browser through the Playwright MCP server, with `npm run dev` running: the queue shows 25 claims, all Waiting, and the instructions page shows the text from `backend/instructions.md`
+- [x] In the browser: Run queue starts the agent and the bar names the claim being worked; Stop ends it, and that claim shows Waiting again
+- [x] Screenshots in light and dark mode match the brand: fonts, page background, rounded panels with no outline, no one-edge borders, amounts like $1,150.00
+- [x] The page works at phone width without scrolling sideways
+- [x] `npm run check:ts` passes
 
 ## Phase 5: Dashboard, the claim page
 
@@ -188,3 +190,4 @@ From the spec: the claims manual, sign-in, real payments and messages to custome
 
 1. **Run and Stop in the dashboard**, as well as the command line.
 2. **Handlers finish referred claims in the dashboard**, through the `referred` state and `resolve_referral`.
+3. **A richer, more colorful dashboard**: state tiles that filter, money totals, search, a type filter, sortable columns, type icons, a theme switch, a live timeline of the agent's steps, and the policy and customer beside each claim. Every change to the backend is added to the Postman collection.

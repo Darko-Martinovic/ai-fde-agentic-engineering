@@ -554,6 +554,40 @@
           ]
         },
         {
+          "name": "Queue shows CLM-1001 paid",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims"
+              ]
+            },
+            "description": "`list_claims` carries each claim's latest decision, payout and payment."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const row = pm.response.json().find((c) => c.claim_id === \"CLM-1001\");",
+                  "pm.test(\"approved and paid $420\", () => {",
+                  "    pm.expect(row.decision).to.eql(\"approve\");",
+                  "    pm.expect(row.paid).to.eql(420);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Start CLM-1002",
           "request": {
             "method": "POST",

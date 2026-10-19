@@ -14,6 +14,9 @@ def test_list_claims(client):
         "amount_claimed": 420.0,
         "submitted_on": "2026-06-24",
         "status": "waiting",
+        "decision": None,
+        "payout": None,
+        "paid": None,
     }
 
 

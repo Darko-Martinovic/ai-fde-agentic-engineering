@@ -54,9 +54,25 @@ def state(conn: sqlite3.Connection) -> AgentState:
     )
 
 
-def launch(mode: Literal["claim", "queue"], claim_ids: list[str]) -> None:
+def return_to_queue(conn: sqlite3.Connection) -> None:
+    """Put claims left in progress back to waiting, clearing unpaid decisions."""
+    with conn:
+        conn.execute(
+            "DELETE FROM decisions WHERE claim_id IN"
+            " (SELECT claim_id FROM claims WHERE status = 'in_progress')"
+        )
+        conn.execute(
+            "UPDATE claims SET status = 'waiting' WHERE status = 'in_progress'"
+        )
+
+
+def launch(
+    conn: sqlite3.Connection, mode: Literal["claim", "queue"], claim_ids: list[str]
+) -> None:
+    """Start a run, first returning any claim an earlier run left in progress."""
     if running():
         raise HTTPException(409, "The agent is already running")
+    return_to_queue(conn)
     RUN.process = start_process(claim_ids)
     RUN.mode = mode
 
@@ -73,7 +89,7 @@ def run_claim(claim_id: str, conn: Db) -> AgentState:
     claim = load_claim(conn, claim_id)
     if claim.status != "waiting":
         raise HTTPException(409, f"Claim {claim_id} is {claim.status}, not waiting")
-    launch("claim", [claim_id])
+    launch(conn, "claim", [claim_id])
     return state(conn)
 
 
@@ -85,7 +101,7 @@ def run_queue(conn: Db) -> AgentState:
     ).fetchone()[0]
     if waiting == 0:
         raise HTTPException(409, "No claims are waiting")
-    launch("queue", [])
+    launch(conn, "queue", [])
     return state(conn)
 
 
@@ -97,12 +113,5 @@ def stop_agent(conn: Db) -> AgentState:
         RUN.process.join(timeout=10)
     RUN.process = None
     RUN.mode = None
-    with conn:
-        conn.execute(
-            "DELETE FROM decisions WHERE claim_id IN"
-            " (SELECT claim_id FROM claims WHERE status = 'in_progress')"
-        )
-        conn.execute(
-            "UPDATE claims SET status = 'waiting' WHERE status = 'in_progress'"
-        )
+    return_to_queue(conn)
     return state(conn)
