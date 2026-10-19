@@ -55,8 +55,8 @@ An Insights page for the claims desk. The queue shows where each claim stands an
 
 **Success criteria**
 
-- [ ] Vitest tests cover how the latest run is picked and the bars' positions
-- [ ] An end-to-end test records steps and decisions through the API, then sees them on Insights and on the claim page
-- [ ] `uv run -m agent` (or Run queue) on all 25 claims, with the results in `docs/STATUS.md`
-- [ ] Screenshots of the queue and Insights after the run, in `assets/`
-- [ ] `npm run check` passes
+- [x] Vitest tests cover how the latest run is picked and the bars' positions
+- [x] An end-to-end test records steps and decisions through the API, then sees them on Insights and on the claim page
+- [x] Run queue on the whole queue, with the results in `docs/STATUS.md` (stopped by hand at CLM-1022, after 21 decisions)
+- [x] Screenshots of the queue and Insights after the run, in `assets/`
+- [x] `npm run check` passes

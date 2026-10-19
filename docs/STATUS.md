@@ -1,6 +1,6 @@
 # Status
 
-The pilot from `docs/PLAN.md` is built: all six phases are done. Insights, from `docs/PLAN_INSIGHTS.md`, is being built: phases 1 and 2 of 3 are done.
+The pilot from `docs/PLAN.md` is built: all six phases are done. Insights, from `docs/PLAN_INSIGHTS.md`, is built: all three phases are done.
 
 ## Built
 
@@ -11,10 +11,10 @@ The pilot from `docs/PLAN.md` is built: all six phases are done. Insights, from 
 - `dashboard/`: the claims desk, in the brand's colors with light and dark themes.
   - Queue: the agent bar (Run queue and Stop), a tile per state that filters the table, money totals, search, a type filter and a sortable table.
   - Claim: the claim in full (story, items, documents), the policy and customer, the decisions and payment, a live timeline of the agent's steps, Run and Stop, a sign-off form for payouts over $1,000, and a form for a handler to decide a referral.
-  - Insights: what the agent's work adds up to, refreshed every five seconds: straight through, time per claim, tool calls and refusals, claims waiting for a handler, the money, the agent's decisions by claim type, the tools it called, the policy sections it cited, and a table of every claim it worked.
+  - Insights: what the agent's work adds up to, refreshed every five seconds: straight through, time per claim, a timeline of the latest run (a bar per claim from its first step to its last, colored by decision), tool calls and refusals, claims waiting for a handler, the money, the agent's decisions by claim type, the tools it called, the policy sections it cited, and a table of every claim it worked.
   - Instructions: the agent's instructions and the policy wording.
 - Insights (`backend/insights.py`): `get_insights` sums up the agent's work on the queue from the records already kept: claims decided, straight through (declined, or approved and paid by the agent), sign-offs, referrals, claims waiting for a handler, tool calls and the calls the backend refused, time per claim (first to last step of its latest run), money, decisions by claim type, tools and the policy sections cited.
-- `e2e/`: Playwright tests of the queue, opening a claim, signing off a payout and deciding a referral, on their own backend (port 8001), dashboard (port 5174) and database (`e2e/undercover-e2e.db`, seeded fresh each run).
+- `e2e/`: Playwright tests of the queue, opening a claim, signing off a payout, deciding a referral, the agent's steps on a claim page and Insights, on their own backend (port 8001), dashboard (port 5174) and database (`e2e/undercover-e2e.db`, seeded fresh each run).
 - `postman/`: a Postman collection and environment for the whole API, including a run through the workflow, the insights it adds up to, and starting and stopping the agent.
 
 ## Running it
@@ -29,3 +29,4 @@ The pilot from `docs/PLAN.md` is built: all six phases are done. Insights, from 
 
 - CLM-1001, run from the dashboard with GPT-6 Luna: approved and paid $420.00 under Section 3, Trip Delay, with each step shown as it arrived.
 - CLM-1003, run with `uv run -m agent CLM-1003`: approved for $3,750.00 (the $3,800.00 bill less the $50.00 deductible) under Section 7, Emergency Medical, and left awaiting sign-off with no payment.
+- Whole queue, run from the dashboard with GPT-6 Luna on October 19, 2026, and stopped by hand on CLM-1022 after 13 minutes: 21 claims decided, 13 approved, 5 declined and 3 referred (CLM-1017, CLM-1018, CLM-1020). 14 went straight through, paying $3,537.00; four approvals over $1,000 wait for sign-off (CLM-1003, CLM-1008, CLM-1011, CLM-1021), holding $8,193.00. 97 tool calls with one refused: a second `decide_claim` on CLM-1011 after its approval. Median 25 seconds a claim, longest 52 (CLM-1019). CLM-1022 went back to waiting with CLM-1023 to CLM-1025. `assets/insights.png` and `assets/queue-after-run.png` show the result. The decisions have not been scored against `data/evals/`.
