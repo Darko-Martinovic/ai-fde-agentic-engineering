@@ -21,6 +21,8 @@ Run from the repo root. Python always goes through `uv run`, never `python`/`pyt
 | TypeScript checks: prettier, ESLint, tsc, vitest with 80% coverage | `npm run check:ts` |
 | End-to-end tests (starts backend and dashboard itself, or reuses running ones) | `npm run e2e` |
 | Format everything | `npm run format` |
+| Run the agent on one claim, or on every waiting claim (calls the model) | `uv run -m agent CLM-1001`, `uv run -m agent` |
+| Reset the database to `data/` | `uv run -m backend.seed` |
 | One Python test | `uv run pytest agent/tests/test_agent.py::test_run --no-cov` |
 | One vitest file | `npx vitest run --root dashboard src/App.test.tsx` |
 | One Playwright test | `npx playwright test e2e/health.spec.ts` |
@@ -34,7 +36,8 @@ The pre-commit hook runs `check:python` when `backend/` or `agent/` files are st
 The product is three parts that talk only over HTTP, plus e2e tests:
 
 - `backend/main.py`: FastAPI app (`backend.main:app`). Every route under `/api` has an `operation_id`, a one-line docstring and no optional inputs (`docs/TECH_STACK.md`), because the agent's tools are built against this API. SQLite is the store until Week 2 Day 3 moves to Supabase. `backend/workflow.py` holds the claim states and the $1,000 sign-off rule: the backend enforces them, so the agent can't bypass them. `backend/api.py` has what routes share (the per-request database, `load_claim`).
-- `agent/main.py`: the UnderCover Agent, LangChain `create_agent` on OpenRouter via `ChatOpenAI` with `base_url` set to OpenRouter. The single entry point is `run(claim_id, thread_id, llm=None)`. The agent reaches claims and its instructions only through the backend API (`backend()` returns an `httpx.Client` on `localhost:8000`), never by reading `data/` or the database directly. The model is `MODEL_NAME` from `.env` if set (for example `openrouter/free`), otherwise `openai/gpt-6-luna` with low reasoning effort.
+- `agent/main.py`: the UnderCover Agent, LangChain `create_agent` on OpenRouter via `ChatOpenAI` with `base_url` set to OpenRouter. The entry point is `run(claim_id, thread_id, llm=None)`: it starts the claim, builds the system prompt from `GET /api/instructions` plus `GET /api/policy-wording`, streams the agent and posts every tool call, tool result and reply to `record_step`. Each tool is one API call, and a refused call (4xx) comes back to the model as text instead of raising. The agent reaches claims only through the backend API (`backend()` returns an `httpx.Client` on `localhost:8000`), never by reading `data/` or the database directly. The model is `MODEL_NAME` from `.env` if set (for example `openrouter/free`), otherwise `openai/gpt-6-luna` with low reasoning effort. `agent/__main__.py` is the command line.
+- `backend/runner.py`: the dashboard's Run and Stop. It starts `agent.__main__.main` in a separate process (multiprocessing, spawn), one run at a time, and Stop terminates that process and puts any `in_progress` claim back to `waiting`, clearing its unpaid decision. Tests replace `start_process` with a fake, so no model is called.
 - `dashboard/`: React + Vite + TypeScript (strict, no `any`). Vite proxies `/api` to `127.0.0.1:8000`, so the dashboard calls relative `/api/...` URLs.
 - `e2e/`: Playwright against `localhost:5173`; `playwright.config.ts` launches both servers.
 

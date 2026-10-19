@@ -93,5 +93,9 @@ def test_operations_are_documented(client):
         "pay_claim",
         "sign_off_claim",
         "resolve_referral",
+        "get_agent",
+        "run_claim",
+        "run_queue",
+        "stop_agent",
     }
     assert all(op["summary"] and op["description"] for op in operations)

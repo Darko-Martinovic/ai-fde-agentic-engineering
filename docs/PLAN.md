@@ -109,15 +109,15 @@ Every operation has an `operation_id`, a one-line docstring and no optional inpu
 
 **Success criteria**
 
-- [ ] Agent tests use a stub model (no model calls) and the real backend in process, on a temporary database
-- [ ] A stub run on CLM-1001 that reads the claim, approves $420 and pays it leaves the claim `decided`, paid, with every tool call and the final reply in `list_steps`
-- [ ] A stub run that approves CLM-1002 for $1,150 and then calls `pay_claim` leaves the claim `awaiting_sign_off` with no payment; the tool returns the backend's refusal to the model instead of crashing the run
-- [ ] A test checks the system prompt holds both the instructions and the policy wording
-- [ ] A test of the command line runs one claim and the whole queue with the stub model
-- [ ] Tests of `run_claim`, `run_queue`, `get_agent` and `stop_agent`, with the child process replaced by a stand-in: a second run while one is going returns 409, a run on a claim that isn't waiting returns 409, and a stop puts the claim back to `waiting`
-- [ ] With `npm run dev` running, `POST /api/agent/claims/CLM-1001` then `POST /api/agent/stop` within a few seconds leaves CLM-1001 `waiting`, with the steps recorded so far
-- [ ] `MODEL_NAME` still overrides the default model (existing test kept)
-- [ ] `npm run check:python` passes
+- [x] Agent tests use a stub model (no model calls) and the real backend in process, on a temporary database
+- [x] A stub run on CLM-1001 that reads the claim, approves $420 and pays it leaves the claim `decided`, paid, with every tool call and the final reply in `list_steps`
+- [x] A stub run that approves CLM-1002 for $1,150 and then calls `pay_claim` leaves the claim `awaiting_sign_off` with no payment; the tool returns the backend's refusal to the model instead of crashing the run
+- [x] A test checks the system prompt holds both the instructions and the policy wording
+- [x] A test of the command line runs one claim and the whole queue with the stub model
+- [x] Tests of `run_claim`, `run_queue`, `get_agent` and `stop_agent`, with the child process replaced by a stand-in: a second run while one is going returns 409, a run on a claim that isn't waiting returns 409, and a stop puts the claim back to `waiting`
+- [x] With `npm run dev` running, `POST /api/agent/claims/CLM-1001` then `POST /api/agent/stop` within a few seconds leaves CLM-1001 `waiting`, with the steps recorded so far
+- [x] `MODEL_NAME` still overrides the default model (existing test kept)
+- [x] `npm run check:python` passes
 
 ## Phase 4: Dashboard, the queue and the instructions
 
