@@ -59,3 +59,17 @@ export function pretty(text: string): string {
     return text;
   }
 }
+
+/** Write a span of time as seconds, or minutes and seconds. */
+export function duration(seconds: number): string {
+  const whole = Math.round(seconds);
+  if (whole < 60) return `${String(whole)} s`;
+  const minutes = String(Math.floor(whole / 60));
+  const rest = whole % 60;
+  return rest === 0 ? `${minutes} min` : `${minutes} min ${String(rest)} s`;
+}
+
+export function percent(part: number, whole: number): string {
+  if (whole === 0) return "—";
+  return `${String(Math.round((part / whole) * 100))}%`;
+}

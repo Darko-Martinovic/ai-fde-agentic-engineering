@@ -44,10 +44,10 @@ An Insights page for the claims desk. The queue shows where each claim stands an
 
 **Success criteria**
 
-- [ ] Vitest tests cover the page with data, the empty state before the agent has worked a claim, and an error from the backend
-- [ ] The stacked bars for a type add up to the claims of that type the agent decided
-- [ ] The page reads well in light and dark, checked in the browser with the Playwright MCP server
-- [ ] `npm run check:ts` passes
+- [x] Vitest tests cover the page with data, the empty state before the agent has worked a claim, and an error from the backend
+- [x] The stacked bars for a type add up to the claims of that type the agent decided
+- [x] The page reads well in light and dark, checked in the browser with the Playwright MCP server
+- [x] `npm run check:ts` passes
 
 ## Phase 3: the run timeline, a full run, and the end-to-end tests
 

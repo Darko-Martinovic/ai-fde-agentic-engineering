@@ -18,10 +18,11 @@ afterEach(() => {
 });
 
 describe("parseRoute", () => {
-  it("knows the three pages", () => {
+  it("knows the four pages", () => {
     expect(parseRoute("")).toEqual({ page: "queue" });
     expect(parseRoute("#/")).toEqual({ page: "queue" });
     expect(parseRoute("#/instructions")).toEqual({ page: "instructions" });
+    expect(parseRoute("#/insights")).toEqual({ page: "insights" });
     expect(parseRoute("#/claims/CLM-1001")).toEqual({
       page: "claim",
       claimId: "CLM-1001",

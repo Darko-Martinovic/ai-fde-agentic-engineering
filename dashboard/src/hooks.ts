@@ -57,12 +57,14 @@ export function usePoll<T>(load: Loader<T>, interval: number | null): Poll<T> {
 export type Route =
   | { page: "queue" }
   | { page: "claim"; claimId: string }
-  | { page: "instructions" };
+  | { page: "instructions" }
+  | { page: "insights" };
 
 export function parseRoute(hash: string): Route {
   const claim = /^#\/claims\/([\w-]+)$/.exec(hash);
   if (claim?.[1]) return { page: "claim", claimId: claim[1] };
   if (hash === "#/instructions") return { page: "instructions" };
+  if (hash === "#/insights") return { page: "insights" };
   return { page: "queue" };
 }
 

@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { App } from "./App";
-import { IDLE, QUEUE, claim, mockFetch } from "./testing";
+import { IDLE, INSIGHTS, QUEUE, claim, mockFetch } from "./testing";
 
 const ROUTES = {
   "GET /api/health": { status: "ok" },
@@ -10,6 +10,7 @@ const ROUTES = {
   "GET /api/claims/CLM-1001": claim(),
   "GET /api/instructions": "# UnderCover Agent\n\nDecide claims.",
   "GET /api/policy-wording": "# Policy Wording",
+  "GET /api/insights": INSIGHTS,
 };
 
 afterEach(() => {
@@ -45,6 +46,13 @@ it("moves between pages", async () => {
     screen
       .getByRole("link", { name: "Instructions" })
       .getAttribute("aria-current"),
+  ).toBe("page");
+
+  window.location.hash = "#/insights";
+  fireEvent(window, new HashChangeEvent("hashchange"));
+  expect(await screen.findByText("Straight through")).toBeDefined();
+  expect(
+    screen.getByRole("link", { name: "Insights" }).getAttribute("aria-current"),
   ).toBe("page");
 
   window.location.hash = "#/claims/CLM-1001";

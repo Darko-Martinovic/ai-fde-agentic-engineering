@@ -1191,3 +1191,158 @@ main {
   background: var(--panel-soft);
   font-size: 12.5px;
 }
+
+/* Insights */
+
+.stat-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.stat-tiles div {
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.stat-tiles dt {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.stat-tiles dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.stat-tiles dd.stat-tiles__note {
+  margin-top: 4px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+.tone--approve {
+  --tone: var(--sea-green);
+  --tone-text: var(--midnight);
+}
+
+.tone--decline {
+  --tone: var(--coral);
+  --tone-text: var(--midnight);
+}
+
+.tone--refer {
+  --tone: var(--marigold);
+  --tone-text: var(--midnight);
+}
+
+.tone--calls {
+  --tone: var(--cerulean);
+  --tone-text: #ffffff;
+}
+
+.tone--refused {
+  --tone: var(--raspberry);
+  --tone-text: #ffffff;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.legend li::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 3px;
+  background: var(--tone);
+}
+
+.bars {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bars li {
+  display: grid;
+  grid-template-columns: minmax(120px, 210px) minmax(0, 1fr) 3ch;
+  align-items: center;
+  gap: 12px;
+}
+
+.bars__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar {
+  display: flex;
+  gap: 2px;
+  height: 22px;
+}
+
+.bar__segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  border-radius: 6px;
+  background: var(--tone);
+  color: var(--tone-text);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bars__note {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink-soft);
+  text-align: right;
+}
+
+@media (max-width: 640px) {
+  .insights-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bars li {
+    grid-template-columns: minmax(0, 1fr) 3ch;
+    gap: 4px 12px;
+  }
+
+  .bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

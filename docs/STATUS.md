@@ -1,6 +1,6 @@
 # Status
 
-The pilot from `docs/PLAN.md` is built: all six phases are done. Insights, from `docs/PLAN_INSIGHTS.md`, is being built: phase 1 of 3 is done.
+The pilot from `docs/PLAN.md` is built: all six phases are done. Insights, from `docs/PLAN_INSIGHTS.md`, is being built: phases 1 and 2 of 3 are done.
 
 ## Built
 
@@ -11,6 +11,7 @@ The pilot from `docs/PLAN.md` is built: all six phases are done. Insights, from 
 - `dashboard/`: the claims desk, in the brand's colors with light and dark themes.
   - Queue: the agent bar (Run queue and Stop), a tile per state that filters the table, money totals, search, a type filter and a sortable table.
   - Claim: the claim in full (story, items, documents), the policy and customer, the decisions and payment, a live timeline of the agent's steps, Run and Stop, a sign-off form for payouts over $1,000, and a form for a handler to decide a referral.
+  - Insights: what the agent's work adds up to, refreshed every five seconds: straight through, time per claim, tool calls and refusals, claims waiting for a handler, the money, the agent's decisions by claim type, the tools it called, the policy sections it cited, and a table of every claim it worked.
   - Instructions: the agent's instructions and the policy wording.
 - Insights (`backend/insights.py`): `get_insights` sums up the agent's work on the queue from the records already kept: claims decided, straight through (declined, or approved and paid by the agent), sign-offs, referrals, claims waiting for a handler, tool calls and the calls the backend refused, time per claim (first to last step of its latest run), money, decisions by claim type, tools and the policy sections cited.
 - `e2e/`: Playwright tests of the queue, opening a claim, signing off a payout and deciding a referral, on their own backend (port 8001), dashboard (port 5174) and database (`e2e/undercover-e2e.db`, seeded fresh each run).
