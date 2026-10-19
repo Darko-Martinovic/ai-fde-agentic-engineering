@@ -307,6 +307,548 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Workflow",
+      "description": "Moves CLM-1001, CLM-1002 and CLM-1010 through the queue, so it changes the data. Run `uv run -m backend.seed` first to start from fresh data.",
+      "item": [
+        {
+          "name": "Start CLM-1001",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1001/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1001",
+                "start"
+              ]
+            },
+            "description": "`start_claim`: waiting to in_progress.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const claim = pm.response.json();",
+                  "pm.test(\"claim is in_progress\", () => pm.expect(claim.status).to.eql(\"in_progress\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record a step on CLM-1001",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1001/steps",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1001",
+                "steps"
+              ]
+            },
+            "description": "`record_step`: one step the agent took.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"thread_id\": \"postman-1\",\n  \"kind\": \"tool_call\",\n  \"text\": \"get_claim CLM-1001\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"kind is tool_call\", () => pm.expect(pm.response.json().kind).to.eql(\"tool_call\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List steps on CLM-1001",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1001/steps",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1001",
+                "steps"
+              ]
+            },
+            "description": "`list_steps`: the steps in order."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has steps\", () => pm.expect(pm.response.json()).to.be.an(\"array\").that.is.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve CLM-1001 for $420",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1001/decision",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1001",
+                "decision"
+              ]
+            },
+            "description": "`decide_claim`: an approval at or under $1,000 stays in progress until it is paid.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"approve\",\n  \"payout\": 420,\n  \"reasons\": \"The agent's reasons, in two or three sentences.\",\n  \"policy_section\": \"Section 3, Trip Delay\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const claim = pm.response.json();",
+                  "pm.test(\"claim is in_progress\", () => pm.expect(claim.status).to.eql(\"in_progress\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pay CLM-1001 $420",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1001/payment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1001",
+                "payment"
+              ]
+            },
+            "description": "`pay_claim`: pays the approved payout.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 420\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const claim = pm.response.json();",
+                  "pm.test(\"claim is decided\", () => pm.expect(claim.status).to.eql(\"decided\"));",
+                  "pm.test(\"paid by the agent\", () => pm.expect(claim.payment.authorized_by).to.eql(\"agent\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pay CLM-1001 again",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1001/payment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1001",
+                "payment"
+              ]
+            },
+            "description": "A second payment is refused.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 420\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"refused\", () => pm.expect(pm.response.json().detail).to.eql(\"Claim CLM-1001 is already paid\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start CLM-1002",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1002/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1002",
+                "start"
+              ]
+            },
+            "description": "`start_claim`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const claim = pm.response.json();",
+                  "pm.test(\"claim is in_progress\", () => pm.expect(claim.status).to.eql(\"in_progress\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve CLM-1002 for $1,150",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1002/decision",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1002",
+                "decision"
+              ]
+            },
+            "description": "`decide_claim`: an approval over $1,000 waits for sign-off.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"approve\",\n  \"payout\": 1150,\n  \"reasons\": \"The agent's reasons, in two or three sentences.\",\n  \"policy_section\": \"Section 5, Baggage and Personal Effects\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const claim = pm.response.json();",
+                  "pm.test(\"claim is awaiting_sign_off\", () => pm.expect(claim.status).to.eql(\"awaiting_sign_off\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pay CLM-1002 without sign-off",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1002/payment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1002",
+                "payment"
+              ]
+            },
+            "description": "`pay_claim` is refused over $1,000, even if the agent tries.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1150\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"refused\", () => pm.expect(pm.response.json().detail).to.eql(\"A payout over $1,000.00 waits for a handler's sign-off\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sign off CLM-1002 as Dana Whitfield",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1002/sign-off",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1002",
+                "sign-off"
+              ]
+            },
+            "description": "`sign_off_claim`: a handler releases the payment.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"handler_id\": \"HND-01\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const claim = pm.response.json();",
+                  "pm.test(\"claim is decided\", () => pm.expect(claim.status).to.eql(\"decided\"));",
+                  "pm.test(\"paid on sign-off\", () => pm.expect(claim.payment.authorized_by).to.eql(\"HND-01\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start CLM-1010",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1010/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1010",
+                "start"
+              ]
+            },
+            "description": "`start_claim`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const claim = pm.response.json();",
+                  "pm.test(\"claim is in_progress\", () => pm.expect(claim.status).to.eql(\"in_progress\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refer CLM-1010",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1010/decision",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1010",
+                "decision"
+              ]
+            },
+            "description": "`decide_claim`: a referral waits for a handler.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"refer\",\n  \"payout\": 0,\n  \"reasons\": \"The agent's reasons, in two or three sentences.\",\n  \"policy_section\": \"Section 7, Emergency Medical\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const claim = pm.response.json();",
+                  "pm.test(\"claim is referred\", () => pm.expect(claim.status).to.eql(\"referred\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resolve CLM-1010 as Marcus Oyelaran",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1010/resolution",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1010",
+                "resolution"
+              ]
+            },
+            "description": "`resolve_referral`: a handler approves the referred claim, which pays it.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"handler_id\": \"HND-02\",\n  \"decision\": \"approve\",\n  \"payout\": 1350,\n  \"reasons\": \"The handler's reasons.\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const claim = pm.response.json();",
+                  "pm.test(\"claim is decided\", () => pm.expect(claim.status).to.eql(\"decided\"));",
+                  "pm.test(\"both decisions kept\", () => pm.expect(claim.decisions).to.have.lengthOf(2));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

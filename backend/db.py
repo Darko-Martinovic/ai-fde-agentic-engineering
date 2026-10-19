@@ -18,6 +18,30 @@ CREATE TABLE IF NOT EXISTS policies (policy_id TEXT PRIMARY KEY, data TEXT NOT N
 CREATE TABLE IF NOT EXISTS customers (customer_id TEXT PRIMARY KEY, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS handlers (handler_id TEXT PRIMARY KEY, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS settings (name TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS steps (
+    step_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    claim_id TEXT NOT NULL,
+    thread_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    text TEXT NOT NULL,
+    recorded_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS decisions (
+    decision_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    claim_id TEXT NOT NULL,
+    decided_by TEXT NOT NULL,
+    decision TEXT NOT NULL,
+    payout REAL NOT NULL,
+    reasons TEXT NOT NULL,
+    policy_section TEXT,
+    decided_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS payments (
+    claim_id TEXT PRIMARY KEY,
+    amount REAL NOT NULL,
+    authorized_by TEXT NOT NULL,
+    paid_at TEXT NOT NULL
+);
 """
 
 
