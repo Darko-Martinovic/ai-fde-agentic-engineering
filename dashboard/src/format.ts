@@ -50,3 +50,12 @@ export function humanize(code: string): string {
   const words = code.replaceAll("_", " ");
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
+
+/** Indent JSON for reading, or return other text as it is. */
+export function pretty(text: string): string {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
+  }
+}

@@ -1,6 +1,6 @@
 # Status
 
-The pilot is being built from `docs/PLAN.md`. Phases 1 to 4 of 6 are done.
+The pilot is being built from `docs/PLAN.md`. Phases 1 to 5 of 6 are done.
 
 ## Built
 
@@ -8,7 +8,7 @@ The pilot is being built from `docs/PLAN.md`. Phases 1 to 4 of 6 are done.
 - The claim workflow (`backend/workflow.py`): `start_claim`, `record_step`, `list_steps`, `decide_claim`, `pay_claim`, `sign_off_claim` and `resolve_referral`. A claim moves from `waiting` to `in_progress`, then to `awaiting_sign_off` (approved over $1,000), `referred` or `decided`. A payment over $1,000 is refused until a handler signs off, and a referral waits for a handler to approve or decline it. Payments are recorded, not made.
 - `agent/`: the UnderCover Agent. It reads the claim, the policy and the customer through the API, decides by the policy wording in its prompt, records its decision, and pays approvals of $1,000 or less. Every tool call, tool result and reply is recorded as a step. A refused payment comes back to the agent as text.
 - Running the agent (`backend/runner.py`): `run_claim`, `run_queue`, `get_agent` and `stop_agent` start the agent as a separate process, one run at a time. Stop ends it at once and puts the claim being worked back to `waiting`, keeping its steps.
-- `dashboard/`: the claims desk, in the brand's colors with light and dark themes. The queue page has the agent bar (Run queue and Stop), a tile per state that filters the table, money totals, search, a type filter and a sortable table. The instructions page shows the agent's instructions and the policy wording. The claim page shows the claim's heading for now.
+- `dashboard/`: the claims desk, in the brand's colors with light and dark themes. The queue page has the agent bar (Run queue and Stop), a tile per state that filters the table, money totals, search, a type filter and a sortable table. The instructions page shows the agent's instructions and the policy wording. The claim page shows the claim in full (story, items, documents), the policy and customer, the decisions and payment, a live timeline of the agent's steps, Run and Stop, a sign-off form for payouts over $1,000, and a form for a handler to decide a referral.
 - `e2e/`: one test of that page.
 - `postman/`: a Postman collection and environment for the API, including a run through the workflow and starting and stopping the agent.
 

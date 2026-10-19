@@ -144,21 +144,21 @@ Every operation has an `operation_id`, a one-line docstring and no optional inpu
 
 **Builds:** the claim page.
 
-- The claim in full: summary, story, items, documents, the policy with its plan, and the customer's earlier claims.
+- The claim in full: summary, story, items with their total, documents, the policy with its plan's limits and add-ons, and the customer's earlier claims.
 - The decision: approve, decline or refer, the payout, the reasons and the policy section, and the payment once made.
-- The agent's steps in order, refreshing every two seconds while the claim is `in_progress`.
+- The agent's steps as a timeline, refreshing every two seconds while the claim is `in_progress`: each tool call with its arguments, each result (JSON indented, refusals highlighted) and the agent's replies.
 - For a claim `awaiting_sign_off`: a handler picker and a Sign off button that calls `sign_off_claim` and shows the payment.
 - For a `referred` claim: the agent's reasons, then a form with a handler picker, approve or decline, the payout and the handler's reasons, which calls `resolve_referral`.
 - Run and Stop buttons: Run starts the agent on this claim when it is waiting and no run is going; Stop ends the run.
 
 **Success criteria**
 
-- [ ] Vitest tests cover a waiting claim, a decided claim with its reasons and section, a claim with steps, the refresh while in progress, a sign-off that shows the payment, a referral resolved by a handler, and Run and Stop
-- [ ] In the browser: CLM-1001 shows its story, three items and four documents
-- [ ] In the browser, after approving CLM-1002 for $1,150 through the API: the page shows Awaiting sign-off, signing off as Dana Whitfield moves it to Decided with a $1,150.00 payment, and the queue's counts change to match
-- [ ] In the browser, after referring CLM-1010 through the API: the page shows Referred with the agent's reasons, and approving it as Marcus Oyelaran for $1,350.00 moves it to Decided with the payment
-- [ ] In the browser: Run on CLM-1001 shows the steps arriving; Stop ends the run and the claim shows Waiting
-- [ ] `npm run check:ts` passes
+- [x] Vitest tests cover a waiting claim, a decided claim with its reasons and section, a claim with steps, the refresh while in progress, a sign-off that shows the payment, a referral resolved by a handler, and Run and Stop
+- [x] In the browser: CLM-1001 shows its story, three items and four documents
+- [x] In the browser, after approving CLM-1002 for $1,150 through the API: the page shows Awaiting sign-off, signing off as Dana Whitfield moves it to Decided with a $1,150.00 payment, and the queue's counts change to match
+- [x] In the browser, after referring CLM-1010 through the API: the page shows Referred with the agent's reasons, and approving it as Marcus Oyelaran for $1,350.00 moves it to Decided with the payment
+- [x] In the browser: Run on CLM-1001 shows the steps arriving; Stop ends the run and the claim shows Waiting
+- [x] `npm run check:ts` passes
 
 ## Phase 6: End-to-end tests and a live run
 
