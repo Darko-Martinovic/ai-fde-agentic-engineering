@@ -65,6 +65,9 @@ labs/*_desk/
 # Claude Code's local settings
 .claude/settings.local.json
 
+# Tracked here even though a global git ignore may exclude it
+!CLAUDE.md
+
 # Editors and operating systems
 .vscode/*
 !.vscode/extensions.json
