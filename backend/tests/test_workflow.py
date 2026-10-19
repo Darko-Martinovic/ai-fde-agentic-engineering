@@ -250,3 +250,19 @@ def test_resolve_by_unknown_handler(client):
 def test_handler_cannot_refer(client):
     referred(client, "CLM-1010")
     assert resolve(client, "CLM-1010", "HND-02", "refer", 0).status_code == 422
+
+
+def test_queue_shows_decisions_and_payments(client):
+    approved(client, "CLM-1001", 420)
+    pay(client, "CLM-1001", 420)
+    approved(client, "CLM-1002", 1150)
+    referred(client, "CLM-1010")
+    resolve(client, "CLM-1010", "HND-02", "decline", 0)
+    queue = {c["claim_id"]: c for c in client.get("/api/claims").json()}
+    assert (queue["CLM-1001"]["decision"], queue["CLM-1001"]["paid"]) == (
+        "approve",
+        420,
+    )
+    assert (queue["CLM-1002"]["payout"], queue["CLM-1002"]["paid"]) == (1150, None)
+    assert queue["CLM-1010"]["decision"] == "decline"
+    assert queue["CLM-1003"]["decision"] is None

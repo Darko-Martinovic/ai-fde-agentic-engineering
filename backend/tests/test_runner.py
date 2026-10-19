@@ -131,3 +131,11 @@ def test_stop_keeps_decided_claims(client):
     claim = client.get("/api/claims/CLM-1002").json()
     assert claim["status"] == "awaiting_sign_off"
     assert len(claim["decisions"]) == 1
+
+
+def test_a_run_returns_claims_left_in_progress(client):
+    client.post("/api/claims/CLM-1004/start")
+    client.post("/api/agent/queue")
+    assert client.get("/api/claims/CLM-1004").json()["status"] == "waiting"
+    client.post("/api/claims/CLM-1001/start")
+    assert client.get("/api/agent").json()["claim_id"] == "CLM-1001"

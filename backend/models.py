@@ -95,6 +95,9 @@ class ClaimSummary(BaseModel):
     amount_claimed: float
     submitted_on: date
     status: ClaimStatus
+    decision: Literal["approve", "decline", "refer"] | None
+    payout: float | None
+    paid: float | None
 
 
 class Claim(BaseModel):
