@@ -1,0 +1,312 @@
+{
+  "info": {
+    "name": "UnderCover API",
+    "description": "The UnderCover backend's API. Pick the UnderCover local environment, start the backend with `npm run dev`, then send a request or run the whole collection.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "health"
+          ]
+        },
+        "description": "`health`: check that the backend is running."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"is ok\", () => pm.expect(pm.response.json().status).to.eql(\"ok\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Claims",
+      "item": [
+        {
+          "name": "List claims",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims"
+              ]
+            },
+            "description": "`list_claims`: the queue with the state of each claim."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const claims = pm.response.json();",
+                  "pm.test(\"25 claims\", () => pm.expect(claims).to.have.lengthOf(25));",
+                  "pm.test(\"first claim is CLM-1001 for Maya Patel\", () => {",
+                  "    pm.expect(claims[0].claim_id).to.eql(\"CLM-1001\");",
+                  "    pm.expect(claims[0].customer_name).to.eql(\"Maya Patel\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get claim",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/{{claimId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "{{claimId}}"
+              ]
+            },
+            "description": "`get_claim`: one claim in full, with the story, items and documents."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const claim = pm.response.json();",
+                  "pm.test(\"claim id matches\", () => pm.expect(claim.claim_id).to.eql(pm.environment.get(\"claimId\")));",
+                  "pm.test(\"has items and documents\", () => {",
+                  "    pm.expect(claim.items).to.be.an(\"array\").that.is.not.empty;",
+                  "    pm.expect(claim.documents).to.be.an(\"array\").that.is.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get claim, unknown",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-9999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-9999"
+              ]
+            },
+            "description": "An unknown claim returns 404."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"says not found\", () => pm.expect(pm.response.json().detail).to.eql(\"Claim CLM-9999 not found\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Policies, customers and handlers",
+      "item": [
+        {
+          "name": "Get policy",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/policies/{{policyId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "policies",
+                "{{policyId}}"
+              ]
+            },
+            "description": "`get_policy`: one policy with its plan's limits and its add-ons."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const policy = pm.response.json();",
+                  "pm.test(\"policy id matches\", () => pm.expect(policy.policy_id).to.eql(pm.environment.get(\"policyId\")));",
+                  "pm.test(\"has the plan's limits\", () => pm.expect(policy.plan).to.have.property(\"deductible\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get customer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/customers/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                "{{customerId}}"
+              ]
+            },
+            "description": "`get_customer`: one customer with their claim history."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const customer = pm.response.json();",
+                  "pm.test(\"customer id matches\", () => pm.expect(customer.customer_id).to.eql(pm.environment.get(\"customerId\")));",
+                  "pm.test(\"has a claim history\", () => pm.expect(customer.previous_claims).to.be.an(\"array\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List handlers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/handlers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "handlers"
+              ]
+            },
+            "description": "`list_handlers`: the claims handlers."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"three handlers\", () => pm.expect(pm.response.json()).to.have.lengthOf(3));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "item": [
+        {
+          "name": "Get policy wording",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/policy-wording",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "policy-wording"
+              ]
+            },
+            "description": "`get_policy_wording`: the policy wording as Markdown."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"is the policy wording\", () => pm.expect(pm.response.text()).to.include(\"# UnderCover Travel Insurance: Policy Wording\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get instructions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/instructions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "instructions"
+              ]
+            },
+            "description": "`get_instructions`: the UnderCover Agent's instructions as Markdown."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"is the agent's instructions\", () => pm.expect(pm.response.text()).to.include(\"# UnderCover Agent\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
