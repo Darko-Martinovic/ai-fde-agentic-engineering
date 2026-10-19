@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Remotes
 
-`origin` (`Darko-Martinovic/undercover`, a fork of `ed-donner/undercover`) is the only remote; the student removed Ed's repo. `gh` defaults to the fork, so PRs open there. Ed's day branches aren't available locally: if `AGENTS.md` calls for one, or for pulling Ed's updates, ask the student before adding `https://github.com/ed-donner/undercover.git` back as `upstream`. `docs/PROCESS.md` says never push; push only when the student asks.
+`origin` is the student's fork (`Darko-Martinovic/undercover`) and `upstream` is Ed's repo (`ed-donner/undercover`), so Ed's day branches are `upstream/<branch>` after `git fetch upstream`. `gh` defaults to the fork, so PRs open there; a contribution to Ed's repo goes through `community_contributions/` as `guides/for_agents/AGENT_GIT_GUIDE.md` describes, with `gh pr create --repo ed-donner/undercover`. `docs/PROCESS.md` says never push; push only when the student asks.
 
 ## Commands
 
