@@ -849,6 +849,241 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Agent",
+      "description": "Starts and stops the UnderCover Agent. Run CLM-1003 calls the model for a moment before Stop ends it.",
+      "item": [
+        {
+          "name": "Get agent",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "agent"
+              ]
+            },
+            "description": "`get_agent`: whether the agent is running, and on which claim."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const agent = pm.response.json();",
+                  "pm.test(\"running is false\", () => pm.expect(agent.running).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Run CLM-1001, already decided",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent/claims/CLM-1001",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "agent",
+                "claims",
+                "CLM-1001"
+              ]
+            },
+            "description": "`run_claim` is refused for a claim that isn't waiting. Run after the Workflow folder, which decides CLM-1001.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"refused\", () => pm.expect(pm.response.json().detail).to.eql(\"Claim CLM-1001 is decided, not waiting\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Run CLM-1003",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent/claims/CLM-1003",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "agent",
+                "claims",
+                "CLM-1003"
+              ]
+            },
+            "description": "`run_claim`: starts the agent on one waiting claim. This calls the model in MODEL_NAME, or GPT-6 Luna by default; the next requests stop it within a second.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const agent = pm.response.json();",
+                  "pm.test(\"running is true\", () => pm.expect(agent.running).to.eql(true));",
+                  "pm.test(\"mode is claim\", () => pm.expect(agent.mode).to.eql(\"claim\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Run the queue while running",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent/queue",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "agent",
+                "queue"
+              ]
+            },
+            "description": "`run_queue` is refused while a run is going.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"refused\", () => pm.expect(pm.response.json().detail).to.eql(\"The agent is already running\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stop",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent/stop",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "agent",
+                "stop"
+              ]
+            },
+            "description": "`stop_agent`: ends the run and puts the claim being worked back to waiting, keeping its steps.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const agent = pm.response.json();",
+                  "pm.test(\"running is false\", () => pm.expect(agent.running).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CLM-1003 is waiting again",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1003",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1003"
+              ]
+            },
+            "description": "After a stop, the claim is back in the queue with no decision."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const claim = pm.response.json();",
+                  "pm.test(\"claim is waiting\", () => pm.expect(claim.status).to.eql(\"waiting\"));",
+                  "pm.test(\"no decision\", () => pm.expect(claim.decisions).to.be.empty);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }
