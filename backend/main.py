@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
 
-from backend import runner, workflow
+from backend import insights, runner, workflow
 from backend.api import Db, find, load_claim, setting
 from backend.models import Claim, ClaimSummary, Customer, Handler, Policy
 
@@ -30,6 +30,7 @@ ORDER BY claim_id
 app = FastAPI(title="UnderCover")
 app.include_router(workflow.router)
 app.include_router(runner.router)
+app.include_router(insights.router)
 
 
 @app.get("/api/health", operation_id="health")

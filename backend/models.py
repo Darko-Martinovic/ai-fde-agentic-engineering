@@ -9,6 +9,7 @@ ClaimStatus = Literal[
     "waiting", "in_progress", "awaiting_sign_off", "referred", "decided"
 ]
 StepKind = Literal["tool_call", "tool_result", "reply"]
+DecisionKind = Literal["approve", "decline", "refer"]
 
 
 class StepIn(BaseModel):
@@ -30,7 +31,7 @@ def check_payout(decision: str, payout: float) -> None:
 
 
 class DecisionIn(BaseModel):
-    decision: Literal["approve", "decline", "refer"]
+    decision: DecisionKind
     payout: float = Field(ge=0)
     reasons: str = Field(min_length=1)
     policy_section: str = Field(min_length=1)
@@ -55,7 +56,7 @@ class ResolutionIn(BaseModel):
 
 class Decision(BaseModel):
     decided_by: str
-    decision: Literal["approve", "decline", "refer"]
+    decision: DecisionKind
     payout: float
     reasons: str
     policy_section: str | None
@@ -95,7 +96,7 @@ class ClaimSummary(BaseModel):
     amount_claimed: float
     submitted_on: date
     status: ClaimStatus
-    decision: Literal["approve", "decline", "refer"] | None
+    decision: DecisionKind | None
     payout: float | None
     paid: float | None
 

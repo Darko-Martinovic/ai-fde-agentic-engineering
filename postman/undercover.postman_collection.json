@@ -885,6 +885,49 @@
       ]
     },
     {
+      "name": "Insights",
+      "description": "Run after the Workflow folder, on fresh data: sums up what the workflow did.",
+      "item": [
+        {
+          "name": "Insights after the workflow",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/insights",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "insights"
+              ]
+            },
+            "description": "`get_insights`: the agent's work on the queue: outcomes, time, tools and money."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const insights = pm.response.json();",
+                  "const totals = insights.totals;",
+                  "pm.test(\"three claims decided by the agent\", () => pm.expect(totals.decided).to.eql(3));",
+                  "pm.test(\"CLM-1001 went straight through\", () => pm.expect(totals.straight_through).to.eql(1));",
+                  "pm.test(\"one sign-off and one referral\", () => { pm.expect(totals.sign_offs).to.eql(1); pm.expect(totals.referred).to.eql(1); });",
+                  "pm.test(\"no claim waits for a handler\", () => pm.expect(totals.waiting_for_handler).to.eql(0));",
+                  "pm.test(\"paid $2,920.00 in all\", () => pm.expect(totals.paid).to.eql(2920));",
+                  "pm.test(\"the recorded step counts as a get_claim call\", () => pm.expect(insights.tools).to.eql([{ tool: \"get_claim\", calls: 1, refused: 0 }]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Agent",
       "description": "Starts and stops the UnderCover Agent. Run CLM-1003 calls the model for a moment before Stop ends it.",
       "item": [
