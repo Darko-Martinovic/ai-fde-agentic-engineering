@@ -1,5 +1,7 @@
 # AI FDE: The Forward Deployed Engineer & Agentic AI Architect
 
+> **About this fork.** This repo is my copy of Ed Donner's original repo, [ed-donner/undercover](https://github.com/ed-donner/undercover), which accompanies his Udemy course [AI FDE: The Forward Deployed Engineer & Agentic AI Architect](https://www.udemy.com/course/ai-fde-forward-deployed-engineer-agentic-ai-architect/learn/lecture/58544007#questions). I use it to build UnderCover as I work through the course. The rest of this README is Ed's, so "I" and "my" below mean Ed, and his day branches (`week1day5-start`, `week1day5-end` and so on) are in his repo, not this one.
+
 ## UnderCover Agent: the Travel Insurance Platform
 
 ![A boarding pass for the course: Week 1 AI Engineer, Week 2 AI Architect, Week 3 AI FDE, carrying the UnderCover Agent to production on AWS](assets/undercover-boarding-pass.svg)
