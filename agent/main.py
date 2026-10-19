@@ -109,7 +109,10 @@ def steps(message: BaseMessage) -> list[tuple[str, str]]:
         return []
     found = [("reply", str(message.text))] if message.text else []
     return found + [
-        ("tool_call", f"{tool_call['name']} {json.dumps(tool_call['args'])}")
+        (
+            "tool_call",
+            f"{tool_call['name']} {json.dumps(tool_call['args'], ensure_ascii=False)}",
+        )
         for tool_call in message.tool_calls
     ]
 

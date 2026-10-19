@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { STATUSES, clock, date, humanize, money } from "./format";
+import { STATUSES, clock, date, humanize, money, pretty } from "./format";
 
 it("writes money in US dollars", () => {
   expect(money(1150)).toBe("$1,150.00");
@@ -18,4 +18,9 @@ it("writes a time of day", () => {
 it("turns codes into labels", () => {
   expect(humanize("emergency_medical")).toBe("Emergency medical");
   expect(STATUSES).toHaveLength(5);
+});
+
+it("indents JSON and leaves other text alone", () => {
+  expect(pretty('{"a":1}')).toBe('{\n  "a": 1\n}');
+  expect(pretty("Refused (409)")).toBe("Refused (409)");
 });
