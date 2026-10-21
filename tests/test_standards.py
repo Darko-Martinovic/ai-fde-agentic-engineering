@@ -64,10 +64,14 @@ def offending(
     ]
 
 
+SVG_NAMESPACE = 'xmlns="http://www.w3.org/2000/svg"'
+
+
 def test_no_address_in_code():
-    """Hosts, ports and URLs live in .env.defaults (standard 22). The chart's
-    SVG namespace is a name, not an address."""
-    assert offending(ADDRESS, PARTS, ("bench/chart.py",)) == []
+    """Hosts, ports and URLs live in .env.defaults (standard 22). The SVG
+    namespace in the comparison's chart is a name, not an address."""
+    found = offending(ADDRESS, PARTS)
+    assert [line for line in found if SVG_NAMESPACE not in line] == []
 
 
 def test_no_model_in_code():

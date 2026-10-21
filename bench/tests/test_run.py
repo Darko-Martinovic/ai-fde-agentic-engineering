@@ -1,5 +1,7 @@
 """A comparison run end to end on stub models, scored against hand-made answers."""
 
+import dataclasses
+
 import pytest
 from langchain_core.messages import AIMessage
 
@@ -113,7 +115,9 @@ def test_a_refused_run_is_tried_again_and_not_scored(tmp_path):
     trial = Trial(FREE, "tiny", 1)
     assert cli.pending([trial], [refused]) == [(trial, 1)]
     assert cli.pending([trial], [answered]) == []
-    assert cli.replace([refused], answered) == [answered]
+    second = dataclasses.replace(answered, repeat=2)
+    assert cli.replace([refused, second], answered) == [answered, second]
+    assert cli.replace([answered], second) == [answered, second]
     write_report([refused], tmp_path)
     text = (tmp_path / "results.md").read_text(encoding="utf-8")
     assert "- OpenRouter free router, tiny claims: 1 of 1 runs refused" in text

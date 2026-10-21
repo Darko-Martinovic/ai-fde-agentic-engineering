@@ -44,10 +44,13 @@ def expected(trial: Trial, estimate: Estimate, key: dict[str, Answer]) -> float:
 
 
 def replace(results: list[Repeat], result: Repeat) -> list[Repeat]:
-    """The runs with this one in place of an earlier, refused try at it."""
+    """The runs with this one in place of an earlier, refused try at it, or
+    added at the end."""
     same = (result.model, result.claims, result.repeat)
-    kept = [r for r in results if (r.model, r.claims, r.repeat) != same]
-    return [*kept, result]
+    tries = [(r.model, r.claims, r.repeat) for r in results]
+    if same not in tries:
+        return [*results, result]
+    return [result if run == same else r for r, run in zip(results, tries, strict=True)]
 
 
 def check_budget(spent: float, cost: float, budget: float) -> None:

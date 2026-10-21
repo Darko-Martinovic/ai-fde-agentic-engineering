@@ -29,9 +29,9 @@ repeats = 1
 [[trials]]
 model = "ollama:qwen3.5:4b"
 claims = "all"
-repeats = 3
+repeats = 2
 
 [[trials]]
 model = "ollama:qwen3.5:9b"
 claims = "all"
-repeats = 3
+repeats = 1

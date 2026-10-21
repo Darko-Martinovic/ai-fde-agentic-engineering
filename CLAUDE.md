@@ -23,6 +23,7 @@ Run from the repo root. Python always goes through `uv run`, never `python`/`pyt
 | Format everything | `npm run format` |
 | Run the agent on one claim, or the queue agent on N claims, on a model (calls the model) | `uv run -m agent CLM-1001`, `uv run -m agent --cap 5 --model anthropic:claude-haiku-5-5` |
 | Reset the database to `data/` | `uv run -m backend.seed` |
+| The model comparison in `bench/plan.toml`, against the dev backend (calls the models, resets the database each run; `--estimate` prints its cost and stops, `--report` rewrites `bench/results.md` from `bench/results.json`) | `uv run -m bench` |
 | One Python test | `uv run pytest agent/tests/test_harness.py::test_work_claim_approves_and_pays --no-cov` |
 | One vitest file | `npx vitest run --root dashboard src/App.test.tsx` |
 | One Playwright test | `npx playwright test e2e/claims.spec.ts` |
@@ -30,7 +31,7 @@ Run from the repo root. Python always goes through `uv run`, never `python`/`pyt
 
 `--no-cov` matters for single Python tests: `pyproject.toml` adds `--cov` with `fail_under = 80`, so a partial run fails on coverage otherwise. pyright is the npm package (`npx pyright`), configured to use `.venv`.
 
-The pre-commit hook runs `check:python` when Python files (`backend/`, `agent/`, `tests/`), `*.toml` or `.env.defaults` are staged and `check:ts` when `dashboard/`, `e2e/`, `*.config.*` or `.env.defaults` files are staged. Never bypass it with `--no-verify`, and never lower thresholds or disable lint rules to get a green run (`docs/PROCESS.md`).
+The pre-commit hook runs `check:python` when Python files (`backend/`, `agent/`, `tests/`, `bench/`), `*.toml` or `.env.defaults` are staged and `check:ts` when `dashboard/`, `e2e/`, `*.config.*` or `.env.defaults` files are staged. Never bypass it with `--no-verify`, and never lower thresholds or disable lint rules to get a green run (`docs/PROCESS.md`).
 
 ## Architecture
 
@@ -41,6 +42,7 @@ The product is three parts that talk only over HTTP, plus e2e tests:
 - `backend/runner.py`: the dashboard's Run and Stop, with a model (`list_models`) and, for the queue, a cap. It starts `agent.__main__.main` with command-line arguments in a separate process (multiprocessing, spawn), one run at a time, and Stop terminates that process and puts any `in_progress` claim back to `waiting`, clearing its unpaid decision. Tests replace `start_process` with a fake, so no model is called.
 - `dashboard/`: React + Vite + TypeScript (strict, no `any`). The keys of `api` in `api.ts` are the backend's operation ids in camelCase. Vite proxies `/api` to `UNDERCOVER_API`, so the dashboard calls relative `/api/...` URLs. Pages are routed by the URL hash (links and `parseRoute` in `paths.ts`, `useRoute` in `hooks.ts`), data is loaded with `usePoll` (refreshes on an interval, pauses when the tab is hidden), and every API call goes through `api.ts`. Brand tokens and the light and dark themes are CSS variables in `styles.css`. Tests stub `fetch` with `mockFetch` from `testing.ts`, keyed by `"METHOD /path"`. ESLint is strict: props are `Readonly<>`, no nested ternaries, no numbers in template strings without `String()`.
 - `e2e/`: Playwright on its own ports and database (`playwright.config.ts`; the dashboard's proxy target comes from `UNDERCOVER_API`). Tests set up the agent's decisions through the API, so no model is called.
+- `bench/`: the model comparison, kept apart from the product. `plan.toml` names the trials (a model from `models.toml`, `all` or `tiny` claims, a number of runs); `run.py` reseeds, works the claims through `agent.__main__.work_claims` and reads the outcome and usage through the API; `score.py` is the only code that reads `data/evals/`; `report.py` and `chart.py` write `bench/results.md` and `results.svg`. Runs are kept in `bench/results.json`, so a comparison that stops picks up where it was, and a run the provider refused (no model call answered) is tried again. It refuses to pass `BENCH_BUDGET_USD`. Its tests stub every model.
 - `postman/`: the API's Postman collection and environment. Add every new or changed endpoint to the collection.
 
 Configuration (`docs/CODE_STANDARDS.md` 22): `settings.py` (Python) and `settings.config.ts` (TypeScript) load the env files. `.env.defaults` (committed) holds every setting that isn't secret, with `${NAME}` for values built from others, `.env` the keys and overrides, and `models.toml` the models allowed with prices. No host, port, URL, model id or price is written in code; `tests/test_standards.py` and `dashboard/src/standards.test.ts` fail if one is. The root `conftest.py` makes tests read `.env.defaults` alone, and so does the e2e run.

@@ -146,7 +146,8 @@ the cost is at the prices in `models.toml`, and the local models cost nothing.
 Percentages are the mean of the runs, with their range when they differ. A run
 in which the provider answered no model call at all, as when a free model is
 rate-limited, says nothing about the model: it isn't scored, it is listed under
-"Runs refused", and the next `uv run -m bench` tries it again.
+"Runs refused", and the next `uv run -m bench` tries it again. A run the
+provider stopped partway is scored, its unanswered claims counted as wrong.
 
 ![Accuracy by model](results.svg)
 
