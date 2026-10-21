@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from agent.__main__ import main as work
 from agent.config import current_model
 from backend.api import Db, load_claim
+from backend.store import claims
 
 router = APIRouter(prefix="/api/agent")
 
@@ -49,27 +50,18 @@ def state(conn: sqlite3.Connection) -> AgentState:
     model = current_model().label
     if not running():
         return AgentState(model=model, running=False, mode=None, claim_id=None)
-    row = conn.execute(
-        "SELECT claim_id FROM claims WHERE status = 'in_progress' ORDER BY claim_id"
-    ).fetchone()
     return AgentState(
         model=model,
         running=True,
         mode=RUN.mode,
-        claim_id=row["claim_id"] if row else None,
+        claim_id=claims.first_in_progress(conn),
     )
 
 
 def return_to_queue(conn: sqlite3.Connection) -> None:
     """Put claims left in progress back to waiting, clearing unpaid decisions."""
     with conn:
-        conn.execute(
-            "DELETE FROM decisions WHERE claim_id IN"
-            " (SELECT claim_id FROM claims WHERE status = 'in_progress')"
-        )
-        conn.execute(
-            "UPDATE claims SET status = 'waiting' WHERE status = 'in_progress'"
-        )
+        claims.return_to_queue(conn)
 
 
 def launch(
@@ -102,10 +94,7 @@ def run_claim(claim_id: str, conn: Db) -> AgentState:
 @router.post("/queue", operation_id="run_queue")
 def run_queue(conn: Db) -> AgentState:
     """Start the agent on every waiting claim, in turn."""
-    waiting = conn.execute(
-        "SELECT COUNT(*) FROM claims WHERE status = 'waiting'"
-    ).fetchone()[0]
-    if waiting == 0:
+    if claims.count_in(conn, "waiting") == 0:
         raise HTTPException(409, "No claims are waiting")
     launch(conn, "queue", [])
     return state(conn)

@@ -6,28 +6,14 @@ from fastapi import APIRouter
 
 from backend.api import Db, load_claim
 from backend.models import Claim, ClaimSummary
+from backend.store import claims
 
 router = APIRouter(prefix="/api/claims")
-
-LIST_CLAIMS = """
-WITH latest AS (
-    SELECT claim_id, decision, payout FROM decisions
-    WHERE decision_id IN (SELECT MAX(decision_id) FROM decisions GROUP BY claim_id)
-)
-SELECT claims.data, claims.status, customers.data AS customer,
-    latest.decision, latest.payout, payments.amount AS paid
-FROM claims
-JOIN customers USING (customer_id)
-LEFT JOIN latest USING (claim_id)
-LEFT JOIN payments USING (claim_id)
-ORDER BY claim_id
-"""
 
 
 @router.get("", operation_id="list_claims")
 def list_claims(conn: Db) -> list[ClaimSummary]:
     """List the claims queue with the state, latest decision and payment of each."""
-    rows = conn.execute(LIST_CLAIMS).fetchall()
     return [
         ClaimSummary.model_validate(
             json.loads(row["data"])
@@ -39,7 +25,7 @@ def list_claims(conn: Db) -> list[ClaimSummary]:
                 "paid": row["paid"],
             }
         )
-        for row in rows
+        for row in claims.queue(conn)
     ]
 
 

@@ -25,13 +25,13 @@
 
 ## Checked by tests
 
-These hold because a test fails when they don't: `tests/test_standards.py` for the Python parts and `dashboard/src/standards.test.ts` for the dashboard and the TypeScript config. A guard that is in the way is a sign the design is wrong, never a reason to loosen the guard.
+Except where marked, these hold because a test fails when they don't: `tests/test_standards.py` for the Python parts and `dashboard/src/standards.test.ts` for the dashboard and the TypeScript config. A guard that is in the way is a sign the design is wrong, never a reason to loosen the guard.
 
 15. One owner for each service's address. In the agent, `httpx` and `/api/` paths appear only in `agent/api.py`; in the dashboard, `fetch` and `/api/` paths only in `api.ts`.
-16. One name for each operation: each function in `agent/api.py` is named after a backend `operation_id`, as each key in `api.ts` and each Postman request is.
-17. `backend/main.py` only puts the app together. Routes live in one router per resource (claims, records, documents, workflow, runner, insights, and later runs), and SQL lives in the module that owns its table.
-18. Size: a module stays under 300 lines and a function under 40, or 120 for a React component. Past that, split it. ESLint enforces `max-lines` 300, `max-lines-per-function` 120 and `complexity` 10; ruff enforces mccabe 8; a test checks each Python module's length.
+16. One name for each operation: each function in `agent/api.py` is named after a backend `operation_id`, each key of `api` in `dashboard/src/api.ts` is the same name in camelCase, and each Postman request's description starts with its operation, every operation having at least one request.
+17. `backend/main.py` only puts the app together. Routes live in one router per resource (claims, records, documents, workflow, runner, insights, and later runs). All SQL lives in `backend/store/`, one module per group of tables, each function named for what it returns or does; routes and other modules call those functions, never the database. `backend/db.py` holds the schema.
+18. Size: a module stays under 300 lines and a function under 40, or 120 for a React component. Past that, split it. ESLint enforces `max-lines` 300, `max-lines-per-function` 120 and `complexity` 10; ruff enforces mccabe 8; tests check each Python module's and function's length.
 19. Page links are built in one place, `dashboard/src/paths.ts`, which also reads them back.
-20. Tests mirror modules: a test file per module it tests, shared helpers in `conftest.py` or `dashboard/src/testing.ts`.
-21. Names say what a thing is, never how it's built: no `utils`, `helpers`, `misc` or `common` modules.
-22. Configuration comes from the environment, filled in from `.env` and then `.env.defaults`, and the models allowed come from `models.toml`. No host, port, URL, model id or price is written in code. Tests and the end-to-end run read `.env.defaults` alone, so `npm run check` never needs `.env`.
+20. Tests mirror modules: a test file per module it tests, shared helpers in `conftest.py` or `dashboard/src/testing.ts`. (Checked by review.)
+21. Names say what a thing is, never how it's built: no `utils`, `helpers`, `misc` or `common` modules. (Checked by review.)
+22. Configuration comes from the environment, filled in from `.env` and then `.env.defaults` by `settings.py` (Python) and `settings.config.ts` (TypeScript), and the models allowed come from `models.toml`. A value can name another as `${NAME}`, so each host and port is written once. No host, port, URL, model id or price is written in code. Tests and the end-to-end run read `.env.defaults` alone, so `npm run check` never needs `.env`.

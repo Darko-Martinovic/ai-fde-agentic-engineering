@@ -7,8 +7,9 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
 
-from backend.api import Db, setting
+from backend.api import Db
 from backend.models import DocumentName, Section, SectionTitle
+from backend.store import records
 
 router = APIRouter(prefix="/api")
 
@@ -37,7 +38,7 @@ TITLE_WEIGHT = 2
 def sections(conn: Db, document: DocumentName) -> list[Section]:
     """Split a document into its opening (section 0) and its numbered sections.
     A section's text leaves out its heading, which its number and title give."""
-    text = setting(conn, STORED[document])
+    text = records.stored(conn, STORED[document])
     headings = list(HEADING.finditer(text))
     starts = [0] + [heading.end() for heading in headings]
     ends = [heading.start() for heading in headings] + [len(text)]
@@ -84,7 +85,7 @@ def title_of(section: Section) -> SectionTitle:
 )
 def get_policy_wording(conn: Db) -> str:
     """Get the policy wording as Markdown."""
-    return setting(conn, STORED["wording"])
+    return records.stored(conn, STORED["wording"])
 
 
 @router.get(

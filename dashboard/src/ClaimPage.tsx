@@ -129,19 +129,19 @@ function ClaimView({
   const { policy_id: policyId, customer_id: customerId } = claim;
   const policy = usePoll(
     useCallback(
-      (signal: AbortSignal) => api.policy(policyId, signal),
+      (signal: AbortSignal) => api.getPolicy(policyId, signal),
       [policyId],
     ),
     null,
   );
   const customer = usePoll(
     useCallback(
-      (signal: AbortSignal) => api.customer(customerId, signal),
+      (signal: AbortSignal) => api.getCustomer(customerId, signal),
       [customerId],
     ),
     null,
   );
-  const handlers = usePoll(api.handlers, null);
+  const handlers = usePoll(api.listHandlers, null);
 
   return (
     <>
@@ -169,16 +169,22 @@ function ClaimView({
 }
 
 export function ClaimPage({ claimId }: Readonly<{ claimId: string }>) {
-  const agent = usePoll(api.agent, 2000);
+  const agent = usePoll(api.getAgent, 2000);
   const claim = usePoll(
-    useCallback((signal: AbortSignal) => api.claim(claimId, signal), [claimId]),
+    useCallback(
+      (signal: AbortSignal) => api.getClaim(claimId, signal),
+      [claimId],
+    ),
     2000,
   );
   const live =
     claim.data?.status === "in_progress" ||
     (agent.data?.running === true && agent.data.claim_id === claimId);
   const steps = usePoll(
-    useCallback((signal: AbortSignal) => api.steps(claimId, signal), [claimId]),
+    useCallback(
+      (signal: AbortSignal) => api.listSteps(claimId, signal),
+      [claimId],
+    ),
     live ? 2000 : null,
   );
   const refresh = () => {

@@ -1,10 +1,11 @@
+// @vitest-environment node
 // Checks that hold the dashboard and the TypeScript config to
 // docs/CODE_STANDARDS.md. The Python parts have the same in tests/test_standards.py.
 import { readFileSync, readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-// Vitest runs from the repo's root.
-const ROOT = `${process.cwd()}/`;
+const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const SOURCE = "dashboard/src/";
 const CONFIGS = [
   "dashboard/vite.config.ts",

@@ -14,7 +14,7 @@ export function errorMessage(reason: unknown): string {
 }
 
 /** Run an action for a form or a button: busy while it runs, its error if it
- *  fails, and `onDone` once it succeeds, so the page shows what changed. */
+ *  fails, and `onDone` afterwards either way, so the page shows what changed. */
 export function useAction(onDone: () => void) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,12 +22,12 @@ export function useAction(onDone: () => void) {
     setBusy(true);
     setError(null);
     action()
-      .then(onDone)
       .catch((reason: unknown) => {
         setError(errorMessage(reason));
       })
       .finally(() => {
         setBusy(false);
+        onDone();
       });
   };
   return { busy, error, run };

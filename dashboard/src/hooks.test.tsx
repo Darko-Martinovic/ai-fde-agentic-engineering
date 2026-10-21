@@ -1,6 +1,13 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { errorMessage, readTheme, usePoll, useRoute, useTheme } from "./hooks";
+import {
+  errorMessage,
+  readTheme,
+  useAction,
+  usePoll,
+  useRoute,
+  useTheme,
+} from "./hooks";
 
 afterEach(() => {
   cleanup();
@@ -92,5 +99,41 @@ describe("useTheme", () => {
       result.current[1]("light");
     });
     expect(document.documentElement.dataset.theme).toBe("light");
+  });
+});
+
+describe("useAction", () => {
+  it("is busy while the action runs, then refreshes", async () => {
+    const onDone = vi.fn();
+    const { result } = renderHook(() => useAction(onDone));
+    let finish: () => void = () => undefined;
+    act(() => {
+      result.current.run(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          }),
+      );
+    });
+    expect(result.current.busy).toBe(true);
+    await act(async () => {
+      finish();
+      await Promise.resolve();
+    });
+    expect(result.current.busy).toBe(false);
+    expect(result.current.error).toBeNull();
+    expect(onDone).toHaveBeenCalledOnce();
+  });
+
+  it("shows why an action failed, and refreshes anyway", async () => {
+    const onDone = vi.fn();
+    const { result } = renderHook(() => useAction(onDone));
+    act(() => {
+      result.current.run(() => Promise.reject(new Error("Already running")));
+    });
+    await waitFor(() => {
+      expect(result.current.error).toBe("Already running");
+    });
+    expect(onDone).toHaveBeenCalledOnce();
   });
 });

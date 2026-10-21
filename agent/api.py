@@ -1,11 +1,12 @@
 """The backend's API, as the agent uses it: one function per operation, named
 after it. A refusal raises Refused; any other error raises httpx's."""
 
+import json
 from typing import Any
 
 import httpx
 
-from agent.config import setting
+from settings import setting
 
 
 def client() -> httpx.Client:
@@ -16,8 +17,10 @@ def client() -> httpx.Client:
 class Refused(Exception):
     """The backend refused a request, with its status and its reason."""
 
-    def __init__(self, status: int, detail: str) -> None:
-        super().__init__(f"Refused ({status}): {detail}")
+    def __init__(self, status: int, detail: object) -> None:
+        # FastAPI's detail is a message, or a list of errors for invalid input
+        reason = detail if isinstance(detail, str) else json.dumps(detail)
+        super().__init__(f"Refused ({status}): {reason}")
         self.status = status
         self.detail = detail
 

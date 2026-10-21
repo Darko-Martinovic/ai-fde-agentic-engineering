@@ -80,7 +80,7 @@ function SignOffForm({
   const payout = claim.decisions.at(-1)?.payout ?? 0;
   const submit = (event: SyntheticEvent) => {
     event.preventDefault();
-    run(() => api.signOff(claim.claim_id, handlerId));
+    run(() => api.signOffClaim(claim.claim_id, handlerId));
   };
   return (
     <form className="action-form action-form--sign-off" onSubmit={submit}>
@@ -161,7 +161,7 @@ function ReferralForm({
   const submit = (event: SyntheticEvent) => {
     event.preventDefault();
     run(() =>
-      api.resolve(claim.claim_id, {
+      api.resolveReferral(claim.claim_id, {
         handler_id: handlerId,
         decision,
         payout: decision === "approve" ? amount : 0,

@@ -3,8 +3,8 @@ import { ErrorNote, Loading, Markdown, Panel } from "./components";
 import { usePoll } from "./hooks";
 
 export function InstructionsPage() {
-  const instructions = usePoll(api.instructions, null);
-  const wording = usePoll(api.policyWording, null);
+  const instructions = usePoll(api.getInstructions, null);
+  const wording = usePoll(api.getPolicyWording, null);
 
   return (
     <div className="page page--narrow">
