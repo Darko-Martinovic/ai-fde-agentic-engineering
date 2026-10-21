@@ -1,10 +1,9 @@
 import { defineConfig } from "@playwright/test";
-import { loadSettings, setting } from "./settings.config";
+import { DEFAULTS_ONLY, loadSettings, setting } from "./settings.config";
 
 // The end-to-end tests run on their own ports and their own database, seeded
 // fresh each run, from .env.defaults alone, so they never touch the data or
 // servers from `npm run dev`.
-const DEFAULTS_ONLY = ".env.defaults";
 loadSettings(DEFAULTS_ONLY);
 
 export default defineConfig({
@@ -23,6 +22,7 @@ export default defineConfig({
         UNDERCOVER_DB: setting("E2E_DB"),
         BACKEND_PORT: setting("E2E_API_PORT"),
         BACKEND_RELOAD: "false",
+        UNDERCOVER_API: setting("E2E_API_URL"),
       },
     },
     {

@@ -2,7 +2,7 @@
 
 import uvicorn
 
-from backend.config import setting
+from settings import setting
 
 
 def main() -> None:

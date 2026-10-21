@@ -5,7 +5,7 @@ pre-commit:
   parallel: true
   jobs:
     - name: python
-      glob: ["{backend,agent,tests,bench}/**/*.py", "conftest.py", "*.toml", ".env.defaults"]
+      glob: ["{backend,agent,tests,bench}/**/*.py", "*.py", "*.toml", ".env.defaults", "postman/**", "dashboard/src/api.ts"]
       group:
         piped: true
         jobs:

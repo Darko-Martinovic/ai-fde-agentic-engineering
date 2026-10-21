@@ -275,7 +275,7 @@ function worked(insights: Insights): boolean {
 }
 
 export function InsightsPage() {
-  const insights = usePoll(api.insights, 5000);
+  const insights = usePoll(api.getInsights, 5000);
   const data = insights.data;
 
   return (

@@ -1,26 +1,25 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
-import { loadSettings, setting } from "../settings.config";
+import { DEFAULTS_ONLY, loadSettings, setting } from "../settings.config";
 
-loadSettings(
-  process.env.VITEST
-    ? ".env.defaults"
-    : (process.env.UNDERCOVER_ENV_FILES ?? ".env,.env.defaults"),
-);
-
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    port: Number(setting("DASHBOARD_PORT")),
-    strictPort: true,
-    proxy: { "/api": setting("UNDERCOVER_API") },
-  },
-  test: {
-    environment: "jsdom",
-    coverage: {
-      include: ["src/**"],
-      exclude: ["src/main.tsx"],
-      thresholds: { statements: 80 },
+export default defineConfig(({ mode }) => {
+  // Tests read the committed defaults alone, never a developer's .env.
+  loadSettings(mode === "test" ? DEFAULTS_ONLY : undefined);
+  return {
+    plugins: [react()],
+    server: {
+      host: setting("DASHBOARD_HOST"),
+      port: Number(setting("DASHBOARD_PORT")),
+      strictPort: true,
+      proxy: { "/api": setting("UNDERCOVER_API") },
     },
-  },
+    test: {
+      environment: "jsdom",
+      coverage: {
+        include: ["src/**"],
+        exclude: ["src/main.tsx"],
+        thresholds: { statements: 80 },
+      },
+    },
+  };
 });

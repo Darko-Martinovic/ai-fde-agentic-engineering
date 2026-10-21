@@ -1,26 +1,12 @@
-"""The agent's settings: the environment, filled in from .env and then
-.env.defaults, and the models it may run on, from models.toml."""
+"""The models the agent may run on, from models.toml. Its other settings are the
+shared ones in settings.py."""
 
-import os
 import tomllib
 from dataclasses import dataclass
 from functools import cache
-from pathlib import Path
 from typing import Any
 
-from dotenv import load_dotenv
-
-ROOT = Path(__file__).resolve().parents[1]
-
-# The environment wins over .env, which wins over .env.defaults. Tests name
-# .env.defaults alone in UNDERCOVER_ENV_FILES, so they never read .env.
-for env_file in os.environ.get("UNDERCOVER_ENV_FILES", ".env,.env.defaults").split(","):
-    load_dotenv(ROOT / env_file)
-
-
-def setting(name: str) -> str:
-    """Return one setting, which must be in the environment or an env file."""
-    return os.environ[name]
+from settings import ROOT, setting
 
 
 @dataclass(frozen=True)

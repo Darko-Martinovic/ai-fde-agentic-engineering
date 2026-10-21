@@ -3,12 +3,14 @@ import json
 import pytest
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage
+from langchain_core.utils.function_calling import convert_to_openai_tool
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 
 from agent import harness
 from agent.config import model
 from agent.tests.stub import StubModel
+from agent.tools import CLAIM_TOOLS
 
 
 def tool_call(name, **args):
@@ -70,13 +72,21 @@ def test_payment_over_the_limit_is_refused(backend):
 
 
 def test_a_tool_cannot_reach_another_claim(backend):
-    """The claim comes from the run's context, so the model can't name another."""
-    harness.work_claim(
-        "CLM-1003",
-        stub(decide("decline", 0), AIMessage(content="Declined.")),
+    """The claim comes from the run's context: a claim the model names is ignored."""
+    elsewhere = tool_call(
+        "decide_claim",
+        claim_id="CLM-1001",
+        decision="decline",
+        payout=0,
+        reasons="Trying another claim.",
+        policy_section="Policy wording 9, General exclusions",
     )
+    harness.work_claim("CLM-1003", stub(elsewhere, AIMessage(content="Declined.")))
     assert backend.get("/api/claims/CLM-1003").json()["status"] == "decided"
     assert backend.get("/api/claims/CLM-1001").json()["status"] == "waiting"
+    for claim_tool in CLAIM_TOOLS:
+        model_sees = convert_to_openai_tool(claim_tool)["function"]["parameters"]
+        assert "claim_id" not in model_sees["properties"]
 
 
 def test_an_unexpected_error_stops_the_run(backend, monkeypatch):
@@ -146,6 +156,29 @@ def test_steps_from_a_reply():
 def test_chat_model_for_each_provider(spec, kind, monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    llm = harness.chat_model(model(spec))
+    allowed = model(spec)
+    llm = harness.chat_model(allowed)
     assert isinstance(llm, kind)
     assert spec.endswith(getattr(llm, "model_name", None) or getattr(llm, "model", ""))
+    for option, value in allowed.options.items():
+        assert getattr(llm, option) == value
+
+
+def test_chat_model_reaches_the_configured_address(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("OPENROUTER_BASE_URL", "http://openrouter.test/api")
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama.test")
+    monkeypatch.setenv("OLLAMA_NUM_CTX", "4096")
+    openrouter = harness.chat_model(model("openrouter:deepseek/deepseek-v4.1-flash"))
+    assert isinstance(openrouter, ChatOpenAI)
+    assert openrouter.openai_api_base == "http://openrouter.test/api"
+    ollama = harness.chat_model(model("ollama:qwen3.5:4b"))
+    assert isinstance(ollama, ChatOllama)
+    assert ollama.base_url == "http://ollama.test"
+    assert ollama.num_ctx == 4096
+
+
+def test_a_refusal_of_invalid_input_reads_as_text(backend):
+    with pytest.raises(harness.api.Refused, match=r"Refused \(422\): \[") as refused:
+        harness.api.pay_claim("CLM-1001", -5)
+    assert refused.value.status == 422

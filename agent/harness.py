@@ -14,30 +14,30 @@ from langchain.agents.middleware import (
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, ToolMessage
+from langgraph.graph.state import CompiledStateGraph
 from langgraph.runtime import Runtime
 from langgraph.types import Command
 
 from agent import api
-from agent.config import Model, current_model, setting
+from agent.config import Model, current_model
 from agent.tools import CLAIM_TOOLS, ClaimContext, read_section
+from settings import setting
 
 # Our providers, and the LangChain integration that serves each one
 INTEGRATIONS = {"openrouter": "openai", "anthropic": "anthropic", "ollama": "ollama"}
 
-
-def connection(provider: str) -> dict[str, Any]:
-    """How to reach a provider, from the settings."""
-    if provider == "openrouter":
-        return {
-            "base_url": setting("OPENROUTER_BASE_URL"),
-            "api_key": setting("OPENROUTER_API_KEY"),
-        }
-    if provider == "anthropic":
-        return {"api_key": setting("ANTHROPIC_API_KEY")}
-    return {
+# How to reach each provider, from the settings
+CONNECTIONS: dict[str, Callable[[], dict[str, Any]]] = {
+    "openrouter": lambda: {
+        "base_url": setting("OPENROUTER_BASE_URL"),
+        "api_key": setting("OPENROUTER_API_KEY"),
+    },
+    "anthropic": lambda: {"api_key": setting("ANTHROPIC_API_KEY")},
+    "ollama": lambda: {
         "base_url": setting("OLLAMA_BASE_URL"),
         "num_ctx": int(setting("OLLAMA_NUM_CTX")),
-    }
+    },
+}
 
 
 def chat_model(model: Model) -> BaseChatModel:
@@ -45,7 +45,7 @@ def chat_model(model: Model) -> BaseChatModel:
     return init_chat_model(
         model.name,
         model_provider=INTEGRATIONS[model.provider],
-        **connection(model.provider),
+        **CONNECTIONS[model.provider](),
         **model.options,
     )
 
@@ -119,7 +119,7 @@ def instructions() -> str:
     return f"{api.get_instructions()}\n\n{contents()}"
 
 
-def claim_agent(llm: BaseChatModel):
+def claim_agent(llm: BaseChatModel) -> CompiledStateGraph[Any, Any, Any, Any]:
     return create_agent(
         llm,
         tools=CLAIM_TOOLS,

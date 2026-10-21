@@ -125,7 +125,7 @@
                 "CLM-9999"
               ]
             },
-            "description": "An unknown claim returns 404."
+            "description": "`get_claim`: a claim that doesn't exist gives a 404."
           },
           "event": [
             {
@@ -671,7 +671,7 @@
                 "payment"
               ]
             },
-            "description": "A second payment is refused.",
+            "description": "`pay_claim`: paying a claim twice is refused.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"amount\": 420\n}"
@@ -1280,7 +1280,7 @@
                 "CLM-1003"
               ]
             },
-            "description": "After a stop, the claim is back in the queue with no decision."
+            "description": "`get_claim`: after Stop, the claim is back in the queue."
           },
           "event": [
             {

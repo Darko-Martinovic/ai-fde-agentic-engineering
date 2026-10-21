@@ -256,37 +256,38 @@ async function post<T>(path: string, body: object = {}): Promise<T> {
 }
 
 export const api = {
-  claims: (signal?: AbortSignal) =>
+  listClaims: (signal?: AbortSignal) =>
     getJson<ClaimSummary[]>("/api/claims", signal),
-  claim: (id: string, signal?: AbortSignal) =>
+  getClaim: (id: string, signal?: AbortSignal) =>
     getJson<Claim>(`/api/claims/${id}`, signal),
   readSection: (document: DocumentName, num: number, signal?: AbortSignal) =>
     getJson<Section>(
       `/api/documents/${document}/sections/${String(num)}`,
       signal,
     ),
-  steps: (id: string, signal?: AbortSignal) =>
+  listSteps: (id: string, signal?: AbortSignal) =>
     getJson<Step[]>(`/api/claims/${id}/steps`, signal),
-  policy: (id: string, signal?: AbortSignal) =>
+  getPolicy: (id: string, signal?: AbortSignal) =>
     getJson<Policy>(`/api/policies/${id}`, signal),
-  customer: (id: string, signal?: AbortSignal) =>
+  getCustomer: (id: string, signal?: AbortSignal) =>
     getJson<Customer>(`/api/customers/${id}`, signal),
-  handlers: (signal?: AbortSignal) =>
+  listHandlers: (signal?: AbortSignal) =>
     getJson<Handler[]>("/api/handlers", signal),
-  instructions: (signal?: AbortSignal) => getText("/api/instructions", signal),
-  policyWording: (signal?: AbortSignal) =>
+  getInstructions: (signal?: AbortSignal) =>
+    getText("/api/instructions", signal),
+  getPolicyWording: (signal?: AbortSignal) =>
     getText("/api/policy-wording", signal),
-  agent: (signal?: AbortSignal) => getJson<AgentState>("/api/agent", signal),
-  insights: (signal?: AbortSignal) =>
+  getAgent: (signal?: AbortSignal) => getJson<AgentState>("/api/agent", signal),
+  getInsights: (signal?: AbortSignal) =>
     getJson<Insights>("/api/insights", signal),
   health: (signal?: AbortSignal) =>
     getJson<{ status: string }>("/api/health", signal),
   runClaim: (id: string) => post<AgentState>(`/api/agent/claims/${id}`),
   runQueue: () => post<AgentState>("/api/agent/queue"),
   stopAgent: () => post<AgentState>("/api/agent/stop"),
-  signOff: (id: string, handlerId: string) =>
+  signOffClaim: (id: string, handlerId: string) =>
     post<Claim>(`/api/claims/${id}/sign-off`, { handler_id: handlerId }),
-  resolve: (
+  resolveReferral: (
     id: string,
     resolution: {
       handler_id: string;

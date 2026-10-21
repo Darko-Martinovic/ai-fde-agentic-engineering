@@ -154,8 +154,8 @@ function ClaimTable({
 }
 
 export function QueuePage() {
-  const claims = usePoll(api.claims, 3000);
-  const agent = usePoll(api.agent, 2000);
+  const claims = usePoll(api.listClaims, 3000);
+  const agent = usePoll(api.getAgent, 2000);
   const [filters, setFilters] = useState<Filters>({
     status: "all",
     type: "all",
