@@ -51,7 +51,7 @@ server = [
 ]
 
 [tool.ruff]
-include = ["backend/**/*.py", "agent/**/*.py", "tests/**/*.py", "conftest.py", "settings.py"]
+include = ["backend/**/*.py", "agent/**/*.py", "bench/**/*.py", "tests/**/*.py", "conftest.py", "settings.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "SIM", "UP", "PL", "S", "PT", "FAST", "C90", "PLR1702"]
@@ -66,19 +66,19 @@ max-complexity = 8
 "tests/*" = ["S101", "PLR2004"]
 
 [tool.pytest.ini_options]
-testpaths = ["backend", "agent", "tests"]
+testpaths = ["backend", "agent", "bench", "tests"]
 pythonpath = ["."]
 addopts = "--import-mode=importlib --cov --cov-report=term-missing"
 
 [tool.coverage.run]
-source = ["backend", "agent"]
+source = ["backend", "agent", "bench"]
 omit = ["*/tests/*"]
 
 [tool.coverage.report]
 fail_under = 80
 
 [tool.pyright]
-include = ["backend", "agent", "settings.py"]
+include = ["backend", "agent", "bench", "settings.py"]
 venvPath = "."
 venv = ".venv"
 pythonVersion = "3.12"

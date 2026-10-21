@@ -84,6 +84,6 @@ The brief in `docs/HARNESS.md`, built on our own pilot: one run works the queue 
 
 **Success criteria**
 
-- [ ] Scoring tested on a stub model and hand-made answers
-- [ ] The comparison run: Ollama `qwen3.5:4b` and `qwen3.5:9b` on 25 claims three times, one free OpenRouter model on the five `tiny` claims, Claude Haiku 5.5 on 25 claims three times, and Claude Opus 5.5 on the five `tiny` claims three times, within the budget. (A measured Haiku claim used 10 model calls, 63,000 input and 3,400 output tokens; at Opus prices that is about $0.32 a claim, so Opus on all 25 would cost about $8 and is left out.)
-- [ ] A write-up of the results, for a community contribution
+- [x] Scoring tested on a stub model and hand-made answers
+- [x] The comparison run, within the budget: Claude Haiku 5.5 on 25 claims three times, Claude Opus 5.5 on the five `tiny` claims three times, one free OpenRouter model (Gemma 4 31B) on the five `tiny` claims, and Ollama `qwen3.5:4b` twice on 25 claims. (A measured Haiku claim used 10 model calls, 63,000 input and 3,400 output tokens; at Opus prices that is about $0.32 a claim, so Opus on all 25 would cost about $8 and is left out. The plan had three runs of each Qwen model; on this machine a 4B run took 25 to 30 minutes and `qwen3.5:9b` three to four minutes a claim, so the 4B ran twice and the 9B was left out. OpenRouter refused every call to the free model, rate-limited upstream, so that trial has no score.)
+- [x] A write-up of the results, for a community contribution: `bench/results.md`, and `community_contributions/Darko-Martinovic/HARNESS.md` in Ed's repo

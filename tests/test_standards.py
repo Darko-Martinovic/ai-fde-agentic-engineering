@@ -15,7 +15,9 @@ from agent import api
 from backend.main import app
 
 ROOT = Path(__file__).resolve().parents[1]
-PARTS = ("backend", "agent")
+PARTS = ("backend", "agent", "bench")
+# The parts that make up the product, which never see the answer key
+PRODUCT = ("backend", "agent")
 MAX_LINES = 300
 MAX_FUNCTION_LINES = 40
 
@@ -62,9 +64,14 @@ def offending(
     ]
 
 
+SVG_NAMESPACE = 'xmlns="http://www.w3.org/2000/svg"'
+
+
 def test_no_address_in_code():
-    """Hosts, ports and URLs live in .env.defaults (standard 22)."""
-    assert offending(ADDRESS) == []
+    """Hosts, ports and URLs live in .env.defaults (standard 22). The SVG
+    namespace in the comparison's chart is a name, not an address."""
+    found = offending(ADDRESS, PARTS)
+    assert [line for line in found if SVG_NAMESPACE not in line] == []
 
 
 def test_no_model_in_code():
@@ -73,8 +80,10 @@ def test_no_model_in_code():
 
 
 def test_nothing_reaches_the_answer_key():
-    """The agent and the backend never see data/evals/."""
-    assert offending(ANSWER_KEY) == []
+    """The agent and the backend never see data/evals/; only the comparison's
+    scoring reads it."""
+    assert offending(ANSWER_KEY, PRODUCT) == []
+    assert offending(ANSWER_KEY, ("bench",), ("bench/score.py",)) == []
 
 
 def test_only_the_api_module_calls_the_backend():
