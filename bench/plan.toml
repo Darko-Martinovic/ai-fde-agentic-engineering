@@ -26,12 +26,9 @@ model = "openrouter:google/gemma-4-31b-it:free"
 claims = "tiny"
 repeats = 1
 
+# Ollama qwen3.5:9b was left out: on this machine it took three to four
+# minutes a claim, so 25 claims would take well over an hour
 [[trials]]
 model = "ollama:qwen3.5:4b"
 claims = "all"
 repeats = 2
-
-[[trials]]
-model = "ollama:qwen3.5:9b"
-claims = "all"
-repeats = 1
