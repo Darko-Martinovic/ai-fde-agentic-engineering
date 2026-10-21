@@ -10,8 +10,8 @@ from pydantic import BaseModel
 
 from agent.__main__ import main as work
 from agent.config import current_model
-from backend.api import Db, load_claim
-from backend.store import claims
+from backend.api import Db, load_claim, now
+from backend.store import claims, runs
 
 router = APIRouter(prefix="/api/agent")
 
@@ -59,9 +59,11 @@ def state(conn: sqlite3.Connection) -> AgentState:
 
 
 def return_to_queue(conn: sqlite3.Connection) -> None:
-    """Put claims left in progress back to waiting, clearing unpaid decisions."""
+    """Put claims left in progress back to waiting, clearing unpaid decisions,
+    and mark any run still running as stopped."""
     with conn:
         claims.return_to_queue(conn)
+        runs.stop_running(conn, now())
 
 
 def launch(

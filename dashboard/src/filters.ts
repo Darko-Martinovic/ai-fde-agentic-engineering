@@ -59,6 +59,7 @@ export function countByStatus(
     in_progress: 0,
     awaiting_sign_off: 0,
     referred: 0,
+    left_for_handler: 0,
     decided: 0,
   };
   for (const claim of claims) counts[claim.status] += 1;

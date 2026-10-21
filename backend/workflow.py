@@ -5,21 +5,26 @@ import sqlite3
 
 from fastapi import APIRouter, HTTPException
 
-from backend.api import Db, found, load_claim, now
+from backend.api import Db, found, load_claim, now, require_running
 from backend.models import (
+    FOR_A_HANDLER,
     Claim,
     DecisionIn,
+    FailureIn,
+    HandlerDecisionIn,
     PaymentIn,
-    ResolutionIn,
     SignOffIn,
+    StartIn,
     Step,
     StepIn,
 )
-from backend.store import claims, records, steps
+from backend.store import claims, records, runs, steps
 
 router = APIRouter(prefix="/api/claims/{claim_id}")
 
 STATUS_AFTER = {"decline": "decided", "refer": "referred"}
+# A claim that fails this many times is left for a handler
+MAX_FAILURES = 2
 
 
 def approval_limit(conn: sqlite3.Connection) -> float:
@@ -31,10 +36,11 @@ def check_handler(conn: sqlite3.Connection, handler_id: str) -> None:
     found(records.handler(conn, handler_id), "Handler", handler_id)
 
 
-def require_status(claim: Claim, status: str) -> None:
-    if claim.status != status:
+def require_status(claim: Claim, *statuses: str) -> None:
+    if claim.status not in statuses:
+        wanted = " or ".join(statuses)
         raise HTTPException(
-            409, f"Claim {claim.claim_id} is {claim.status}, not {status}"
+            409, f"Claim {claim.claim_id} is {claim.status}, not {wanted}"
         )
 
 
@@ -42,7 +48,7 @@ def add_decision(
     conn: sqlite3.Connection,
     claim_id: str,
     decided_by: str,
-    decision: DecisionIn | ResolutionIn,
+    decision: DecisionIn | HandlerDecisionIn,
     policy_section: str | None,
 ) -> None:
     claims.add_decision(
@@ -66,11 +72,34 @@ def add_payment(
 
 
 @router.post("/start", operation_id="start_claim")
-def start_claim(claim_id: str, conn: Db) -> Claim:
-    """Start work on a waiting claim."""
+def start_claim(claim_id: str, start: StartIn, conn: Db) -> Claim:
+    """Start work on a waiting claim in a run, within the run's cap."""
     require_status(load_claim(conn, claim_id), "waiting")
+    run = require_running(conn, start.run_id)
+    started = runs.claims_started(conn, run.run_id)
+    if claim_id not in started and len(started) >= run.cap:
+        raise HTTPException(
+            409, f"Run {run.run_id} has reached its cap of {run.cap} claims"
+        )
     with conn:
-        claims.set_status(conn, claim_id, "in_progress")
+        if not claims.start(conn, claim_id):
+            raise HTTPException(409, f"Claim {claim_id} has just been started")
+        runs.add_attempt(conn, run.run_id, claim_id, start.thread_id, now())
+    return load_claim(conn, claim_id)
+
+
+@router.post("/failure", operation_id="fail_claim")
+def fail_claim(claim_id: str, failure: FailureIn, conn: Db) -> Claim:
+    """Record that work on a claim failed before it was decided: the claim goes
+    back in the queue, or is left for a handler when it has failed twice."""
+    require_status(load_claim(conn, claim_id), "in_progress")
+    failures = steps.count_of(conn, claim_id, "failure") + 1
+    status = "left_for_handler" if failures >= MAX_FAILURES else "waiting"
+    step = {"thread_id": failure.thread_id, "kind": "failure", "text": failure.reason}
+    with conn:
+        claims.clear_decisions(conn, claim_id)
+        steps.add(conn, claim_id, step | {"recorded_at": now()})
+        claims.set_status(conn, claim_id, status)
     return load_claim(conn, claim_id)
 
 
@@ -143,12 +172,13 @@ def sign_off_claim(claim_id: str, sign_off: SignOffIn, conn: Db) -> Claim:
     return load_claim(conn, claim_id)
 
 
-@router.post("/resolution", operation_id="resolve_referral")
-def resolve_referral(claim_id: str, resolution: ResolutionIn, conn: Db) -> Claim:
-    """Approve or decline a referred claim as a handler, paying an approval."""
+@router.post("/handler-decision", operation_id="decide_as_handler")
+def decide_as_handler(claim_id: str, resolution: HandlerDecisionIn, conn: Db) -> Claim:
+    """Approve or decline, as a handler, a claim the agent referred or that was
+    left for a handler, paying an approval."""
     claim = load_claim(conn, claim_id)
     check_handler(conn, resolution.handler_id)
-    require_status(claim, "referred")
+    require_status(claim, *FOR_A_HANDLER)
     with conn:
         add_decision(conn, claim_id, resolution.handler_id, resolution, None)
         if resolution.decision == "approve":

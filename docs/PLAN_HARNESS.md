@@ -42,13 +42,13 @@ The brief in `docs/HARNESS.md`, built on our own pilot: one run works the queue 
 
 ## Phase 3: Runs, to-do lists, failures and usage
 
-**Builds:** a `runs` table (mode, cap, model, status, times, summary and to-do list) with `start_run`, `get_latest_run`, `write_todos` and `finish_run`; a claim's attempts; `fail_claim`, which puts a claim back in the queue or, on its second failure, leaves it for a handler (`left_for_handler`); `start_claim` taking the run and refusing claims past its cap; `resolve_referral` renamed `decide_as_handler`, for referred claims and claims left for a handler; and a usage middleware that records each model call's tokens, cost and time against the claim and the run, with the cost from OpenRouter when it reports one and from `models.toml` otherwise.
+**Builds:** a `runs` table (mode, cap, model, status, times, summary and to-do list) with `start_run`, `get_latest_run`, `write_todos` and `finish_run`; a claim's attempts; `fail_claim`, which puts a claim back in the queue or, on its second failure, leaves it for a handler (`left_for_handler`); `start_claim` taking the run and refusing claims past its cap; `resolve_referral` renamed `decide_as_handler`, for referred claims and claims left for a handler; and a usage middleware that records each model call's tokens, cost and time against the claim and the run, with the cost worked out from the prices in `models.toml` (the free models cost nothing, so OpenRouter's own cost report isn't needed). The claim agent also gets `ModelRetryMiddleware` (provider errors are retried twice) and `ModelCallLimitMiddleware` (30 calls a claim), and `work_claim` turns any failure, or a claim left undecided, into `fail_claim`, reporting in a line.
 
 **Success criteria**
 
-- [ ] Tests for a run's cap, a first failure going back to `waiting`, a second leaving the claim for a handler, a claim never decided or paid twice, and Stop marking the run stopped
-- [ ] A stub run records its model calls' tokens and cost, and a run's totals are its own
-- [ ] Postman covers every new and changed operation, and newman passes
+- [x] Tests for a run's cap, a first failure going back to `waiting`, a second leaving the claim for a handler, a claim never decided or paid twice, and Stop marking the run stopped
+- [x] A stub run records its model calls' tokens and cost, and a run's totals are its own
+- [x] Postman covers every new and changed operation, and newman passes
 
 ## Phase 4: The queue agent
 
@@ -85,5 +85,5 @@ The brief in `docs/HARNESS.md`, built on our own pilot: one run works the queue 
 **Success criteria**
 
 - [ ] Scoring tested on a stub model and hand-made answers
-- [ ] The comparison run: Ollama `qwen3.5:4b` and `qwen3.5:9b` on 25 claims three times, one free OpenRouter model on the five `tiny` claims, Claude Haiku 5.5 on 25 claims three times, and Claude Opus 5.5 on 25 claims once and the five `tiny` claims three times, within the budget
+- [ ] The comparison run: Ollama `qwen3.5:4b` and `qwen3.5:9b` on 25 claims three times, one free OpenRouter model on the five `tiny` claims, Claude Haiku 5.5 on 25 claims three times, and Claude Opus 5.5 on the five `tiny` claims three times, within the budget. (A measured Haiku claim used 10 model calls, 63,000 input and 3,400 output tokens; at Opus prices that is about $0.32 a claim, so Opus on all 25 would cost about $8 and is left out.)
 - [ ] A write-up of the results, for a community contribution

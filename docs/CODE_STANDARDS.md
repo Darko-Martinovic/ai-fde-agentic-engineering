@@ -20,7 +20,7 @@
 
 ## The agent
 
-13. The agent has three parts, kept apart, and its settings. `api.py` is the backend's API. `tools.py` holds every tool and the contexts the tools read. `harness.py` builds and runs the agents: their models, middleware and runs. `config.py` reads the settings and the models allowed. Rules about claims and payments are enforced by the backend, whatever the agent does.
+13. The agent has three parts, kept apart, and their supports. `api.py` is the backend's API. `tools.py` holds every tool and the contexts the tools read. `harness.py` builds and runs the agents: their models and runs. `middleware.py` holds what happens around their model and tool calls, and `config.py` reads the models allowed. Rules about claims and payments are enforced by the backend, whatever the agent does.
 14. Instructions give an agent its goal, what it has to work from and what done looks like. They don't script its steps: it plans those itself. Anything that must always happen, or happen in a fixed order, is done by the code.
 
 ## Checked by tests

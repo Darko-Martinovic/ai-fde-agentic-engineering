@@ -53,6 +53,17 @@ def first_in_progress(conn: sqlite3.Connection) -> str | None:
     return row["claim_id"] if row else None
 
 
+def start(conn: sqlite3.Connection, claim_id: str) -> bool:
+    """Move a waiting claim to in progress, in one step so two starts can't both
+    take it. Return whether this start took it."""
+    cursor = conn.execute(
+        "UPDATE claims SET status = 'in_progress'"
+        " WHERE claim_id = ? AND status = 'waiting'",
+        (claim_id,),
+    )
+    return cursor.rowcount == 1
+
+
 def set_status(conn: sqlite3.Connection, claim_id: str, status: str) -> None:
     conn.execute("UPDATE claims SET status = ? WHERE claim_id = ?", (status, claim_id))
 
@@ -64,6 +75,11 @@ def return_to_queue(conn: sqlite3.Connection) -> None:
         " (SELECT claim_id FROM claims WHERE status = 'in_progress')"
     )
     conn.execute("UPDATE claims SET status = 'waiting' WHERE status = 'in_progress'")
+
+
+def clear_decisions(conn: sqlite3.Connection, claim_id: str) -> None:
+    """Remove a claim's decisions, as when work on it failed before it was final."""
+    conn.execute("DELETE FROM decisions WHERE claim_id = ?", (claim_id,))
 
 
 def decisions(conn: sqlite3.Connection, claim_id: str) -> list[dict[str, Any]]:

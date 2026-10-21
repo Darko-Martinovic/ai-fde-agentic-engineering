@@ -1,5 +1,7 @@
 import pytest
 
+from backend.tests.claim_starts import start
+
 
 def search(client, query):
     response = client.get("/api/documents/search", params={"query": query})
@@ -71,6 +73,6 @@ def test_a_document_that_isnt_there(client):
 
 
 def test_a_section_step_must_name_a_section(client):
-    client.post("/api/claims/CLM-1001/start")
+    start(client, "CLM-1001")
     step = {"thread_id": "t", "kind": "section", "text": "manual 9"}
     assert client.post("/api/claims/CLM-1001/steps", json=step).status_code == 422

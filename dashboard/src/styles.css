@@ -433,6 +433,12 @@ main {
   --tone-ink: var(--raspberry-ink);
 }
 
+.badge--left_for_handler,
+.tile--left_for_handler {
+  --tone: color-mix(in srgb, var(--raspberry) 65%, var(--midnight));
+  --tone-ink: var(--raspberry-ink);
+}
+
 .badge--decided,
 .tile--decided,
 .badge--approve {
@@ -513,7 +519,8 @@ main {
 }
 
 .tile--waiting,
-.tile--referred {
+.tile--referred,
+.tile--left_for_handler {
   color: #ffffff;
 }
 
@@ -1411,4 +1418,10 @@ main {
   margin: 0;
   font-weight: 600;
   color: var(--cerulean-ink);
+}
+
+.step__failure {
+  margin: 0;
+  font-weight: 600;
+  color: var(--raspberry-ink);
 }

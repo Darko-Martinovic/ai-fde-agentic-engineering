@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
+import { startClaim } from "./claim-starts";
 
 // The agent's decisions are set up through the API, so no model is called.
 async function agentDecides(
@@ -7,7 +8,7 @@ async function agentDecides(
   decision: "approve" | "refer",
   payout: number,
 ) {
-  await request.post(`/api/claims/${claimId}/start`);
+  await startClaim(request, claimId);
   const response = await request.post(`/api/claims/${claimId}/decision`, {
     data: {
       decision,

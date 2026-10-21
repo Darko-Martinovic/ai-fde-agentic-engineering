@@ -70,8 +70,27 @@ def read_section(document: str, number: int) -> dict[str, Any]:
     return send("GET", f"/api/documents/{document}/sections/{number}").json()
 
 
-def start_claim(claim_id: str) -> dict[str, Any]:
-    return send("POST", f"/api/claims/{claim_id}/start").json()
+def start_claim(claim_id: str, run_id: int, thread_id: str) -> dict[str, Any]:
+    body = {"run_id": run_id, "thread_id": thread_id}
+    return send("POST", f"/api/claims/{claim_id}/start", body).json()
+
+
+def fail_claim(claim_id: str, thread_id: str, reason: str) -> dict[str, Any]:
+    body = {"thread_id": thread_id, "reason": reason}
+    return send("POST", f"/api/claims/{claim_id}/failure", body).json()
+
+
+def start_run(mode: str, cap: int, model: str) -> dict[str, Any]:
+    body = {"mode": mode, "cap": cap, "model": model}
+    return send("POST", "/api/runs", body).json()
+
+
+def finish_run(run_id: int, summary: str) -> dict[str, Any]:
+    return send("POST", f"/api/runs/{run_id}/finish", {"summary": summary}).json()
+
+
+def record_usage(run_id: int, usage: dict[str, Any]) -> None:
+    send("POST", f"/api/runs/{run_id}/usage", usage)
 
 
 def record_step(claim_id: str, thread_id: str, kind: str, text: str) -> None:

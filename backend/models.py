@@ -6,9 +6,17 @@ from typing import Literal, Self
 from pydantic import BaseModel, Field, model_validator
 
 ClaimStatus = Literal[
-    "waiting", "in_progress", "awaiting_sign_off", "referred", "decided"
+    "waiting",
+    "in_progress",
+    "awaiting_sign_off",
+    "referred",
+    "left_for_handler",
+    "decided",
 ]
-StepKind = Literal["tool_call", "tool_result", "reply", "section"]
+# The states a handler decides a claim from: the agent referred it, or it failed
+# twice and was left for a handler
+FOR_A_HANDLER: tuple[ClaimStatus, ...] = ("referred", "left_for_handler")
+StepKind = Literal["tool_call", "tool_result", "reply", "section", "failure"]
 DecisionKind = Literal["approve", "decline", "refer"]
 
 
@@ -63,7 +71,17 @@ class DecisionIn(BaseModel):
         return self
 
 
-class ResolutionIn(BaseModel):
+class StartIn(BaseModel):
+    run_id: int
+    thread_id: str = Field(min_length=1)
+
+
+class FailureIn(BaseModel):
+    thread_id: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+
+
+class HandlerDecisionIn(BaseModel):
     handler_id: str
     decision: Literal["approve", "decline"]
     payout: float = Field(ge=0)
@@ -216,3 +234,54 @@ class Handler(BaseModel):
     role: str
     email: str
     can_approve_over_limit: bool
+
+
+RunStatus = Literal["running", "finished", "stopped"]
+TodoStatus = Literal["pending", "in_progress", "completed", "left_for_handler"]
+
+
+class Todo(BaseModel):
+    content: str = Field(min_length=1)
+    status: TodoStatus
+
+
+class RunIn(BaseModel):
+    mode: Literal["queue", "claim"]
+    cap: int = Field(ge=1)
+    model: str = Field(min_length=1)
+
+
+class Usage(BaseModel):
+    model_calls: int
+    input_tokens: int
+    output_tokens: int
+    cost: float
+    seconds: float
+
+
+class Run(RunIn):
+    run_id: int
+    status: RunStatus
+    started_at: datetime
+    finished_at: datetime | None
+    summary: str | None
+    todos: list[Todo]
+    claims_started: int
+    usage: Usage
+
+
+class TodosIn(BaseModel):
+    todos: list[Todo]
+
+
+class FinishIn(BaseModel):
+    summary: str
+
+
+class UsageIn(BaseModel):
+    claim_id: str | None
+    model: str
+    input_tokens: int = Field(ge=0)
+    output_tokens: int = Field(ge=0)
+    cost: float = Field(ge=0)
+    seconds: float = Field(ge=0)

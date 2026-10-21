@@ -1,6 +1,7 @@
 import pytest
 
 from backend import db
+from backend.tests.claim_starts import start
 
 SECTION_READ = (
     '{"document": "manual", "document_title": "Claims manual", "number": 9,'
@@ -29,7 +30,7 @@ def add_steps(claim_id, thread_id, steps):
 
 
 def decide(client, claim_id, decision, payout, section="Section 3, Trip Delay"):
-    client.post(f"/api/claims/{claim_id}/start")
+    start(client, claim_id)
     response = client.post(
         f"/api/claims/{claim_id}/decision",
         json={

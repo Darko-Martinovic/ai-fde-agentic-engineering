@@ -35,6 +35,7 @@ export const STATUS_LABELS: Record<ClaimStatus, string> = {
   in_progress: "In progress",
   awaiting_sign_off: "Awaiting sign-off",
   referred: "Referred",
+  left_for_handler: "Left for a handler",
   decided: "Decided",
 };
 

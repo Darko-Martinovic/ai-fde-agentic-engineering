@@ -1,5 +1,11 @@
 import { useState, type SyntheticEvent } from "react";
-import { api, type Claim, type Decision, type Handler } from "./api";
+import {
+  FOR_A_HANDLER,
+  api,
+  type Claim,
+  type Decision,
+  type Handler,
+} from "./api";
 import { DecisionBadge, Panel } from "./components";
 import { clock, date, money } from "./format";
 import { useAction } from "./hooks";
@@ -161,7 +167,7 @@ function ReferralForm({
   const submit = (event: SyntheticEvent) => {
     event.preventDefault();
     run(() =>
-      api.resolveReferral(claim.claim_id, {
+      api.decideAsHandler(claim.claim_id, {
         handler_id: handlerId,
         decision,
         payout: decision === "approve" ? amount : 0,
@@ -172,7 +178,11 @@ function ReferralForm({
 
   return (
     <form className="action-form action-form--referral" onSubmit={submit}>
-      <h3>Decide the referral</h3>
+      <h3>
+        {claim.status === "referred"
+          ? "Decide the referral"
+          : "Decide the claim"}
+      </h3>
       <HandlerPicker
         handlers={handlers}
         value={handlerId}
@@ -242,7 +252,7 @@ export function DecisionPanel({
       {claim.status === "awaiting_sign_off" && (
         <SignOffForm claim={claim} handlers={handlers} onDone={onChange} />
       )}
-      {claim.status === "referred" && (
+      {FOR_A_HANDLER.includes(claim.status) && (
         <ReferralForm claim={claim} handlers={handlers} onDone={onChange} />
       )}
     </Panel>

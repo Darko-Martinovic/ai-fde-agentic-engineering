@@ -1,5 +1,13 @@
 export type ClaimStatus =
-  "waiting" | "in_progress" | "awaiting_sign_off" | "referred" | "decided";
+  | "waiting"
+  | "in_progress"
+  | "awaiting_sign_off"
+  | "referred"
+  | "left_for_handler"
+  | "decided";
+
+/** The states a handler decides a claim from. */
+export const FOR_A_HANDLER: ClaimStatus[] = ["referred", "left_for_handler"];
 
 export type DecisionKind = "approve" | "decline" | "refer";
 
@@ -125,7 +133,8 @@ export interface Handler {
   role: string;
 }
 
-export type StepKind = "tool_call" | "tool_result" | "reply" | "section";
+export type StepKind =
+  "tool_call" | "tool_result" | "reply" | "section" | "failure";
 
 export type DocumentName = "wording" | "manual";
 
@@ -287,7 +296,7 @@ export const api = {
   stopAgent: () => post<AgentState>("/api/agent/stop"),
   signOffClaim: (id: string, handlerId: string) =>
     post<Claim>(`/api/claims/${id}/sign-off`, { handler_id: handlerId }),
-  resolveReferral: (
+  decideAsHandler: (
     id: string,
     resolution: {
       handler_id: string;
@@ -295,5 +304,5 @@ export const api = {
       payout: number;
       reasons: string;
     },
-  ) => post<Claim>(`/api/claims/${id}/resolution`, resolution),
+  ) => post<Claim>(`/api/claims/${id}/handler-decision`, resolution),
 };
