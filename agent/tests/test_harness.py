@@ -9,7 +9,7 @@ from langchain_openai import ChatOpenAI
 
 from agent import harness, middleware
 from agent.config import model
-from agent.tests.stub import FREE, StubModel, decide, stub, tool_call
+from agent.tests.stub import FREE, REASONS, StubModel, decide, stub, tool_call
 from agent.tools import CLAIM_TOOLS
 
 
@@ -110,11 +110,11 @@ def test_reports_say_where_each_claim_stands(backend, run):
     referred = harness.work_claim(
         "CLM-1010", run, FREE, stub(decide("refer", 0), AIMessage(content="."))
     )
-    assert referred == "CLM-1010: referred to a handler"
+    assert referred == f"CLM-1010: referred to a handler, because: {REASONS}"
     declined = harness.work_claim(
         "CLM-1005", run, FREE, stub(decide("decline", 0), AIMessage(content="."))
     )
-    assert declined == "CLM-1005: declined"
+    assert declined == f"CLM-1005: declined, because: {REASONS}"
     held = harness.work_claim(
         "CLM-1002", run, FREE, stub(decide("approve", 1150), AIMessage(content="."))
     )
@@ -219,6 +219,21 @@ def test_chat_model_reaches_the_configured_address(monkeypatch):
     assert ollama.num_ctx == 4096
 
 
+def test_chat_model_times_out_and_leaves_retries_to_the_middleware(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("MODEL_TIMEOUT", "42")
+    openrouter = harness.chat_model(model("openrouter:deepseek/deepseek-v4.1-flash"))
+    assert isinstance(openrouter, ChatOpenAI)
+    assert (openrouter.request_timeout, openrouter.max_retries) == (42.0, 0)
+    anthropic = harness.chat_model(model("anthropic:claude-haiku-5-5"))
+    assert isinstance(anthropic, ChatAnthropic)
+    assert (anthropic.default_request_timeout, anthropic.max_retries) == (42.0, 0)
+    ollama = harness.chat_model(model("ollama:qwen3.5:4b"))
+    assert isinstance(ollama, ChatOllama)
+    assert ollama.client_kwargs == {"timeout": 42.0}
+
+
 def test_a_refusal_of_invalid_input_reads_as_text(backend):
     with pytest.raises(harness.api.Refused, match=r"Refused \(422\): \[") as refused:
         harness.api.pay_claim("CLM-1001", -5)
@@ -234,7 +249,10 @@ def test_an_error_after_the_decision_leaves_the_decision(backend, run):
 
     llm = FailsLast(messages=iter([decide("decline", 0)]))
     report = harness.work_claim("CLM-1005", run, FREE, llm)
-    assert report == "CLM-1005: declined (then TimeoutError: the provider timed out)"
+    assert report == (
+        f"CLM-1005: declined, because: {REASONS}"
+        " (then TimeoutError: the provider timed out)"
+    )
     assert backend.get("/api/claims/CLM-1005").json()["status"] == "decided"
 
 

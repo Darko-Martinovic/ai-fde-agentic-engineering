@@ -1,9 +1,11 @@
 # Tech stack
 
 - `backend/`: FastAPI and SQLite. Every API operation has an `operation_id`, a one-line docstring and no optional inputs. Paying a claim is a separate operation that takes the amount.
-- `agent/`: LangChain's `create_agent` on OpenRouter, with one entry point that takes a claim id and a thread id. It reaches claims and its instructions only through the backend's API. It uses `openai/gpt-6-luna` with low reasoning effort by default, or the model in the environment variable `MODEL_NAME` if set, such as `openrouter/free`.
-- `dashboard/`: React, Vite and TypeScript.
+- `agent/`: LangChain's `create_agent`, in five modules. `api.py` is the only way the agent reaches the backend, one function per operation: claims, runs, its instructions and the documents. `tools.py` holds every tool, and each tool reads what it needs, such as the claim a claim agent is working on, from the agent's `context_schema` through `ToolRuntime`. `middleware.py` records each reply, tool call, tool result and section read on the claim, and each model call's tokens, cost and time on the run. `harness.py` builds and runs the agents: `run_queue(cap, model)` runs a queue agent that hands each claim, one at a time, to a claim agent, and `work_claim(claim_id, run_id, model)` works one claim from a clean start, keeping no checkpoints. LangChain's own middleware returns refusals to the model, retries provider errors and limits the model calls. The to-do list, the subagent and the document lookup are our own tools, with no other agent framework. `config.py` reads `models.toml`. Models come through `init_chat_model` from OpenRouter, Anthropic or a local Ollama, each one listed in `models.toml` with its price; the default is `MODEL_NAME`, `deepseek/deepseek-v4.1-flash` on OpenRouter as the brief asks, and the dashboard or `--model` picks another.
+- `dashboard/`: React, Vite and TypeScript. It calls the backend only through `api.ts`, at relative `/api` URLs that Vite proxies to `UNDERCOVER_API`.
 - `e2e/`: Playwright tests.
 - `data/`: the business data the backend starts from. The agent never sees `data/evals/`, which holds the answer key.
 
-Python 3.12 with uv, all in the root `pyproject.toml`. Node 26. The OpenRouter key is `OPENROUTER_API_KEY` in `.env`.
+Python 3.12 with uv, all in the root `pyproject.toml`. Node 26.
+
+Settings: `.env.defaults` (committed) holds every setting that isn't secret, such as `UNDERCOVER_API` and the ports, with `${NAME}` for values built from others; `.env` holds the keys (`OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`) and any overrides, such as `MODEL_NAME`; `settings.py` and `settings.config.ts` read both. No address, port, model id or price is written in code.
