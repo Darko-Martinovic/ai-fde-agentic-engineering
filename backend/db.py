@@ -34,6 +34,35 @@ CREATE TABLE IF NOT EXISTS decisions (
     policy_section TEXT,
     decided_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS runs (
+    run_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mode TEXT NOT NULL,
+    cap INTEGER NOT NULL,
+    model TEXT NOT NULL,
+    status TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    finished_at TEXT,
+    summary TEXT,
+    todos TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS attempts (
+    attempt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL,
+    claim_id TEXT NOT NULL,
+    thread_id TEXT NOT NULL,
+    started_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS usage (
+    usage_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL,
+    claim_id TEXT,
+    model TEXT NOT NULL,
+    input_tokens INTEGER NOT NULL,
+    output_tokens INTEGER NOT NULL,
+    cost REAL NOT NULL,
+    seconds REAL NOT NULL,
+    recorded_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS payments (
     claim_id TEXT PRIMARY KEY,
     amount REAL NOT NULL,

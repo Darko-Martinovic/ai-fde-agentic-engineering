@@ -7,9 +7,9 @@ from langchain_core.utils.function_calling import convert_to_openai_tool
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 
-from agent import harness
+from agent import harness, middleware
 from agent.config import model
-from agent.tests.stub import StubModel
+from agent.tests.stub import FREE, StubModel
 from agent.tools import CLAIM_TOOLS
 
 
@@ -33,7 +33,7 @@ def decide(decision, payout):
     )
 
 
-def test_work_claim_approves_and_pays(backend):
+def test_work_claim_approves_and_pays(backend, run):
     llm = stub(
         tool_call("get_claim"),
         tool_call("get_policy", policy_id="POL-2001"),
@@ -42,7 +42,8 @@ def test_work_claim_approves_and_pays(backend):
         tool_call("pay_claim", amount=420.0),
         AIMessage(content="Approved and paid $420.00."),
     )
-    assert harness.work_claim("CLM-1001", llm) == "Approved and paid $420.00."
+    report = harness.work_claim("CLM-1001", run, FREE, llm)
+    assert report == "CLM-1001: approved $420.00, paid"
     claim = backend.get("/api/claims/CLM-1001").json()
     assert claim["status"] == "decided"
     assert claim["payment"]["amount"] == 420.0
@@ -54,13 +55,13 @@ def test_work_claim_approves_and_pays(backend):
     assert steps[0]["thread_id"].startswith("CLM-1001-")
 
 
-def test_payment_over_the_limit_is_refused(backend):
+def test_payment_over_the_limit_is_refused(backend, run):
     llm = stub(
         decide("approve", 1150.0),
         tool_call("pay_claim", amount=1150.0),
         AIMessage(content="Approved; the payment waits for sign-off."),
     )
-    harness.work_claim("CLM-1002", llm)
+    harness.work_claim("CLM-1002", run, FREE, llm)
     claim = backend.get("/api/claims/CLM-1002").json()
     assert claim["status"] == "awaiting_sign_off"
     assert claim["payment"] is None
@@ -71,7 +72,7 @@ def test_payment_over_the_limit_is_refused(backend):
     )
 
 
-def test_a_tool_cannot_reach_another_claim(backend):
+def test_a_tool_cannot_reach_another_claim(backend, run):
     """The claim comes from the run's context: a claim the model names is ignored."""
     elsewhere = tool_call(
         "decide_claim",
@@ -81,7 +82,9 @@ def test_a_tool_cannot_reach_another_claim(backend):
         reasons="Trying another claim.",
         policy_section="Policy wording 9, General exclusions",
     )
-    harness.work_claim("CLM-1003", stub(elsewhere, AIMessage(content="Declined.")))
+    harness.work_claim(
+        "CLM-1003", run, FREE, stub(elsewhere, AIMessage(content="Declined."))
+    )
     assert backend.get("/api/claims/CLM-1003").json()["status"] == "decided"
     assert backend.get("/api/claims/CLM-1001").json()["status"] == "waiting"
     for claim_tool in CLAIM_TOOLS:
@@ -89,15 +92,71 @@ def test_a_tool_cannot_reach_another_claim(backend):
         assert "claim_id" not in model_sees["properties"]
 
 
-def test_an_unexpected_error_stops_the_run(backend, monkeypatch):
+def test_an_unexpected_error_fails_the_claim_not_the_run(backend, run, monkeypatch):
     def broken(policy_id):
         raise RuntimeError("the backend fell over")
 
     monkeypatch.setattr(harness.api, "get_policy", broken)
-    with pytest.raises(RuntimeError):
-        harness.work_claim(
-            "CLM-1001", stub(tool_call("get_policy", policy_id="POL-2001"))
-        )
+    llm = stub(tool_call("get_policy", policy_id="POL-2001"))
+    report = harness.work_claim("CLM-1001", run, FREE, llm)
+    assert report == (
+        "CLM-1001: failed, back in the queue (RuntimeError: the backend fell over)"
+    )
+    claim = backend.get("/api/claims/CLM-1001").json()
+    assert claim["status"] == "waiting"
+    failure = backend.get("/api/claims/CLM-1001/steps").json()[-1]
+    assert failure["kind"] == "failure"
+
+
+def test_stopping_without_a_decision_is_a_failure(backend, run):
+    first = harness.work_claim("CLM-1001", run, FREE, stub(AIMessage(content="Hmm.")))
+    assert first.startswith("CLM-1001: failed, back in the queue")
+    second = harness.work_claim("CLM-1001", run, FREE, stub(AIMessage(content="Hmm.")))
+    assert second == f"CLM-1001: failed twice, left for a handler ({harness.STOPPED})"
+
+
+def test_a_model_error_is_a_failure(backend, run):
+
+    class Broken(StubModel):
+        def _generate(self, *args, **kwargs):
+            raise TimeoutError("the provider timed out")
+
+    report = harness.work_claim("CLM-1004", run, FREE, Broken(messages=iter([])))
+    assert "TimeoutError: the provider timed out" in report
+    assert backend.get("/api/claims/CLM-1004").json()["status"] == "waiting"
+
+
+def test_reports_say_where_each_claim_stands(backend, run):
+    referred = harness.work_claim(
+        "CLM-1010", run, FREE, stub(decide("refer", 0), AIMessage(content="."))
+    )
+    assert referred == "CLM-1010: referred to a handler"
+    declined = harness.work_claim(
+        "CLM-1005", run, FREE, stub(decide("decline", 0), AIMessage(content="."))
+    )
+    assert declined == "CLM-1005: declined"
+    held = harness.work_claim(
+        "CLM-1002", run, FREE, stub(decide("approve", 1150), AIMessage(content="."))
+    )
+    assert held == "CLM-1002: approved $1,150.00, waiting for a handler's sign-off"
+
+
+def test_usage_is_recorded_on_the_run(backend, run):
+    priced = model("anthropic:claude-haiku-5-5")
+    reply = AIMessage(
+        content="",
+        tool_calls=[{"name": "get_claim", "args": {}, "id": "1"}],
+        usage_metadata={
+            "input_tokens": 20000,
+            "output_tokens": 1000,
+            "total_tokens": 21000,
+        },
+    )
+    harness.work_claim("CLM-1001", run, priced, stub(reply, AIMessage(content=".")))
+    usage = backend.get("/api/runs/latest").json()["usage"]
+    assert usage["model_calls"] == 2
+    assert usage["input_tokens"] == 20000
+    assert usage["cost"] == pytest.approx(priced.cost(20000, 1000))
 
 
 def test_instructions_list_the_sections_not_the_wording(backend):
@@ -108,9 +167,11 @@ def test_instructions_list_the_sections_not_the_wording(backend):
     assert "# UnderCover Travel Insurance: Policy Wording" not in prompt
 
 
-def test_sections_read_are_recorded(backend):
+def test_sections_read_are_recorded(backend, run):
     harness.work_claim(
         "CLM-1001",
+        run,
+        FREE,
         stub(
             tool_call("search_documents", query="meals without receipts"),
             tool_call("read_section", document="manual", number=10),
@@ -139,7 +200,7 @@ def test_steps_from_a_reply():
         content="Reading the claim.",
         tool_calls=[{"name": "get_policy", "args": {"policy_id": "P"}, "id": "1"}],
     )
-    assert harness.steps(thinking) == [
+    assert middleware.steps(thinking) == [
         ("reply", "Reading the claim."),
         ("tool_call", 'get_policy {"policy_id": "P"}'),
     ]
@@ -182,3 +243,26 @@ def test_a_refusal_of_invalid_input_reads_as_text(backend):
     with pytest.raises(harness.api.Refused, match=r"Refused \(422\): \[") as refused:
         harness.api.pay_claim("CLM-1001", -5)
     assert refused.value.status == 422
+
+
+def test_an_error_after_the_decision_leaves_the_decision(backend, run):
+    class FailsLast(StubModel):
+        def _generate(self, messages, *args, **kwargs):
+            if len(messages) > 2:
+                raise TimeoutError("the provider timed out")
+            return super()._generate(messages, *args, **kwargs)
+
+    llm = FailsLast(messages=iter([decide("decline", 0)]))
+    report = harness.work_claim("CLM-1005", run, FREE, llm)
+    assert report == "CLM-1005: declined (then TimeoutError: the provider timed out)"
+    assert backend.get("/api/claims/CLM-1005").json()["status"] == "decided"
+
+
+def test_a_claim_is_untouched_when_its_agent_cannot_be_built(backend, run, monkeypatch):
+    def no_key(model):
+        raise KeyError("ANTHROPIC_API_KEY")
+
+    monkeypatch.setattr(harness, "chat_model", no_key)
+    with pytest.raises(KeyError):
+        harness.work_claim("CLM-1001", run, FREE)
+    assert backend.get("/api/claims/CLM-1001").json()["status"] == "waiting"

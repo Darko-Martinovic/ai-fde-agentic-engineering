@@ -7,7 +7,8 @@ from backend import db
 
 
 def reply_only(monkeypatch):
-    """Give every run a stub model that reads the claim and replies."""
+    """Give every run a stub model that reads the claim and replies, deciding
+    nothing, so each claim fails and goes back in the queue."""
 
     def stub(model):
         return StubModel(
@@ -28,8 +29,11 @@ def reply_only(monkeypatch):
 def test_one_claim(backend, monkeypatch, capsys):
     reply_only(monkeypatch)
     cli.main(["CLM-1001"])
-    assert capsys.readouterr().out == "CLM-1001: Looked at it.\n"
-    assert backend.get("/api/claims/CLM-1001").json()["status"] == "in_progress"
+    expected = f"CLM-1001: failed, back in the queue ({harness.STOPPED})"
+    assert capsys.readouterr().out == expected + "\n"
+    run = backend.get("/api/runs/latest").json()
+    assert (run["mode"], run["cap"], run["status"]) == ("claim", 1, "finished")
+    assert run["summary"] == expected
 
 
 def test_the_queue(backend, monkeypatch, capsys):
@@ -43,9 +47,8 @@ def test_the_queue(backend, monkeypatch, capsys):
         )
     conn.close()
     cli.main([])
-    assert capsys.readouterr().out.splitlines() == [
-        "CLM-1003: Looked at it.",
-        "CLM-1004: Looked at it.",
-    ]
-    statuses = {c["claim_id"]: c["status"] for c in backend.get("/api/claims").json()}
-    assert statuses["CLM-1003"] == statuses["CLM-1004"] == "in_progress"
+    lines = capsys.readouterr().out.splitlines()
+    assert [line.split(":")[0] for line in lines] == ["CLM-1003", "CLM-1004"]
+    run = backend.get("/api/runs/latest").json()
+    assert (run["mode"], run["cap"], run["claims_started"]) == ("queue", 2, 2)
+    assert run["summary"].splitlines() == lines

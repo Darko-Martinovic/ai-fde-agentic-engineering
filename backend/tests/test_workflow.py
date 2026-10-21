@@ -1,8 +1,6 @@
 import pytest
 
-
-def start(client, claim_id):
-    return client.post(f"/api/claims/{claim_id}/start")
+from backend.tests.claim_starts import a_run, start
 
 
 def decide(client, claim_id, decision, payout):
@@ -29,7 +27,7 @@ def sign_off(client, claim_id, handler_id):
 
 def resolve(client, claim_id, handler_id, decision, payout):
     return client.post(
-        f"/api/claims/{claim_id}/resolution",
+        f"/api/claims/{claim_id}/handler-decision",
         json={
             "handler_id": handler_id,
             "decision": decision,
@@ -266,3 +264,73 @@ def test_queue_shows_decisions_and_payments(client):
     assert (queue["CLM-1002"]["payout"], queue["CLM-1002"]["paid"]) == (1150, None)
     assert queue["CLM-1010"]["decision"] == "decline"
     assert queue["CLM-1003"]["decision"] is None
+
+
+def fail(client, claim_id, reason="The model provider timed out"):
+    return client.post(
+        f"/api/claims/{claim_id}/failure",
+        json={"thread_id": f"{claim_id}-test", "reason": reason},
+    )
+
+
+def test_a_run_stops_at_its_cap(client):
+    run_id = client.post(
+        "/api/runs", json={"mode": "queue", "cap": 2, "model": "ollama:qwen3.5:4b"}
+    ).json()["run_id"]
+    assert start(client, "CLM-1001", run_id).status_code == 200
+    assert start(client, "CLM-1002", run_id).status_code == 200
+    third = start(client, "CLM-1003", run_id)
+    assert third.status_code == 409
+    assert third.json()["detail"] == f"Run {run_id} has reached its cap of 2 claims"
+    assert client.get("/api/claims/CLM-1003").json()["status"] == "waiting"
+
+
+def test_a_claim_tried_again_counts_once_against_the_cap(client):
+    run_id = client.post(
+        "/api/runs", json={"mode": "queue", "cap": 1, "model": "ollama:qwen3.5:4b"}
+    ).json()["run_id"]
+    start(client, "CLM-1001", run_id)
+    fail(client, "CLM-1001")
+    assert start(client, "CLM-1001", run_id).status_code == 200
+
+
+def test_a_claim_needs_a_running_run(client):
+    run_id = a_run(client)
+    client.post(f"/api/runs/{run_id}/finish", json={"summary": "Done."})
+    response = start(client, "CLM-1001", run_id)
+    assert response.status_code == 409
+    assert response.json()["detail"] == f"Run {run_id} is finished, not running"
+
+
+def test_a_failure_puts_the_claim_back_in_the_queue(client):
+    approved(client, "CLM-1001", 420)
+    claim = fail(client, "CLM-1001").json()
+    assert claim["status"] == "waiting"
+    assert claim["decisions"] == []
+    steps = client.get("/api/claims/CLM-1001/steps").json()
+    assert steps[-1]["kind"] == "failure"
+    assert steps[-1]["text"] == "The model provider timed out"
+
+
+def test_a_second_failure_leaves_the_claim_for_a_handler(client):
+    start(client, "CLM-1001")
+    fail(client, "CLM-1001")
+    start(client, "CLM-1001")
+    assert fail(client, "CLM-1001").json()["status"] == "left_for_handler"
+    assert start(client, "CLM-1001").status_code == 409
+
+
+def test_only_a_claim_in_progress_can_fail(client):
+    assert fail(client, "CLM-1001").status_code == 409
+    referred(client, "CLM-1010")
+    assert fail(client, "CLM-1010").status_code == 409
+
+
+def test_a_handler_decides_a_claim_left_for_them(client):
+    start(client, "CLM-1004")
+    fail(client, "CLM-1004")
+    start(client, "CLM-1004")
+    fail(client, "CLM-1004")
+    claim = resolve(client, "CLM-1004", "HND-01", "approve", 74).json()
+    assert claim["status"] == "decided"
+    assert claim["payment"]["authorized_by"] == "HND-01"

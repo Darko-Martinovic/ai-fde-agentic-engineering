@@ -7,6 +7,7 @@ const KIND_LABELS: Record<StepKind, string> = {
   tool_result: "Tool result",
   reply: "Agent",
   section: "Reads a section",
+  failure: "This attempt failed",
 };
 
 function StepBody({ step }: Readonly<{ step: Step }>) {
@@ -36,6 +37,9 @@ function StepBody({ step }: Readonly<{ step: Step }>) {
   }
   if (step.kind === "section") {
     return <p className="step__section">{sectionName(sectionOf(step))}</p>;
+  }
+  if (step.kind === "failure") {
+    return <p className="step__failure">{step.text}</p>;
   }
   return <p className="step__reply">{step.text}</p>;
 }

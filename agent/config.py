@@ -8,6 +8,9 @@ from typing import Any
 
 from settings import ROOT, setting
 
+# models.toml gives prices per million tokens
+PER_MILLION = 1_000_000
+
 
 @dataclass(frozen=True)
 class Model:
@@ -26,6 +29,11 @@ class Model:
     @property
     def name(self) -> str:
         return self.spec.split(":", 1)[1]
+
+    def cost(self, input_tokens: int, output_tokens: int) -> float:
+        """What a model call cost in US dollars, at the prices in models.toml."""
+        spent = input_tokens * self.input_price + output_tokens * self.output_price
+        return spent / PER_MILLION
 
 
 @cache

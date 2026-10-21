@@ -1,5 +1,5 @@
 """What the backend's routes share: the database for a request, the time, and
-loading a claim."""
+loading a claim or a run."""
 
 import json
 import sqlite3
@@ -10,9 +10,9 @@ from typing import Annotated
 from fastapi import Depends, HTTPException
 
 from backend import db
-from backend.models import Claim
+from backend.models import Claim, Run
 from backend.seed import ensure_seeded
-from backend.store import claims
+from backend.store import claims, runs
 
 
 def database() -> Iterator[sqlite3.Connection]:
@@ -50,3 +50,24 @@ def load_claim(conn: sqlite3.Connection, claim_id: str) -> Claim:
             "payment": claims.payment(conn, claim_id),
         }
     )
+
+
+def load_run(conn: sqlite3.Connection, run_id: int) -> Run:
+    """Load one run with its to-do list, the claims it started and its usage."""
+    row = found(runs.run(conn, run_id), "Run", str(run_id))
+    return Run.model_validate(
+        dict(row)
+        | {
+            "todos": json.loads(row["todos"]),
+            "claims_started": len(runs.claims_started(conn, run_id)),
+            "usage": dict(runs.usage(conn, run_id)),
+        }
+    )
+
+
+def require_running(conn: sqlite3.Connection, run_id: int) -> Run:
+    """Load a run that is still running, or refuse."""
+    run = load_run(conn, run_id)
+    if run.status != "running":
+        raise HTTPException(409, f"Run {run_id} is {run.status}, not running")
+    return run

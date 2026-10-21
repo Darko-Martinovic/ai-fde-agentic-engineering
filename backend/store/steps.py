@@ -27,3 +27,10 @@ def every_step(conn: sqlite3.Connection) -> list[sqlite3.Row]:
         "SELECT claim_id, thread_id, kind, text, recorded_at FROM steps"
         " ORDER BY step_id"
     ).fetchall()
+
+
+def count_of(conn: sqlite3.Connection, claim_id: str, kind: str) -> int:
+    """How many steps of one kind a claim has, such as its failures."""
+    return conn.execute(
+        "SELECT COUNT(*) FROM steps WHERE claim_id = ? AND kind = ?", (claim_id, kind)
+    ).fetchone()[0]

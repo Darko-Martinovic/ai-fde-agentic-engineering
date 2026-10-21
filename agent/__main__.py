@@ -4,6 +4,7 @@
 import sys
 
 from agent import api
+from agent.config import current_model
 from agent.harness import work_claim
 
 
@@ -13,9 +14,17 @@ def waiting_claims() -> list[str]:
 
 
 def main(claim_ids: list[str]) -> None:
-    """Run the agent on the claims given, or on the whole queue if none are."""
-    for claim_id in claim_ids or waiting_claims():
-        print(f"{claim_id}: {work_claim(claim_id)}", flush=True)
+    """Run the agent on the claims given, or on the whole queue if none are, in
+    one run, finished with each claim's report."""
+    model = current_model()
+    claims = claim_ids or waiting_claims()
+    mode = "claim" if claim_ids else "queue"
+    run_id = api.start_run(mode, max(len(claims), 1), model.spec)["run_id"]
+    reports = []
+    for claim_id in claims:
+        reports.append(work_claim(claim_id, run_id, model))
+        print(reports[-1], flush=True)
+    api.finish_run(run_id, "\n".join(reports))
 
 
 if __name__ == "__main__":

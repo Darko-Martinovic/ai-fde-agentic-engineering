@@ -1,6 +1,7 @@
 # The models the agent may run on, chosen by MODEL_NAME or in the dashboard.
-# `spec` is provider:model. Prices are US dollars per million tokens, used where
-# the provider doesn't report a cost. `options` go to the model's LangChain class.
+# `spec` is provider:model. Prices are US dollars per million tokens, which the
+# agent records each model call's cost from. `options` go to the model's
+# LangChain class.
 
 [[models]]
 spec = "openrouter:deepseek/deepseek-v4.1-flash"

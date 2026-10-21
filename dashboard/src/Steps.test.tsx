@@ -24,3 +24,16 @@ it("shows a section read among the steps", () => {
     screen.getByText("Claims manual 10. Meals without receipts"),
   ).toBeDefined();
 });
+
+it("shows a failed attempt among the steps", () => {
+  const failure: Step = {
+    ...SECTION,
+    kind: "failure",
+    text: "TimeoutError: the provider timed out",
+  };
+  render(<StepsPanel steps={[failure]} live={false} />);
+  expect(screen.getByText("This attempt failed")).toBeDefined();
+  expect(
+    screen.getByText("TimeoutError: the provider timed out"),
+  ).toBeDefined();
+});

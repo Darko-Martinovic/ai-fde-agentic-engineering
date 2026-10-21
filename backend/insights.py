@@ -12,7 +12,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from backend.api import Db
-from backend.models import ClaimStatus, DecisionKind
+from backend.models import FOR_A_HANDLER, ClaimStatus, DecisionKind
 from backend.store import claims, steps
 from backend.workflow import approval_limit
 
@@ -197,7 +197,9 @@ def totals(records: Records, work: list[ClaimWork]) -> Totals:
         straight_through=sum(records.straight_through(c) for c in decided),
         sign_offs=sum(d["payout"] > records.limit for d in records.approvals()),
         referred=sum(d["decision"] == "refer" for d in decided.values()),
-        waiting_for_handler=in_state["awaiting_sign_off"] + in_state["referred"],
+        waiting_for_handler=sum(
+            in_state[s] for s in ("awaiting_sign_off", *FOR_A_HANDLER)
+        ),
         tool_calls=sum(w.tool_calls for w in work),
         refused=sum(w.refused for w in work),
         median_seconds=median(seconds) if seconds else None,

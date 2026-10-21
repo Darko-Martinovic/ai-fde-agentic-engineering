@@ -450,6 +450,47 @@
       "description": "Moves CLM-1001, CLM-1002 and CLM-1010 through the queue, so it changes the data. Run `uv run -m backend.seed` first to start from fresh data.",
       "item": [
         {
+          "name": "Start a run",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/runs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "runs"
+              ]
+            },
+            "description": "`start_run`: a run of the agent, capped at a number of claims, that the claims below start in.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"queue\",\n  \"cap\": 25,\n  \"model\": \"openrouter:openrouter/free\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const run = pm.response.json();",
+                  "pm.test(\"is running\", () => pm.expect(run.status).to.eql(\"running\"));",
+                  "pm.collectionVariables.set(\"runId\", run.run_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Start CLM-1001",
           "request": {
             "method": "POST",
@@ -471,10 +512,10 @@
                 "start"
               ]
             },
-            "description": "`start_claim`: waiting to in_progress.",
+            "description": "`start_claim`: start a waiting claim in the run.",
             "body": {
               "mode": "raw",
-              "raw": "{}"
+              "raw": "{\n  \"run_id\": {{runId}},\n  \"thread_id\": \"CLM-1001-postman\"\n}"
             }
           },
           "event": [
@@ -746,10 +787,10 @@
                 "start"
               ]
             },
-            "description": "`start_claim`.",
+            "description": "`start_claim`: start a waiting claim in the run.",
             "body": {
               "mode": "raw",
-              "raw": "{}"
+              "raw": "{\n  \"run_id\": {{runId}},\n  \"thread_id\": \"CLM-1002-postman\"\n}"
             }
           },
           "event": [
@@ -914,10 +955,10 @@
                 "start"
               ]
             },
-            "description": "`start_claim`.",
+            "description": "`start_claim`: start a waiting claim in the run.",
             "body": {
               "mode": "raw",
-              "raw": "{}"
+              "raw": "{\n  \"run_id\": {{runId}},\n  \"thread_id\": \"CLM-1010-postman\"\n}"
             }
           },
           "event": [
@@ -987,7 +1028,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/claims/CLM-1010/resolution",
+              "raw": "{{baseUrl}}/api/claims/CLM-1010/handler-decision",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -995,10 +1036,10 @@
                 "api",
                 "claims",
                 "CLM-1010",
-                "resolution"
+                "handler-decision"
               ]
             },
-            "description": "`resolve_referral`: a handler approves the referred claim, which pays it.",
+            "description": "`decide_as_handler`: a handler approves the referred claim, which pays it.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"handler_id\": \"HND-02\",\n  \"decision\": \"approve\",\n  \"payout\": 1350,\n  \"reasons\": \"The handler's reasons.\"\n}"
@@ -1014,6 +1055,249 @@
                   "const claim = pm.response.json();",
                   "pm.test(\"claim is decided\", () => pm.expect(claim.status).to.eql(\"decided\"));",
                   "pm.test(\"both decisions kept\", () => pm.expect(claim.decisions).to.have.lengthOf(2));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Runs",
+      "description": "Run after the Workflow folder, on fresh data: the run's to-do list, usage, a failed claim and the finish.",
+      "item": [
+        {
+          "name": "Write the to-do list",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/runs/{{runId}}/todos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "runs",
+                "{{runId}}",
+                "todos"
+              ]
+            },
+            "description": "`write_todos`: replace the run's to-do list.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"todos\": [\n    {\n      \"content\": \"Work CLM-1001\",\n      \"status\": \"completed\"\n    },\n    {\n      \"content\": \"Work CLM-1004\",\n      \"status\": \"in_progress\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"two items\", () => pm.expect(pm.response.json().todos.length).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record a model call",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/runs/{{runId}}/usage",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "runs",
+                "{{runId}}",
+                "usage"
+              ]
+            },
+            "description": "`record_usage`: one model call's tokens, cost and time.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claim_id\": \"CLM-1004\",\n  \"model\": \"anthropic:claude-haiku-5-5\",\n  \"input_tokens\": 1000,\n  \"output_tokens\": 100,\n  \"cost\": 0.00015,\n  \"seconds\": 1.2\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"one call\", () => pm.expect(pm.response.json().usage.model_calls).to.eql(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start CLM-1004",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1004/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1004",
+                "start"
+              ]
+            },
+            "description": "`start_claim`: start a waiting claim in the run.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"run_id\": {{runId}},\n  \"thread_id\": \"CLM-1004-postman\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fail CLM-1004",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1004/failure",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1004",
+                "failure"
+              ]
+            },
+            "description": "`fail_claim`: work on the claim failed; it goes back in the queue.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"thread_id\": \"CLM-1004-postman\",\n  \"reason\": \"The model provider timed out\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const claim = pm.response.json();",
+                  "pm.test(\"back in the queue\", () => pm.expect(claim.status).to.eql(\"waiting\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Latest run",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/runs/latest",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "runs",
+                "latest"
+              ]
+            },
+            "description": "`get_latest_run`: the run, with what it started and used."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const run = pm.response.json();",
+                  "pm.test(\"four claims started\", () => pm.expect(run.claims_started).to.eql(4));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Finish the run",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/runs/{{runId}}/finish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "runs",
+                "{{runId}}",
+                "finish"
+              ]
+            },
+            "description": "`finish_run`: finish the run with its summary for the handlers.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"summary\": \"Worked four claims; CLM-1004 failed and went back in the queue.\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"is finished\", () => pm.expect(pm.response.json().status).to.eql(\"finished\"));"
                 ]
               }
             }
@@ -1298,6 +1582,12 @@
           ]
         }
       ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "runId",
+      "value": ""
     }
   ]
 }

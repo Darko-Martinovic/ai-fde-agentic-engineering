@@ -26,7 +26,7 @@ it("writes a time of day", () => {
 
 it("turns codes into labels", () => {
   expect(humanize("emergency_medical")).toBe("Emergency medical");
-  expect(STATUSES).toHaveLength(5);
+  expect(STATUSES).toHaveLength(6);
 });
 
 it("indents JSON and leaves other text alone", () => {

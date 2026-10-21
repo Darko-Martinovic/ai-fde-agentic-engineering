@@ -1,6 +1,7 @@
 import pytest
 
 from backend import db, runner
+from backend.tests.claim_starts import start
 
 MODEL = "DeepSeek V4.1 Flash"
 
@@ -55,7 +56,7 @@ def test_run_claim(client, fake_process):
         "claim_id": None,
     }
     assert fake_process[0].claim_ids == ["CLM-1001"]
-    client.post("/api/claims/CLM-1001/start")
+    start(client, "CLM-1001")
     assert client.get("/api/agent").json()["claim_id"] == "CLM-1001"
 
 
@@ -68,7 +69,7 @@ def test_one_run_at_a_time(client):
 
 
 def test_run_needs_a_waiting_claim(client):
-    client.post("/api/claims/CLM-1001/start")
+    start(client, "CLM-1001")
     response = client.post("/api/agent/claims/CLM-1001")
     assert response.status_code == 409
     assert response.json()["detail"] == "Claim CLM-1001 is in_progress, not waiting"
@@ -106,7 +107,7 @@ def test_finished_run_is_not_running(client, fake_process):
 
 def test_stop(client, fake_process):
     client.post("/api/agent/claims/CLM-1001")
-    client.post("/api/claims/CLM-1001/start")
+    start(client, "CLM-1001")
     client.post(
         "/api/claims/CLM-1001/steps",
         json={"thread_id": "t-1", "kind": "tool_call", "text": "get_claim"},
@@ -135,7 +136,7 @@ def test_stop(client, fake_process):
 
 
 def test_stop_keeps_decided_claims(client):
-    client.post("/api/claims/CLM-1002/start")
+    start(client, "CLM-1002")
     client.post(
         "/api/claims/CLM-1002/decision",
         json={
@@ -152,8 +153,17 @@ def test_stop_keeps_decided_claims(client):
 
 
 def test_a_run_returns_claims_left_in_progress(client):
-    client.post("/api/claims/CLM-1004/start")
+    start(client, "CLM-1004")
     client.post("/api/agent/queue")
     assert client.get("/api/claims/CLM-1004").json()["status"] == "waiting"
-    client.post("/api/claims/CLM-1001/start")
+    start(client, "CLM-1001")
     assert client.get("/api/agent").json()["claim_id"] == "CLM-1001"
+
+
+def test_stop_marks_the_run_stopped(client, fake_process):
+    start(client, "CLM-1001")
+    client.post("/api/agent/stop")
+    run = client.get("/api/runs/latest").json()
+    assert run["status"] == "stopped"
+    assert run["finished_at"] is not None
+    assert client.get("/api/claims/CLM-1001").json()["status"] == "waiting"

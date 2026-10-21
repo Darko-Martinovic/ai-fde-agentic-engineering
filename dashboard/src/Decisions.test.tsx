@@ -61,7 +61,7 @@ it("lets a handler decide a referral", async () => {
         }),
       ],
     }),
-    "POST /api/claims/CLM-1001/resolution": claim(),
+    "POST /api/claims/CLM-1001/handler-decision": claim(),
   });
   const fetchMock = mockFetch(table);
   render(<ClaimPage claimId="CLM-1001" />);
@@ -82,9 +82,9 @@ it("lets a handler decide a referral", async () => {
   expect(approve).toHaveProperty("disabled", false);
   fireEvent.click(approve);
   await waitFor(() => {
-    expect(calledWith(fetchMock, "POST /api/claims/CLM-1001/resolution")).toBe(
-      true,
-    );
+    expect(
+      calledWith(fetchMock, "POST /api/claims/CLM-1001/handler-decision"),
+    ).toBe(true);
   });
   const call = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
   expect(JSON.parse(call?.[1]?.body as string)).toEqual({
@@ -120,4 +120,28 @@ it("shows why a handler's action failed", async () => {
     await screen.findByRole("button", { name: "Sign off $1,150.00" }),
   );
   expect(await screen.findByText("Handler HND-01 not found")).toBeDefined();
+});
+
+it("lets a handler decide a claim left for them", async () => {
+  const fetchMock = mockFetch(
+    claimRoutes({
+      "GET /api/claims/CLM-1001": claim({ status: "left_for_handler" }),
+      "POST /api/claims/CLM-1001/handler-decision": claim(),
+    }),
+  );
+  render(<ClaimPage claimId="CLM-1001" />);
+  expect(
+    await screen.findByRole("heading", { name: "Decide the claim" }),
+  ).toBeDefined();
+  await screen.findByRole("option", { name: /Dana Whitfield/ });
+  fireEvent.click(screen.getByLabelText("Decline"));
+  fireEvent.change(screen.getByLabelText("Reasons"), {
+    target: { value: "Not covered." },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Record the decision" }));
+  await waitFor(() => {
+    expect(
+      calledWith(fetchMock, "POST /api/claims/CLM-1001/handler-decision"),
+    ).toBe(true);
+  });
 });

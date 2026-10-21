@@ -71,6 +71,7 @@ it("counts each state", () => {
     in_progress: 0,
     awaiting_sign_off: 1,
     referred: 0,
+    left_for_handler: 0,
     decided: 2,
   });
 });

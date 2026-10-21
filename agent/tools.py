@@ -9,8 +9,16 @@ from agent import api
 
 
 @dataclass(frozen=True)
-class ClaimContext:
-    """What a claim agent's tools know: the claim it works on and its thread."""
+class RunScope:
+    """What every agent in a run knows: the run."""
+
+    run_id: int
+
+
+@dataclass(frozen=True)
+class ClaimContext(RunScope):
+    """What a claim agent's tools know: its run, the claim it works on and the
+    claim's thread."""
 
     claim_id: str
     thread_id: str
