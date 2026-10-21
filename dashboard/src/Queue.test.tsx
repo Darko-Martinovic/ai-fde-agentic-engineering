@@ -24,7 +24,11 @@ function rows() {
 }
 
 it("shows the counts, the money and the claims", async () => {
-  mockFetch({ "GET /api/claims": QUEUE, "GET /api/agent": IDLE });
+  mockFetch({
+    "GET /api/claims": QUEUE,
+    "GET /api/agent": IDLE,
+    "GET /api/runs/latest": null,
+  });
   render(<QueuePage />);
   expect(await screen.findByText("CLM-1001")).toBeDefined();
   const decided = screen.getByRole("button", { name: /Decided/ });
@@ -40,7 +44,11 @@ it("shows the counts, the money and the claims", async () => {
 });
 
 it("filters by tile, search and type, and sorts", async () => {
-  mockFetch({ "GET /api/claims": QUEUE, "GET /api/agent": IDLE });
+  mockFetch({
+    "GET /api/claims": QUEUE,
+    "GET /api/agent": IDLE,
+    "GET /api/runs/latest": null,
+  });
   render(<QueuePage />);
   await screen.findByText("CLM-1001");
 
@@ -73,7 +81,11 @@ it("filters by tile, search and type, and sorts", async () => {
 });
 
 it("says when nothing matches", async () => {
-  mockFetch({ "GET /api/claims": QUEUE, "GET /api/agent": IDLE });
+  mockFetch({
+    "GET /api/claims": QUEUE,
+    "GET /api/agent": IDLE,
+    "GET /api/runs/latest": null,
+  });
   render(<QueuePage />);
   await screen.findByText("CLM-1001");
   fireEvent.change(screen.getByLabelText("Search"), {
@@ -89,6 +101,7 @@ it("shows an error and tries again", async () => {
       { status: 500 },
     ),
     "GET /api/agent": IDLE,
+    "GET /api/runs/latest": null,
   };
   mockFetch(routes);
   render(<QueuePage />);
@@ -102,6 +115,7 @@ it("runs the queue and stops the agent", async () => {
   const routes: Record<string, unknown> = {
     "GET /api/claims": QUEUE,
     "GET /api/agent": IDLE,
+    "GET /api/runs/latest": null,
     "GET /api/agent/models": MODELS,
     "POST /api/agent/queue": {
       ...IDLE,
@@ -149,6 +163,7 @@ it("shows why the agent didn't start", async () => {
   mockFetch({
     "GET /api/claims": QUEUE,
     "GET /api/agent": IDLE,
+    "GET /api/runs/latest": null,
     "GET /api/agent/models": MODELS,
     "POST /api/agent/queue": Response.json(
       { detail: "The agent is already running" },

@@ -2,6 +2,8 @@ import { expect, it } from "vitest";
 import {
   STATUSES,
   clock,
+  cost,
+  count,
   date,
   duration,
   humanize,
@@ -13,6 +15,12 @@ import {
 it("writes money in US dollars", () => {
   expect(money(1150)).toBe("$1,150.00");
   expect(money(0)).toBe("$0.00");
+});
+
+it("writes model spend to a hundredth of a cent, and counts with commas", () => {
+  expect(cost(0.0094)).toBe("$0.0094");
+  expect(cost(1.5)).toBe("$1.5000");
+  expect(count(72240)).toBe("72,240");
 });
 
 it("writes dates without shifting them across time zones", () => {

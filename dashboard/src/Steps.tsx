@@ -1,5 +1,5 @@
 import { sectionOf, type Step, type StepKind } from "./api";
-import { Panel } from "./components";
+import { FIRST_STEP, LiveBadge, Panel } from "./components";
 import { clock, pretty, sectionName } from "./format";
 
 const KIND_LABELS: Record<StepKind, string> = {
@@ -44,6 +44,29 @@ function StepBody({ step }: Readonly<{ step: Step }>) {
   return <p className="step__reply">{step.text}</p>;
 }
 
+/** The agent's steps on a claim, in order, announced as they arrive. */
+export function StepList({ steps }: Readonly<{ steps: Step[] }>) {
+  return (
+    <ol className="steps" aria-live="polite">
+      {steps.map((step, index) => (
+        <li
+          key={`${step.recorded_at}-${String(index)}`}
+          className={`step step--${step.kind}`}
+        >
+          <span className="step__marker" aria-hidden="true" />
+          <div className="step__content">
+            <p className="step__meta">
+              <span>{KIND_LABELS[step.kind]}</span>
+              <time dateTime={step.recorded_at}>{clock(step.recorded_at)}</time>
+            </p>
+            <StepBody step={step} />
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export function StepsPanel({
   steps,
   live,
@@ -52,40 +75,13 @@ export function StepsPanel({
     <Panel
       title="What the agent did"
       className="panel--steps"
-      actions={
-        live ? (
-          <span className="live">
-            <span className="live__dot" aria-hidden="true" />
-            Live
-          </span>
-        ) : undefined
-      }
+      actions={live ? <LiveBadge /> : undefined}
     >
       {steps?.length ? (
-        <ol className="steps" aria-live="polite">
-          {steps.map((step, index) => (
-            <li
-              key={`${step.recorded_at}-${String(index)}`}
-              className={`step step--${step.kind}`}
-            >
-              <span className="step__marker" aria-hidden="true" />
-              <div className="step__content">
-                <p className="step__meta">
-                  <span>{KIND_LABELS[step.kind]}</span>
-                  <time dateTime={step.recorded_at}>
-                    {clock(step.recorded_at)}
-                  </time>
-                </p>
-                <StepBody step={step} />
-              </div>
-            </li>
-          ))}
-        </ol>
+        <StepList steps={steps} />
       ) : (
         <p className="muted">
-          {live
-            ? "Waiting for the agent's first step."
-            : "The agent hasn't worked on this claim yet."}
+          {live ? FIRST_STEP : "The agent hasn't worked on this claim yet."}
         </p>
       )}
     </Panel>

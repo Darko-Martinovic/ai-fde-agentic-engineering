@@ -22,6 +22,23 @@ export function money(amount: number): string {
   return dollars.format(amount);
 }
 
+// Model spend runs to fractions of a cent, so it shows four decimals
+const spend = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 4,
+});
+
+export function cost(amount: number): string {
+  return spend.format(amount);
+}
+
+const counts = new Intl.NumberFormat("en-US");
+
+export function count(amount: number): string {
+  return counts.format(amount);
+}
+
 export function date(isoDate: string): string {
   return day.format(new Date(`${isoDate.slice(0, 10)}T00:00:00Z`));
 }
