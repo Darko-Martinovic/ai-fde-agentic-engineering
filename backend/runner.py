@@ -69,6 +69,10 @@ def running() -> bool:
 
 
 def state(conn: sqlite3.Connection) -> AgentState:
+    if RUN.process is not None and not RUN.process.is_alive():
+        # The process ended on its own, or was killed outside Stop: put back
+        # any claim it left in progress and stop its run if it never finished
+        clear(conn)
     if not running():
         return AgentState(model=None, running=False, mode=None, claim_id=None)
     return AgentState(
@@ -77,6 +81,14 @@ def state(conn: sqlite3.Connection) -> AgentState:
         mode=RUN.mode,
         claim_id=claims.first_in_progress(conn),
     )
+
+
+def clear(conn: sqlite3.Connection) -> None:
+    """Forget the agent's process and put back what it left behind."""
+    RUN.process = None
+    RUN.mode = None
+    RUN.model = None
+    return_to_queue(conn)
 
 
 def return_to_queue(conn: sqlite3.Connection) -> None:
@@ -144,8 +156,5 @@ def stop_agent(conn: Db) -> AgentState:
     if RUN.process is not None:
         RUN.process.terminate()
         RUN.process.join(timeout=10)
-    RUN.process = None
-    RUN.mode = None
-    RUN.model = None
-    return_to_queue(conn)
+    clear(conn)
     return state(conn)

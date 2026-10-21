@@ -108,8 +108,8 @@ def test_missed_claims_are_worked_before_the_run_finishes(backend):
 
 def test_missed_lists_retries_then_new_claims_within_the_cap(backend, run):
     harness.work_claim("CLM-1001", run, FREE, stub(AIMessage(content="Unsure.")))
-    assert harness.missed(run, 2) == ["CLM-1001", "CLM-1002"]
-    assert harness.missed(run, 1) == ["CLM-1001"]
+    assert harness.missed(["CLM-1001"], 2) == ["CLM-1001", "CLM-1002"]
+    assert harness.missed(["CLM-1001"], 1) == ["CLM-1001"]
 
 
 def test_work_claim_calls_made_at_once_go_one_at_a_time_within_the_cap(backend):

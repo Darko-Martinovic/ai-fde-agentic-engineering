@@ -52,23 +52,37 @@ MISSED = (
 )
 LEFT_WAITING = "Still waiting, though this run should have worked them: {claims}."
 STOPPED = (
-    "The agent stopped before finishing the claim, having replied without a"
-    f" decision or reached its limit of {MAX_MODEL_CALLS} model calls"
+    "The agent stopped before finishing the claim: it replied with no decision"
+    " or an approval left unpaid, or reached its limit of"
+    f" {MAX_MODEL_CALLS} model calls"
 )
 
 # Our providers, and the LangChain integration that serves each one
 INTEGRATIONS = {"openrouter": "openai", "anthropic": "anthropic", "ollama": "ollama"}
 
-# How to reach each provider, from the settings
+
+def timeout() -> float:
+    return float(setting("MODEL_TIMEOUT"))
+
+
+# How to reach each provider, from the settings. A call that takes too long
+# fails, and only ModelRetryMiddleware retries it, not the provider's client.
 CONNECTIONS: dict[str, Callable[[], dict[str, Any]]] = {
     "openrouter": lambda: {
         "base_url": setting("OPENROUTER_BASE_URL"),
         "api_key": setting("OPENROUTER_API_KEY"),
+        "timeout": timeout(),
+        "max_retries": 0,
     },
-    "anthropic": lambda: {"api_key": setting("ANTHROPIC_API_KEY")},
+    "anthropic": lambda: {
+        "api_key": setting("ANTHROPIC_API_KEY"),
+        "timeout": timeout(),
+        "max_retries": 0,
+    },
     "ollama": lambda: {
         "base_url": setting("OLLAMA_BASE_URL"),
         "num_ctx": int(setting("OLLAMA_NUM_CTX")),
+        "client_kwargs": {"timeout": timeout()},
     },
 }
 
@@ -138,13 +152,15 @@ def queue_agent(
 
 
 def report(claim: dict[str, Any]) -> str:
-    """The line a claim's work reports: its outcome, from the backend's record."""
+    """The line a claim's work reports: its outcome, from the backend's record,
+    with the reasons for a decline or a referral, which the handlers need."""
     claim_id, status = claim["claim_id"], claim["status"]
     decision = claim["decisions"][-1] if claim["decisions"] else None
     if decision is None or status == "left_for_handler":
         return f"{claim_id}: {BY_STATE[status]}"
     if decision["decision"] != "approve":
-        return f"{claim_id}: {BY_DECISION[decision['decision']]}"
+        outcome = BY_DECISION[decision["decision"]]
+        return f"{claim_id}: {outcome}, because: {decision['reasons']}"
     return f"{claim_id}: approved ${decision['payout']:,.2f}, {BY_STATE[status]}"
 
 
@@ -180,31 +196,35 @@ def work_claim(
     return report(api.get_claim(claim_id))
 
 
-def missed(run_id: int, cap: int) -> list[str]:
-    """The waiting claims the run should still have worked: those it tried that
-    went back in the queue, and new ones while it's under its cap."""
-    run = api.get_latest_run()
-    started = run["claims_started"] if run else []
+def missed(started: list[str], cap: int) -> list[str]:
+    """The waiting claims a run that started these should still have worked:
+    those it tried that went back in the queue, and new ones while it's under
+    its cap."""
     waiting = [c["claim_id"] for c in waiting_claims()]
     tried_again = [c for c in waiting if c in started]
     new = [c for c in waiting if c not in started][: cap - len(started)]
     return tried_again + new
 
 
-def drive(agent: CompiledStateGraph[Any, Any, Any, Any], context: RunContext) -> str:
-    """Drive the queue agent through its run, remind it once of any claims it
-    missed, and return its summary, with any claims still missed after that."""
+def drive(
+    agent: CompiledStateGraph[Any, Any, Any, Any],
+    context: RunContext,
+    started: list[str],
+) -> str:
+    """Drive the queue agent through its run, which fills in the claims it
+    started, remind it once of any claims it missed, and return its summary,
+    with any claims still missed after that."""
     ask = f"Work up to {context.cap} waiting claims in this run."
     result = agent.invoke(
         {"messages": [{"role": "user", "content": ask}]}, context=context
     )
-    still_waiting = missed(context.run_id, context.cap)
+    still_waiting = missed(started, context.cap)
     if still_waiting:
         reminder = MISSED.format(claims=", ".join(still_waiting))
         messages = [*result["messages"], {"role": "user", "content": reminder}]
         result = agent.invoke({"messages": messages}, context=context)
     summary = str(result["messages"][-1].text)
-    still_waiting = missed(context.run_id, context.cap)
+    still_waiting = missed(started, context.cap)
     if still_waiting:
         summary += "\n\n" + LEFT_WAITING.format(claims=", ".join(still_waiting))
     return summary
@@ -222,13 +242,18 @@ def run_queue(
     agent = queue_agent(llm or chat_model(model), model, cap)
     run_id = api.start_run("queue", cap, model.spec)["run_id"]
     one_at_a_time = threading.Lock()
+    started: list[str] = []
 
     def work(claim_id: str) -> str:
         with one_at_a_time:
-            return work_claim(claim_id, run_id, model, claim_llm)
+            report = work_claim(claim_id, run_id, model, claim_llm)
+            if claim_id not in started:
+                started.append(claim_id)
+            return report
 
+    context = RunContext(run_id=run_id, cap=cap, work=work)
     try:
-        summary = drive(agent, RunContext(run_id=run_id, cap=cap, work=work))
+        summary = drive(agent, context, started)
     except Exception as error:
         api.finish_run(run_id, f"The run stopped: {type(error).__name__}: {error}")
         raise

@@ -34,12 +34,16 @@ def tool_call(name, **args):
     return calls(call(name, **args))
 
 
+# The reasons every decision in the tests gives
+REASONS = "The delay was covered and the costs were reasonable."
+
+
 def decide(decision, payout):
     """A reply that decides the claim, against the Trip Delay section."""
     return tool_call(
         "decide_claim",
         decision=decision,
         payout=payout,
-        reasons="The delay was covered and the costs were reasonable.",
+        reasons=REASONS,
         policy_section="Section 3, Trip Delay",
     )

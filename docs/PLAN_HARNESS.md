@@ -75,8 +75,8 @@ The brief in `docs/HARNESS.md`, built on our own pilot: one run works the queue 
 
 **Success criteria**
 
-- [ ] Five claims worked on their own, the other 20 still waiting; the to-do list filled in and ticked off; each claim's steps with the sections read
-- [ ] `npm run check` passes
+- [x] Five claims worked on their own, the other 20 still waiting; the to-do list filled in and ticked off; each claim's steps with the sections read
+- [x] `npm run check` passes
 
 ## Phase 7: The model comparison
 

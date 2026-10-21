@@ -139,7 +139,8 @@ def write_todos(todos: list[Todo], runtime: ToolRuntime[RunContext]) -> str:
 @tool
 def work_claim(claim_id: str, runtime: ToolRuntime[RunContext]) -> str:
     """Hand one waiting claim to a claim agent, which works it from a clean start
-    and reports back in a line: the decision and payout, or what went wrong."""
+    and reports back in a line: the decision and payout, with the reasons for a
+    decline or a referral, or what went wrong."""
     return runtime.context.work(claim_id)
 
 

@@ -69,7 +69,7 @@ def words(text: str) -> set[str]:
 
 
 def score(query: set[str], section: Section) -> int:
-    """How well a section matches a query; a word in its title counts three times."""
+    """How well a section matches a query; a word in its title counts twice."""
     in_title = len(query & words(section.title))
     return len(query & words(section.text)) + TITLE_WEIGHT * in_title
 

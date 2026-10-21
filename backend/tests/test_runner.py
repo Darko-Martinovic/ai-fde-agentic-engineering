@@ -192,3 +192,12 @@ def test_list_models(client):
     assert [m["spec"] for m in models if m["default"]] == [
         "openrouter:deepseek/deepseek-v4.1-flash"
     ]
+
+
+def test_a_process_that_died_leaves_nothing_in_progress(client, fake_process):
+    client.post("/api/agent/claims/CLM-1001", json=ON_A_MODEL)
+    start(client, "CLM-1001")
+    fake_process[0].alive = False
+    assert client.get("/api/agent").json()["running"] is False
+    assert client.get("/api/claims/CLM-1001").json()["status"] == "waiting"
+    assert client.get("/api/runs/latest").json()["status"] == "stopped"
