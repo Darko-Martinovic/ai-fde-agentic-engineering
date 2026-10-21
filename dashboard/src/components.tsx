@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ClaimStatus, DecisionKind } from "./api";
@@ -95,16 +95,33 @@ export function Panel({
   className?: string;
   actions?: ReactNode;
 }>) {
+  const heading = useId();
   return (
-    <section className={`panel ${className}`}>
+    <section
+      className={`panel ${className}`}
+      aria-labelledby={title ? heading : undefined}
+    >
       {title && (
         <header className="panel__header">
-          <h2>{title}</h2>
+          <h2 id={heading}>{title}</h2>
           {actions}
         </header>
       )}
       {children}
     </section>
+  );
+}
+
+/** What a live timeline says before the agent's first step arrives. */
+export const FIRST_STEP = "Waiting for the agent's first step.";
+
+/** Marks something happening now, such as a run or a claim being worked. */
+export function LiveBadge() {
+  return (
+    <span className="live">
+      <span className="live__dot" aria-hidden="true" />
+      Live
+    </span>
   );
 }
 

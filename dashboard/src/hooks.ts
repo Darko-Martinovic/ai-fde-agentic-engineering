@@ -76,6 +76,22 @@ export function usePoll<T>(load: Loader<T>, interval: number | null): Poll<T> {
   };
 }
 
+/** The time now, in ms, kept current every `interval` ms, or held while
+ *  `interval` is null. */
+export function useNow(interval: number | null): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (interval === null) return;
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, interval);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [interval]);
+  return now;
+}
+
 export function useRoute(): Route {
   const [hash, setHash] = useState(window.location.hash);
   useEffect(() => {
@@ -149,4 +165,10 @@ export function useModelChoice() {
     error: models.error,
     pick,
   };
+}
+
+/** A model's label from models.toml, or its id when it is no longer listed. */
+export function useModelLabel(spec: string): string {
+  const models = usePoll(api.listModels, null);
+  return models.data?.find((m) => m.spec === spec)?.label ?? spec;
 }

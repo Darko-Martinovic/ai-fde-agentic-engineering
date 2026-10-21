@@ -21,6 +21,7 @@ import {
   totals,
 } from "./filters";
 import { paths } from "./paths";
+import { RunPanel } from "./RunPanel";
 
 const COLUMNS: { key: SortKey; label: string; numeric?: boolean }[] = [
   { key: "claim_id", label: "Claim" },
@@ -179,6 +180,7 @@ export function QueuePage() {
         waiting={countByStatus(all).waiting}
         onChange={refresh}
       />
+      <RunPanel claims={all} />
       {claims.error && (
         <ErrorNote message={claims.error} onRetry={claims.reload} />
       )}

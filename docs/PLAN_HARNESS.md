@@ -65,9 +65,9 @@ The brief in `docs/HARNESS.md`, built on our own pilot: one run works the queue 
 
 **Success criteria**
 
-- [ ] Vitest tests for each part of the run panel and each state
-- [ ] An end-to-end test of a run set up through the API: its to-do list, the claim being worked and its summary
-- [ ] Checked in the browser in light, dark and at phone width
+- [x] Vitest tests for each part of the run panel and each state
+- [x] An end-to-end test of a run set up through the API: its to-do list, the claim being worked and its summary
+- [x] Checked in the browser in light, dark and at phone width
 
 ## Phase 6: A live trial and the docs
 
