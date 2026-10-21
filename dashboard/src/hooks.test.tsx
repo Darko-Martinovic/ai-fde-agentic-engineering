@@ -1,13 +1,6 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  errorMessage,
-  parseRoute,
-  readTheme,
-  usePoll,
-  useRoute,
-  useTheme,
-} from "./hooks";
+import { errorMessage, readTheme, usePoll, useRoute, useTheme } from "./hooks";
 
 afterEach(() => {
   cleanup();
@@ -15,20 +8,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
   localStorage.clear();
   window.location.hash = "";
-});
-
-describe("parseRoute", () => {
-  it("knows the four pages", () => {
-    expect(parseRoute("")).toEqual({ page: "queue" });
-    expect(parseRoute("#/")).toEqual({ page: "queue" });
-    expect(parseRoute("#/instructions")).toEqual({ page: "instructions" });
-    expect(parseRoute("#/insights")).toEqual({ page: "insights" });
-    expect(parseRoute("#/claims/CLM-1001")).toEqual({
-      page: "claim",
-      claimId: "CLM-1001",
-    });
-    expect(parseRoute("#/claims/")).toEqual({ page: "queue" });
-  });
 });
 
 it("follows the hash", async () => {

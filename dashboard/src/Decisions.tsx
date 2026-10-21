@@ -2,7 +2,7 @@ import { useState, type SyntheticEvent } from "react";
 import { api, type Claim, type Decision, type Handler } from "./api";
 import { DecisionBadge, Panel } from "./components";
 import { clock, date, money } from "./format";
-import { errorMessage } from "./hooks";
+import { useAction } from "./hooks";
 
 function who(id: string, handlers: Handler[]): string {
   if (id === "agent") return "UnderCover Agent";
@@ -63,22 +63,11 @@ function HandlerPicker({
   );
 }
 
-function useAction(onDone: () => void) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const run = (action: () => Promise<unknown>) => {
-    setBusy(true);
-    setError(null);
-    action()
-      .then(onDone)
-      .catch((reason: unknown) => {
-        setError(errorMessage(reason));
-      })
-      .finally(() => {
-        setBusy(false);
-      });
-  };
-  return { busy, error, run };
+/** The handler picked in a form: the first handler until someone picks one,
+ *  including when the handlers arrive after the form. */
+function useHandlerChoice(handlers: Handler[]) {
+  const [picked, setPicked] = useState("");
+  return [picked || (handlers[0]?.handler_id ?? ""), setPicked] as const;
 }
 
 function SignOffForm({
@@ -86,7 +75,7 @@ function SignOffForm({
   handlers,
   onDone,
 }: Readonly<{ claim: Claim; handlers: Handler[]; onDone: () => void }>) {
-  const [handlerId, setHandlerId] = useState(handlers[0]?.handler_id ?? "");
+  const [handlerId, setHandlerId] = useHandlerChoice(handlers);
   const { busy, error, run } = useAction(onDone);
   const payout = claim.decisions.at(-1)?.payout ?? 0;
   const submit = (event: SyntheticEvent) => {
@@ -117,13 +106,49 @@ function SignOffForm({
   );
 }
 
+type HandlerDecision = "approve" | "decline";
+
+function DecisionChoice({
+  value,
+  onChange,
+}: Readonly<{
+  value: HandlerDecision;
+  onChange: (decision: HandlerDecision) => void;
+}>) {
+  return (
+    <fieldset className="choice">
+      <legend>Decision</legend>
+      {(["approve", "decline"] as const).map((option) => (
+        <label key={option}>
+          <input
+            type="radio"
+            name="decision"
+            value={option}
+            checked={value === option}
+            onChange={() => {
+              onChange(option);
+            }}
+          />
+          {option === "approve" ? "Approve" : "Decline"}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
+function submitLabel(decision: HandlerDecision, amount: number): string {
+  return decision === "approve" && amount > 0
+    ? `Approve and pay ${money(amount)}`
+    : "Record the decision";
+}
+
 function ReferralForm({
   claim,
   handlers,
   onDone,
 }: Readonly<{ claim: Claim; handlers: Handler[]; onDone: () => void }>) {
-  const [handlerId, setHandlerId] = useState(handlers[0]?.handler_id ?? "");
-  const [decision, setDecision] = useState<"approve" | "decline">("approve");
+  const [handlerId, setHandlerId] = useHandlerChoice(handlers);
+  const [decision, setDecision] = useState<HandlerDecision>("approve");
   const [payout, setPayout] = useState("");
   const [reasons, setReasons] = useState("");
   const { busy, error, run } = useAction(onDone);
@@ -153,23 +178,7 @@ function ReferralForm({
         value={handlerId}
         onChange={setHandlerId}
       />
-      <fieldset className="choice">
-        <legend>Decision</legend>
-        {(["approve", "decline"] as const).map((option) => (
-          <label key={option}>
-            <input
-              type="radio"
-              name="decision"
-              value={option}
-              checked={decision === option}
-              onChange={() => {
-                setDecision(option);
-              }}
-            />
-            {option === "approve" ? "Approve" : "Decline"}
-          </label>
-        ))}
-      </fieldset>
+      <DecisionChoice value={decision} onChange={setDecision} />
       {decision === "approve" && (
         <label className="field">
           <span>Payout in US dollars</span>
@@ -201,9 +210,7 @@ function ReferralForm({
         className="button button--primary"
         disabled={busy || !valid}
       >
-        {decision === "approve" && amount > 0
-          ? `Approve and pay ${money(amount)}`
-          : "Record the decision"}
+        {submitLabel(decision, amount)}
       </button>
     </form>
   );

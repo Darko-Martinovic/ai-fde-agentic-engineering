@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { parseRoute, type Route } from "./paths";
 
 export type Loader<T> = (signal: AbortSignal) => Promise<T>;
 
@@ -10,6 +11,26 @@ export interface Poll<T> {
 
 export function errorMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : "Something went wrong";
+}
+
+/** Run an action for a form or a button: busy while it runs, its error if it
+ *  fails, and `onDone` once it succeeds, so the page shows what changed. */
+export function useAction(onDone: () => void) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = (action: () => Promise<unknown>) => {
+    setBusy(true);
+    setError(null);
+    action()
+      .then(onDone)
+      .catch((reason: unknown) => {
+        setError(errorMessage(reason));
+      })
+      .finally(() => {
+        setBusy(false);
+      });
+  };
+  return { busy, error, run };
 }
 
 /** Load data now, then again every `interval` ms while the page is visible.
@@ -52,20 +73,6 @@ export function usePoll<T>(load: Loader<T>, interval: number | null): Poll<T> {
       setTick((t) => t + 1);
     },
   };
-}
-
-export type Route =
-  | { page: "queue" }
-  | { page: "claim"; claimId: string }
-  | { page: "instructions" }
-  | { page: "insights" };
-
-export function parseRoute(hash: string): Route {
-  const claim = /^#\/claims\/([\w-]+)$/.exec(hash);
-  if (claim?.[1]) return { page: "claim", claimId: claim[1] };
-  if (hash === "#/instructions") return { page: "instructions" };
-  if (hash === "#/insights") return { page: "insights" };
-  return { page: "queue" };
 }
 
 export function useRoute(): Route {

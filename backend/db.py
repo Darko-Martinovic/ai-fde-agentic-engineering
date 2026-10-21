@@ -1,10 +1,8 @@
 """The UnderCover database."""
 
-import os
 import sqlite3
-from pathlib import Path
 
-DEFAULT_PATH = Path(__file__).parent / "undercover.db"
+from backend.config import database_path
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS claims (
@@ -45,14 +43,9 @@ CREATE TABLE IF NOT EXISTS payments (
 """
 
 
-def path() -> Path:
-    """Return the database file: UNDERCOVER_DB if set, or backend/undercover.db."""
-    return Path(os.getenv("UNDERCOVER_DB") or DEFAULT_PATH)
-
-
 def connect() -> sqlite3.Connection:
     """Open the database, creating its tables if they don't exist."""
-    conn = sqlite3.connect(path(), check_same_thread=False)
+    conn = sqlite3.connect(database_path(), check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
     return conn

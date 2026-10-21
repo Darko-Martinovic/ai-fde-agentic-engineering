@@ -101,7 +101,12 @@ it("runs the queue and stops the agent", async () => {
   const routes: Record<string, unknown> = {
     "GET /api/claims": QUEUE,
     "GET /api/agent": IDLE,
-    "POST /api/agent/queue": { running: true, mode: "queue", claim_id: null },
+    "POST /api/agent/queue": {
+      ...IDLE,
+      running: true,
+      mode: "queue",
+      claim_id: null,
+    },
     "POST /api/agent/stop": IDLE,
   };
   const fetchMock = mockFetch(routes);
@@ -109,6 +114,7 @@ it("runs the queue and stops the agent", async () => {
   expect(await screen.findByText("The agent is idle")).toBeDefined();
 
   routes["GET /api/agent"] = {
+    ...IDLE,
     running: true,
     mode: "queue",
     claim_id: "CLM-1001",
