@@ -34,7 +34,12 @@ export function useAction(onDone: () => void) {
   return { busy, error, run };
 }
 
-/** Load data now, then again every `interval` ms while the page is visible.
+/** How long a load that failed waits before it tries again, so data loaded
+ *  once (an interval of null) comes back after the backend restarts. */
+const RETRY_MS = 5000;
+
+/** Load data now, then again every `interval` ms while the page is visible,
+ *  or, with no interval, every RETRY_MS until a load succeeds.
  *  Pass a stable `load` (from useCallback); a new one loads afresh. */
 export function usePoll<T>(load: Loader<T>, interval: number | null): Poll<T> {
   const [data, setData] = useState<T | null>(null);
@@ -66,6 +71,16 @@ export function usePoll<T>(load: Loader<T>, interval: number | null): Poll<T> {
       clearInterval(timer);
     };
   }, [interval]);
+
+  useEffect(() => {
+    if (interval !== null || error === null) return;
+    const timer = setTimeout(() => {
+      setTick((t) => t + 1);
+    }, RETRY_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [interval, error, tick]);
 
   return {
     data,

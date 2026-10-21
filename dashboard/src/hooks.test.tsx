@@ -63,6 +63,28 @@ describe("usePoll", () => {
     expect(result.current.error).toBeNull();
   });
 
+  it("tries a failed load again until it succeeds, with no interval", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let fails = 2;
+    const load = () =>
+      fails-- > 0
+        ? Promise.reject(new Error("Request failed (502)"))
+        : Promise.resolve("ok");
+    const { result } = renderHook(() => usePoll(load, null));
+    await waitFor(() => {
+      expect(result.current.error).toBe("Request failed (502)");
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(result.current.data).toBeNull();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(result.current.data).toBe("ok");
+    expect(result.current.error).toBeNull();
+  });
+
   it("describes errors that aren't Errors", () => {
     expect(errorMessage(new Error("x"))).toBe("x");
     expect(errorMessage("x")).toBe("Something went wrong");
