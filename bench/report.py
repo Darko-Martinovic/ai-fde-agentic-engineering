@@ -56,12 +56,31 @@ def missed_claims(runs: list[Repeat]) -> list[str]:
     ]
 
 
-def summarize(results: list[Repeat]) -> list[Summary]:
-    """Add up each trial's runs, in the order the trials were run."""
-    trials: dict[tuple[str, str], list[Repeat]] = defaultdict(list)
+def trials(results: list[Repeat]) -> dict[tuple[str, str], list[Repeat]]:
+    """Each trial's runs, by model and claims, in the order the trials were run."""
+    grouped: dict[tuple[str, str], list[Repeat]] = defaultdict(list)
     for result in results:
-        trials[(result.label, result.claims)].append(result)
-    return [summary(label, claims, runs) for (label, claims), runs in trials.items()]
+        grouped[(result.label, result.claims)].append(result)
+    return grouped
+
+
+def summarize(results: list[Repeat]) -> list[Summary]:
+    """Add up each trial's scored runs, leaving out the runs refused."""
+    scored = [result for result in results if not result.refused]
+    return [
+        summary(label, claims, runs) for (label, claims), runs in trials(scored).items()
+    ]
+
+
+def refusals(results: list[Repeat]) -> str:
+    """The trials with runs the provider refused, which aren't scored."""
+    lines = [
+        f"- {label}, {claims} claims: {sum(r.refused for r in runs)} of "
+        f"{len(runs)} runs refused"
+        for (label, claims), runs in trials(results).items()
+        if any(r.refused for r in runs)
+    ]
+    return "\n".join(lines) + "\n" if lines else "- None\n"
 
 
 def summary(label: str, claims: str, runs: list[Repeat]) -> Summary:
@@ -124,7 +143,10 @@ usage through the API. A decision is right when it matches the handlers' in
 for an approval, the payout is within a dollar of theirs. A claim left
 undecided counts as wrong. Model calls, tokens, cost and time are per claim;
 the cost is at the prices in `models.toml`, and the local models cost nothing.
-Percentages are the mean of the runs, with their range when they differ.
+Percentages are the mean of the runs, with their range when they differ. A run
+in which the provider answered no model call at all, as when a free model is
+rate-limited, says nothing about the model: it isn't scored, it is listed under
+"Runs refused", and the next `uv run -m bench` tries it again.
 
 ![Accuracy by model](results.svg)
 
@@ -139,6 +161,8 @@ def write_report(results: list[Repeat], folder: Path) -> None:
         + table(summaries)
         + "\n## The claims each model got wrong\n\n"
         + misses(summaries)
+        + "\n## Runs refused\n\n"
+        + refusals(results)
     )
     (folder / "results.md").write_text(text, encoding="utf-8")
     (folder / "results.svg").write_text(chart(summaries), encoding="utf-8")

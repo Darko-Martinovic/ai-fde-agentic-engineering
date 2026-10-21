@@ -1,5 +1,6 @@
 import json
 
+from bench.plan import load
 from bench.score import (
     Answer,
     Outcome,
@@ -66,3 +67,12 @@ def test_answers_and_the_tiny_set(tmp_path, key):
     assert answers(path) == key
     assert chosen(key, "tiny") == ["CLM-1001", "CLM-1005"]
     assert chosen(key, "all") == ["CLM-1001", "CLM-1002", "CLM-1005"]
+
+
+def test_the_plan_names_only_models_allowed():
+    trials, estimate = load()
+    assert trials
+    assert all(
+        trial.claims in {"all", "tiny"} and trial.repeats >= 1 for trial in trials
+    )
+    assert estimate.cost(trials[0].model, 0) == 0

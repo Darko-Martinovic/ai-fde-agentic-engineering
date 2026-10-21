@@ -42,6 +42,12 @@ class Repeat:
     seconds: float
     misses: list[dict[str, Any]]
 
+    @property
+    def refused(self) -> bool:
+        """The provider answered no model call, as a free model's rate limit
+        does: the run says nothing about the model, so it isn't scored."""
+        return self.worked > 0 and self.model_calls == 0
+
 
 def miss(answer: Answer, got: Outcome) -> dict[str, Any]:
     """A claim the agent got wrong: what the handlers decided, and what it did."""

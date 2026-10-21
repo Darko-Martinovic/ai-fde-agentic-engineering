@@ -1,7 +1,8 @@
 """Run the model comparison in bench/plan.toml against the backend at
 UNDERCOVER_API, which must be running with the dashboard's agent idle: each run
 reseeds its database. Runs already in bench/results.json are kept, so a
-comparison that stops picks up where it was. It refuses to start, or to go on,
+comparison that stops picks up where it was; a run the provider refused is
+tried again. It refuses to start, or to go on,
 when the cost would pass BENCH_BUDGET_USD."""
 
 import argparse
@@ -26,8 +27,9 @@ def parse(arguments: list[str]) -> argparse.Namespace:
 
 
 def pending(trials: list[Trial], results: list[Repeat]) -> list[tuple[Trial, int]]:
-    """The runs of the plan not done yet, as a trial and the run's number."""
-    done = {(r.model, r.claims, r.repeat) for r in results}
+    """The runs of the plan not done yet, or refused, as a trial and the run's
+    number."""
+    done = {(r.model, r.claims, r.repeat) for r in results if not r.refused}
     return [
         (trial, repeat)
         for trial in trials
@@ -39,6 +41,13 @@ def pending(trials: list[Trial], results: list[Repeat]) -> list[tuple[Trial, int
 def expected(trial: Trial, estimate: Estimate, key: dict[str, Answer]) -> float:
     """What one run of a trial should cost."""
     return estimate.cost(trial.model, len(chosen(key, trial.claims)))
+
+
+def replace(results: list[Repeat], result: Repeat) -> list[Repeat]:
+    """The runs with this one in place of an earlier, refused try at it."""
+    same = (result.model, result.claims, result.repeat)
+    kept = [r for r in results if (r.model, r.claims, r.repeat) != same]
+    return [*kept, result]
 
 
 def check_budget(spent: float, cost: float, budget: float) -> None:
@@ -69,9 +78,10 @@ def main(arguments: list[str]) -> None:
     for trial, repeat in todo:
         check_budget(spent, expected(trial, estimate, key), budget)
         print(f"{trial.model.label}, {trial.claims} claims, run {repeat}", flush=True)
-        results.append(run_repeat(trial, repeat, key))
+        result = run_repeat(trial, repeat, key)
+        results = replace(results, result)
         save_results(results, RESULTS)
-        spent += results[-1].cost
+        spent += result.cost
     write_report(results, FOLDER)
 
 

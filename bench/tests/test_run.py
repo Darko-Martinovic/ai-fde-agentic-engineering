@@ -8,7 +8,8 @@ from agent import harness
 from agent.config import Model
 from agent.tests.stub import FREE, decide, stub, tool_call
 from bench.plan import Estimate, Trial
-from bench.run import load_results, run_repeat, save_results
+from bench.report import write_report
+from bench.run import Repeat, load_results, run_repeat, save_results
 
 # CLM-1001 approved and paid as the handlers did; CLM-1005 approved, where they
 # declined it
@@ -96,3 +97,24 @@ def test_the_report_alone(plan):
         .read_text(encoding="utf-8")
         .startswith("# Model comparison")
     )
+
+
+def repeat(model_calls: int) -> Repeat:
+    """A tiny run of the free router, as saved, with this many model calls."""
+    return Repeat(
+        FREE.spec, FREE.label, "tiny", 1, 5, 0, 0, 5, model_calls, 0, 0, 0.0, 9.0, []
+    )
+
+
+def test_a_refused_run_is_tried_again_and_not_scored(tmp_path):
+    refused, answered = repeat(0), repeat(12)
+    assert refused.refused
+    assert not answered.refused
+    trial = Trial(FREE, "tiny", 1)
+    assert cli.pending([trial], [refused]) == [(trial, 1)]
+    assert cli.pending([trial], [answered]) == []
+    assert cli.replace([refused], answered) == [answered]
+    write_report([refused], tmp_path)
+    text = (tmp_path / "results.md").read_text(encoding="utf-8")
+    assert "- OpenRouter free router, tiny claims: 1 of 1 runs refused" in text
+    assert "| OpenRouter free router |" not in text
