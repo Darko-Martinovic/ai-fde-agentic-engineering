@@ -43,8 +43,3 @@ def test_reset(client):
     conn.close()
     seed.reset()
     assert {c["status"] for c in client.get("/api/claims").json()} == {"waiting"}
-
-
-def test_database_path(monkeypatch):
-    monkeypatch.delenv("UNDERCOVER_DB")
-    assert db.path() == db.DEFAULT_PATH

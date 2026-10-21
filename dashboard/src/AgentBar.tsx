@@ -1,6 +1,5 @@
-import { useState } from "react";
 import { api, type AgentState } from "./api";
-import { errorMessage } from "./hooks";
+import { useAction } from "./hooks";
 
 function describe(agent: AgentState | null): string {
   if (agent === null) return "Checking the agent";
@@ -20,22 +19,8 @@ export function AgentBar({
   waiting: number;
   onChange: () => void;
 }>) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run: act } = useAction(onChange);
   const running = agent?.running ?? false;
-
-  const act = (action: () => Promise<AgentState>) => {
-    setBusy(true);
-    setError(null);
-    action()
-      .catch((reason: unknown) => {
-        setError(errorMessage(reason));
-      })
-      .finally(() => {
-        setBusy(false);
-        onChange();
-      });
-  };
 
   return (
     <section
@@ -46,6 +31,9 @@ export function AgentBar({
       <div className="agent-bar__text">
         <strong>UnderCover Agent</strong>
         <span>{describe(agent)}</span>
+        {agent && (
+          <span className="agent-bar__model">Model: {agent.model}</span>
+        )}
         {error && <span className="agent-bar__error">{error}</span>}
       </div>
       <div className="agent-bar__actions">

@@ -1,7 +1,7 @@
 from langchain_core.messages import AIMessage
 
 import agent.__main__ as cli
-from agent import main
+from agent import harness
 from agent.tests.stub import StubModel
 from backend import db
 
@@ -9,26 +9,20 @@ from backend import db
 def reply_only(monkeypatch):
     """Give every run a stub model that reads the claim and replies."""
 
-    def stub():
+    def stub(model):
         return StubModel(
             messages=iter(
                 [
                     AIMessage(
                         content="",
-                        tool_calls=[
-                            {
-                                "name": "get_claim",
-                                "args": {"claim_id": "CLM-1001"},
-                                "id": "1",
-                            }
-                        ],
+                        tool_calls=[{"name": "get_claim", "args": {}, "id": "1"}],
                     ),
                     AIMessage(content="Looked at it."),
                 ]
             )
         )
 
-    monkeypatch.setattr(main, "model", stub)
+    monkeypatch.setattr(harness, "chat_model", stub)
 
 
 def test_one_claim(backend, monkeypatch, capsys):

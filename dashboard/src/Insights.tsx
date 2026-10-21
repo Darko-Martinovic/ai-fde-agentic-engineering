@@ -17,6 +17,7 @@ import {
 import { DECISION_LABELS, duration, money, percent } from "./format";
 import { usePoll } from "./hooks";
 import { Timeline } from "./Timeline";
+import { paths } from "./paths";
 
 const DECISIONS: DecisionKind[] = ["approve", "decline", "refer"];
 
@@ -179,7 +180,7 @@ function ClaimTable({ claims }: Readonly<{ claims: ClaimWork[] }>) {
           {claims.map((claim) => (
             <tr key={claim.claim_id}>
               <td>
-                <a className="mono" href={`#/claims/${claim.claim_id}`}>
+                <a className="mono" href={paths.claim(claim.claim_id)}>
                   {claim.claim_id}
                 </a>
               </td>
@@ -292,7 +293,7 @@ export function InsightsPage() {
       {data !== null && !worked(data) && (
         <p className="empty">
           The agent hasn't worked a claim yet. Run it from the{" "}
-          <a href="#/">queue</a>, and its work adds up here.
+          <a href={paths.queue}>queue</a>, and its work adds up here.
         </p>
       )}
       {data !== null && worked(data) && <Report insights={data} />}

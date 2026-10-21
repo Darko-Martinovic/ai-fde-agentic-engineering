@@ -5,16 +5,16 @@ pre-commit:
   parallel: true
   jobs:
     - name: python
-      glob: "{backend,agent}/**/*.py"
+      glob: ["{backend,agent,tests,bench}/**/*.py", "conftest.py", "*.toml", ".env.defaults"]
       group:
         piped: true
         jobs:
-          - run: uv run ruff format {staged_files}
+          - run: uv run ruff format
             stage_fixed: true
           - run: npm run check:python
 
     - name: typescript
-      glob: ["{dashboard,e2e}/**", "*.config.*"]
+      glob: ["{dashboard,e2e}/**", "*.config.*", ".env.defaults"]
       group:
         piped: true
         jobs:

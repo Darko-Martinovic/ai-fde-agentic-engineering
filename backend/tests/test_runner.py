@@ -2,6 +2,8 @@ import pytest
 
 from backend import db, runner
 
+MODEL = "DeepSeek V4.1 Flash"
+
 
 class FakeProcess:
     """Stands in for the agent's process, so no model is called."""
@@ -36,6 +38,7 @@ def fake_process(monkeypatch):
 
 def test_idle(client):
     assert client.get("/api/agent").json() == {
+        "model": MODEL,
         "running": False,
         "mode": None,
         "claim_id": None,
@@ -45,7 +48,12 @@ def test_idle(client):
 def test_run_claim(client, fake_process):
     response = client.post("/api/agent/claims/CLM-1001")
     assert response.status_code == 200
-    assert response.json() == {"running": True, "mode": "claim", "claim_id": None}
+    assert response.json() == {
+        "model": MODEL,
+        "running": True,
+        "mode": "claim",
+        "claim_id": None,
+    }
     assert fake_process[0].claim_ids == ["CLM-1001"]
     client.post("/api/claims/CLM-1001/start")
     assert client.get("/api/agent").json()["claim_id"] == "CLM-1001"
@@ -69,7 +77,12 @@ def test_run_needs_a_waiting_claim(client):
 
 def test_run_queue(client, fake_process):
     response = client.post("/api/agent/queue")
-    assert response.json() == {"running": True, "mode": "queue", "claim_id": None}
+    assert response.json() == {
+        "model": MODEL,
+        "running": True,
+        "mode": "queue",
+        "claim_id": None,
+    }
     assert fake_process[0].claim_ids == []
 
 
@@ -108,7 +121,12 @@ def test_stop(client, fake_process):
         },
     )
     response = client.post("/api/agent/stop")
-    assert response.json() == {"running": False, "mode": None, "claim_id": None}
+    assert response.json() == {
+        "model": MODEL,
+        "running": False,
+        "mode": None,
+        "claim_id": None,
+    }
     assert fake_process[0].alive is False
     claim = client.get("/api/claims/CLM-1001").json()
     assert claim["status"] == "waiting"

@@ -135,6 +135,7 @@ export interface Step {
 }
 
 export interface AgentState {
+  model: string;
   running: boolean;
   mode: "claim" | "queue" | null;
   claim_id: string | null;

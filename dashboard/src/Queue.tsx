@@ -20,6 +20,7 @@ import {
   sortClaims,
   totals,
 } from "./filters";
+import { paths } from "./paths";
 
 const COLUMNS: { key: SortKey; label: string; numeric?: boolean }[] = [
   { key: "claim_id", label: "Claim" },
@@ -130,7 +131,7 @@ function ClaimTable({
           {claims.map((claim) => (
             <tr key={claim.claim_id} className={`row--${claim.status}`}>
               <td>
-                <a className="mono" href={`#/claims/${claim.claim_id}`}>
+                <a className="mono" href={paths.claim(claim.claim_id)}>
                   {claim.claim_id}
                 </a>
               </td>

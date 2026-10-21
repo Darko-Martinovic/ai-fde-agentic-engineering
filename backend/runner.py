@@ -9,12 +9,14 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from agent.__main__ import main as work
+from agent.config import current_model
 from backend.api import Db, load_claim
 
 router = APIRouter(prefix="/api/agent")
 
 
 class AgentState(BaseModel):
+    model: str
     running: bool
     mode: Literal["claim", "queue"] | None
     claim_id: str | None
@@ -44,13 +46,17 @@ def running() -> bool:
 
 
 def state(conn: sqlite3.Connection) -> AgentState:
+    model = current_model().label
     if not running():
-        return AgentState(running=False, mode=None, claim_id=None)
+        return AgentState(model=model, running=False, mode=None, claim_id=None)
     row = conn.execute(
         "SELECT claim_id FROM claims WHERE status = 'in_progress' ORDER BY claim_id"
     ).fetchone()
     return AgentState(
-        running=True, mode=RUN.mode, claim_id=row["claim_id"] if row else None
+        model=model,
+        running=True,
+        mode=RUN.mode,
+        claim_id=row["claim_id"] if row else None,
     )
 
 

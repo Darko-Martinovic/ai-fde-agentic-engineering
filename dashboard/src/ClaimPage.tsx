@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
-import { api, type AgentState, type Claim } from "./api";
+import { useCallback } from "react";
+import { api, type AgentState, type Claim, type Step } from "./api";
 import {
   CustomerPanel,
   DocumentsPanel,
@@ -10,8 +10,21 @@ import {
 import { ClaimType, ErrorNote, Loading, StatusBadge } from "./components";
 import { DecisionPanel } from "./Decisions";
 import { date, money } from "./format";
-import { errorMessage, usePoll } from "./hooks";
+import { useAction, usePoll } from "./hooks";
 import { StepsPanel } from "./Steps";
+import { paths } from "./paths";
+
+type AgentAction = "run" | "stop" | "return" | null;
+
+/** What the agent can do on this claim now: run on it, stop working on it, or
+ *  put it back in the queue after a run that left it in progress. */
+function agentAction(claim: Claim, agent: AgentState | null): AgentAction {
+  const running = agent?.running ?? false;
+  if (claim.status === "waiting") return "run";
+  if (running && agent?.claim_id === claim.claim_id) return "stop";
+  if (!running && claim.status === "in_progress") return "return";
+  return null;
+}
 
 function AgentControls({
   claim,
@@ -22,59 +35,44 @@ function AgentControls({
   agent: AgentState | null;
   onChange: () => void;
 }>) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useAction(onChange);
   const running = agent?.running ?? false;
-  const workingHere = running && agent?.claim_id === claim.claim_id;
-  const stranded = !running && claim.status === "in_progress";
-
-  const act = (action: () => Promise<AgentState>) => {
-    setBusy(true);
-    setError(null);
-    action()
-      .catch((reason: unknown) => {
-        setError(errorMessage(reason));
-      })
-      .finally(() => {
-        setBusy(false);
-        onChange();
-      });
-  };
+  const action = agentAction(claim, agent);
 
   return (
     <div className="agent-controls">
-      {claim.status === "waiting" && (
+      {action === "run" && (
         <button
           type="button"
           className="button button--primary"
           disabled={busy || running}
           title={running ? "The agent is working on another claim" : undefined}
           onClick={() => {
-            act(() => api.runClaim(claim.claim_id));
+            run(() => api.runClaim(claim.claim_id));
           }}
         >
           Run the agent
         </button>
       )}
-      {workingHere && (
+      {action === "stop" && (
         <button
           type="button"
           className="button button--danger"
           disabled={busy}
           onClick={() => {
-            act(api.stopAgent);
+            run(api.stopAgent);
           }}
         >
           Stop
         </button>
       )}
-      {stranded && (
+      {action === "return" && (
         <button
           type="button"
           className="button button--secondary"
           disabled={busy}
           onClick={() => {
-            act(api.stopAgent);
+            run(api.stopAgent);
           }}
         >
           Return to the queue
@@ -82,6 +80,89 @@ function AgentControls({
       )}
       {error && <span className="form-error">{error}</span>}
     </div>
+  );
+}
+
+function ClaimHead({
+  claim,
+  agent,
+  onChange,
+}: Readonly<{
+  claim: Claim;
+  agent: AgentState | null;
+  onChange: () => void;
+}>) {
+  return (
+    <header className="claim-head">
+      <div>
+        <p className="claim-head__id mono">{claim.claim_id}</p>
+        <h1>{claim.summary}</h1>
+        <p className="claim-head__meta">
+          <ClaimType type={claim.claim_type} />
+          <span>{claim.incident_location}</span>
+          <span>Submitted {date(claim.submitted_on)}</span>
+          <span className="mono">{money(claim.amount_claimed)}</span>
+        </p>
+      </div>
+      <div className="claim-head__side">
+        <StatusBadge status={claim.status} />
+        <AgentControls claim={claim} agent={agent} onChange={onChange} />
+      </div>
+    </header>
+  );
+}
+
+function ClaimView({
+  claim,
+  agent,
+  steps,
+  live,
+  onChange,
+}: Readonly<{
+  claim: Claim;
+  agent: AgentState | null;
+  steps: Step[] | null;
+  live: boolean;
+  onChange: () => void;
+}>) {
+  const { policy_id: policyId, customer_id: customerId } = claim;
+  const policy = usePoll(
+    useCallback(
+      (signal: AbortSignal) => api.policy(policyId, signal),
+      [policyId],
+    ),
+    null,
+  );
+  const customer = usePoll(
+    useCallback(
+      (signal: AbortSignal) => api.customer(customerId, signal),
+      [customerId],
+    ),
+    null,
+  );
+  const handlers = usePoll(api.handlers, null);
+
+  return (
+    <>
+      <ClaimHead claim={claim} agent={agent} onChange={onChange} />
+      <div className="claim-grid">
+        <div className="claim-grid__main">
+          <StoryPanel claim={claim} />
+          <ItemsPanel claim={claim} />
+          <DocumentsPanel claim={claim} />
+          <StepsPanel steps={steps} live={live} />
+        </div>
+        <div className="claim-grid__side">
+          <DecisionPanel
+            claim={claim}
+            handlers={handlers.data ?? []}
+            onChange={onChange}
+          />
+          <PolicyPanel policy={policy.data} />
+          <CustomerPanel customer={customer.data} />
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -98,25 +179,6 @@ export function ClaimPage({ claimId }: Readonly<{ claimId: string }>) {
     useCallback((signal: AbortSignal) => api.steps(claimId, signal), [claimId]),
     live ? 2000 : null,
   );
-  const policyId = claim.data?.policy_id;
-  const customerId = claim.data?.customer_id;
-  const policy = usePoll(
-    useCallback(
-      (signal: AbortSignal) =>
-        policyId ? api.policy(policyId, signal) : Promise.resolve(null),
-      [policyId],
-    ),
-    null,
-  );
-  const customer = usePoll(
-    useCallback(
-      (signal: AbortSignal) =>
-        customerId ? api.customer(customerId, signal) : Promise.resolve(null),
-      [customerId],
-    ),
-    null,
-  );
-  const handlers = usePoll(api.handlers, null);
   const refresh = () => {
     claim.reload();
     agent.reload();
@@ -125,7 +187,7 @@ export function ClaimPage({ claimId }: Readonly<{ claimId: string }>) {
 
   return (
     <div className="page">
-      <a className="back" href="#/">
+      <a className="back" href={paths.queue}>
         Back to the queue
       </a>
       {claim.error && (
@@ -135,45 +197,13 @@ export function ClaimPage({ claimId }: Readonly<{ claimId: string }>) {
         <Loading label={`Loading ${claimId}`} />
       )}
       {claim.data && (
-        <>
-          <header className="claim-head">
-            <div>
-              <p className="claim-head__id mono">{claim.data.claim_id}</p>
-              <h1>{claim.data.summary}</h1>
-              <p className="claim-head__meta">
-                <ClaimType type={claim.data.claim_type} />
-                <span>{claim.data.incident_location}</span>
-                <span>Submitted {date(claim.data.submitted_on)}</span>
-                <span className="mono">{money(claim.data.amount_claimed)}</span>
-              </p>
-            </div>
-            <div className="claim-head__side">
-              <StatusBadge status={claim.data.status} />
-              <AgentControls
-                claim={claim.data}
-                agent={agent.data}
-                onChange={refresh}
-              />
-            </div>
-          </header>
-          <div className="claim-grid">
-            <div className="claim-grid__main">
-              <StoryPanel claim={claim.data} />
-              <ItemsPanel claim={claim.data} />
-              <DocumentsPanel claim={claim.data} />
-              <StepsPanel steps={steps.data} live={live} />
-            </div>
-            <div className="claim-grid__side">
-              <DecisionPanel
-                claim={claim.data}
-                handlers={handlers.data ?? []}
-                onChange={refresh}
-              />
-              <PolicyPanel policy={policy.data} />
-              <CustomerPanel customer={customer.data} />
-            </div>
-          </div>
-        </>
+        <ClaimView
+          claim={claim.data}
+          agent={agent.data}
+          steps={steps.data}
+          live={live}
+          onChange={refresh}
+        />
       )}
     </div>
   );

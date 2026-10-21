@@ -1,6 +1,7 @@
 import type { ClaimWork } from "./api";
 import { DECISION_LABELS, clock, duration } from "./format";
 import { latestRun, layout } from "./runs";
+import { paths } from "./paths";
 
 function at(epochSeconds: number): string {
   return clock(new Date(epochSeconds * 1000).toISOString());
@@ -27,7 +28,7 @@ export function Timeline({ claims }: Readonly<{ claims: ClaimWork[] }>) {
       <ol className="timeline__rows" aria-label="The latest run">
         {bars.map(({ claim, left, width }) => (
           <li key={claim.claim_id}>
-            <a className="mono" href={`#/claims/${claim.claim_id}`}>
+            <a className="mono" href={paths.claim(claim.claim_id)}>
               {claim.claim_id}
             </a>
             <span className="timeline__track">

@@ -1,12 +1,20 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
+import { loadSettings, setting } from "../settings.config";
 
-// UNDERCOVER_API points the proxy at another backend, as the end-to-end tests do.
-const api = process.env.UNDERCOVER_API ?? "http://127.0.0.1:8000";
+loadSettings(
+  process.env.VITEST
+    ? ".env.defaults"
+    : (process.env.UNDERCOVER_ENV_FILES ?? ".env,.env.defaults"),
+);
 
 export default defineConfig({
   plugins: [react()],
-  server: { proxy: { "/api": api } },
+  server: {
+    port: Number(setting("DASHBOARD_PORT")),
+    strictPort: true,
+    proxy: { "/api": setting("UNDERCOVER_API") },
+  },
   test: {
     environment: "jsdom",
     coverage: {

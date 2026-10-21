@@ -1,5 +1,13 @@
 import { vi } from "vitest";
-import type { AgentState, Claim, ClaimSummary, Insights } from "./api";
+import type {
+  AgentState,
+  Claim,
+  ClaimSummary,
+  Customer,
+  Decision,
+  Insights,
+  Policy,
+} from "./api";
 
 /** Routes keyed by "METHOD /path": a value is sent as JSON (a string as text),
  *  a Response as it is, and a missing route answers 404. */
@@ -86,7 +94,12 @@ export const QUEUE: ClaimSummary[] = [
   }),
 ];
 
-export const IDLE: AgentState = { running: false, mode: null, claim_id: null };
+export const IDLE: AgentState = {
+  model: "DeepSeek V4.1 Flash",
+  running: false,
+  mode: null,
+  claim_id: null,
+};
 
 export function claim(overrides: Partial<Claim> = {}): Claim {
   return {
@@ -197,3 +210,94 @@ export const INSIGHTS: Insights = {
     },
   ],
 };
+
+// A claim page's records, for the claim page and its decision forms
+export const POLICY: Policy = {
+  policy_id: "POL-2001",
+  customer_id: "CUS-3001",
+  plan: {
+    plan: "premium",
+    name: "UnderCover Premium",
+    trip_cancellation_max: 5000,
+    trip_delay_waiting_hours: 6,
+    trip_delay_max: 800,
+    baggage_delay_waiting_hours: 12,
+    baggage_delay_max: 300,
+    baggage_max: 1500,
+    per_item_limit: 300,
+    passport_max: 250,
+    emergency_medical_max: 100000,
+    deductible: 50,
+  },
+  deductible_applies_to: ["baggage", "emergency_medical"],
+  add_ons: [
+    {
+      add_on: "electronics_plus",
+      name: "Electronics Plus",
+      effect: "Raises the per-item limit for electronics.",
+      electronics_per_item_limit: 1200,
+    },
+  ],
+  purchased_on: "2026-04-22",
+  sold_through: "Meridian Air checkout",
+  trip: {
+    destination: "Rome, Italy",
+    departs_on: "2026-06-10",
+    returns_on: "2026-06-18",
+    trip_cost: 3100,
+  },
+  travelers: ["Maya Patel"],
+  status: "active",
+};
+
+export const CUSTOMER: Customer = {
+  customer_id: "CUS-3001",
+  name: "Maya Patel",
+  email: "maya.patel@example.com",
+  phone: "+1 201 555 0143",
+  customer_since: "2023-04-11",
+  previous_claims: [
+    {
+      claim_id: "CLM-0412",
+      filed_on: "2024-08-19",
+      incident_date: "2024-08-09",
+      claim_type: "baggage_delay",
+      summary: "Checked bag arrived 30 hours late in Lisbon",
+      outcome: "approved",
+      amount_paid: 140,
+    },
+  ],
+};
+
+export const HANDLERS = [
+  {
+    handler_id: "HND-01",
+    name: "Dana Whitfield",
+    role: "Senior Claims Handler",
+  },
+  { handler_id: "HND-02", name: "Marcus Oyelaran", role: "Claims Handler" },
+];
+
+export function decision(overrides: Partial<Decision> = {}): Decision {
+  return {
+    decided_by: "agent",
+    decision: "approve",
+    payout: 1150,
+    reasons: "The suitcase was lost by the carrier.",
+    policy_section: "Section 5, Baggage and Personal Effects",
+    decided_at: "2026-10-19T15:00:00Z",
+    ...overrides,
+  };
+}
+
+export function claimRoutes(overrides: Routes = {}): Routes {
+  return {
+    "GET /api/claims/CLM-1001": claim(),
+    "GET /api/claims/CLM-1001/steps": [],
+    "GET /api/policies/POL-2001": POLICY,
+    "GET /api/customers/CUS-3001": CUSTOMER,
+    "GET /api/handlers": HANDLERS,
+    "GET /api/agent": IDLE,
+    ...overrides,
+  };
+}

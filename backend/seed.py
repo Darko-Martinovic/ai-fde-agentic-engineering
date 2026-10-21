@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from backend import db
+from backend.config import database_path
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 
@@ -68,7 +69,7 @@ def ensure_seeded(conn: sqlite3.Connection) -> None:
 
 def reset() -> None:
     """Delete the database and seed a fresh one."""
-    db.path().unlink(missing_ok=True)
+    database_path().unlink(missing_ok=True)
     conn = db.connect()
     seed(conn)
     conn.close()
@@ -76,4 +77,4 @@ def reset() -> None:
 
 if __name__ == "__main__":
     reset()
-    print(f"Reset {db.path()}")
+    print(f"Reset {database_path()}")

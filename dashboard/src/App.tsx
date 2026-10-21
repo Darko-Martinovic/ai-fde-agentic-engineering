@@ -1,8 +1,9 @@
 import { api } from "./api";
 import { ClaimPage } from "./ClaimPage";
 import { Logo } from "./components";
-import { usePoll, useRoute, useTheme, type Route, type Theme } from "./hooks";
+import { usePoll, useRoute, useTheme, type Theme } from "./hooks";
 import { InsightsPage } from "./Insights";
+import { paths, type Route } from "./paths";
 import { InstructionsPage } from "./Instructions";
 import { QueuePage } from "./Queue";
 
@@ -48,7 +49,7 @@ export function App() {
   return (
     <>
       <header className="topbar">
-        <a className="brand" href="#/">
+        <a className="brand" href={paths.queue}>
           <Logo />
           <span>
             <strong>UnderCover</strong>
@@ -57,19 +58,19 @@ export function App() {
         </a>
         <nav className="nav" aria-label="Pages">
           <a
-            href="#/"
+            href={paths.queue}
             aria-current={route.page === "queue" ? "page" : undefined}
           >
             Queue
           </a>
           <a
-            href="#/insights"
+            href={paths.insights}
             aria-current={route.page === "insights" ? "page" : undefined}
           >
             Insights
           </a>
           <a
-            href="#/instructions"
+            href={paths.instructions}
             aria-current={route.page === "instructions" ? "page" : undefined}
           >
             Instructions
