@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage
@@ -88,10 +90,38 @@ def test_an_unexpected_error_stops_the_run(backend, monkeypatch):
         )
 
 
-def test_instructions_hold_the_wording(backend):
+def test_instructions_list_the_sections_not_the_wording(backend):
     prompt = harness.instructions()
     assert prompt.startswith("# UnderCover Agent")
-    assert "# UnderCover Travel Insurance: Policy Wording" in prompt
+    assert "- Claims manual 9. Repeat claims" in prompt
+    assert "- Policy wording 3. Trip Delay" in prompt
+    assert "# UnderCover Travel Insurance: Policy Wording" not in prompt
+
+
+def test_sections_read_are_recorded(backend):
+    harness.work_claim(
+        "CLM-1001",
+        stub(
+            tool_call("search_documents", query="meals without receipts"),
+            tool_call("read_section", document="manual", number=10),
+            tool_call("read_section", document="manual", number=99),
+            AIMessage(content="Read the manual."),
+        ),
+    )
+    steps = backend.get("/api/claims/CLM-1001/steps").json()
+    results = [s["text"] for s in steps if s["kind"] == "tool_result"]
+    assert any('"title": "Meals without receipts"' in text for text in results)
+    sections = [json.loads(s["text"]) for s in steps if s["kind"] == "section"]
+    assert sections == [
+        {
+            "document": "manual",
+            "document_title": "Claims manual",
+            "number": 10,
+            "title": "Meals without receipts",
+        }
+    ]
+    refused = [s["text"] for s in steps if s["text"].startswith("Refused")]
+    assert refused == ["Refused (404): There is no section 99 in the manual"]
 
 
 def test_steps_from_a_reply():

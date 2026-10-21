@@ -11,6 +11,7 @@ import { ClaimType, ErrorNote, Loading, StatusBadge } from "./components";
 import { DecisionPanel } from "./Decisions";
 import { date, money } from "./format";
 import { useAction, usePoll } from "./hooks";
+import { SectionsPanel } from "./Sections";
 import { StepsPanel } from "./Steps";
 import { paths } from "./paths";
 
@@ -150,6 +151,7 @@ function ClaimView({
           <StoryPanel claim={claim} />
           <ItemsPanel claim={claim} />
           <DocumentsPanel claim={claim} />
+          <SectionsPanel steps={steps} />
           <StepsPanel steps={steps} live={live} />
         </div>
         <div className="claim-grid__side">

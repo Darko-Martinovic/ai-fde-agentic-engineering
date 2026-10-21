@@ -36,6 +36,19 @@ def get_customer(customer_id: str) -> dict[str, Any]:
 
 
 @tool
+def search_documents(query: str) -> list[dict[str, Any]]:
+    """Find the sections of the policy wording and the claims manual that best
+    match what you're looking for, such as "meals without receipts"."""
+    return api.search_documents(query)
+
+
+@tool
+def read_section(document: Literal["wording", "manual"], number: int) -> dict[str, Any]:
+    """Read one numbered section of the policy wording or the claims manual."""
+    return api.read_section(document, number)
+
+
+@tool
 def decide_claim(
     decision: Literal["approve", "decline", "refer"],
     payout: float,
@@ -62,4 +75,12 @@ def pay_claim(amount: float, runtime: ToolRuntime[ClaimContext]) -> dict[str, An
     return api.pay_claim(runtime.context.claim_id, amount)
 
 
-CLAIM_TOOLS = [get_claim, get_policy, get_customer, decide_claim, pay_claim]
+CLAIM_TOOLS = [
+    get_claim,
+    get_policy,
+    get_customer,
+    search_documents,
+    read_section,
+    decide_claim,
+    pay_claim,
+]

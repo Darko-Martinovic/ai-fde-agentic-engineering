@@ -125,13 +125,31 @@ export interface Handler {
   role: string;
 }
 
-export type StepKind = "tool_call" | "tool_result" | "reply";
+export type StepKind = "tool_call" | "tool_result" | "reply" | "section";
+
+export type DocumentName = "wording" | "manual";
+
+export interface SectionTitle {
+  document: DocumentName;
+  document_title: string;
+  number: number;
+  title: string;
+}
+
+export interface Section extends SectionTitle {
+  text: string;
+}
 
 export interface Step {
   thread_id: string;
   kind: StepKind;
   text: string;
   recorded_at: string;
+}
+
+/** The section a `section` step names; the backend checks its shape. */
+export function sectionOf(step: Step): SectionTitle {
+  return JSON.parse(step.text) as SectionTitle;
 }
 
 export interface AgentState {
@@ -242,6 +260,11 @@ export const api = {
     getJson<ClaimSummary[]>("/api/claims", signal),
   claim: (id: string, signal?: AbortSignal) =>
     getJson<Claim>(`/api/claims/${id}`, signal),
+  readSection: (document: DocumentName, num: number, signal?: AbortSignal) =>
+    getJson<Section>(
+      `/api/documents/${document}/sections/${String(num)}`,
+      signal,
+    ),
   steps: (id: string, signal?: AbortSignal) =>
     getJson<Step[]>(`/api/claims/${id}/steps`, signal),
   policy: (id: string, signal?: AbortSignal) =>

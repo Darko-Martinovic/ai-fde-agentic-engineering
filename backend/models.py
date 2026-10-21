@@ -8,14 +8,35 @@ from pydantic import BaseModel, Field, model_validator
 ClaimStatus = Literal[
     "waiting", "in_progress", "awaiting_sign_off", "referred", "decided"
 ]
-StepKind = Literal["tool_call", "tool_result", "reply"]
+StepKind = Literal["tool_call", "tool_result", "reply", "section"]
 DecisionKind = Literal["approve", "decline", "refer"]
+
+
+DocumentName = Literal["wording", "manual"]
+
+
+class SectionTitle(BaseModel):
+    document: DocumentName
+    document_title: str
+    number: int
+    title: str
+
+
+class Section(SectionTitle):
+    text: str
 
 
 class StepIn(BaseModel):
     thread_id: str = Field(min_length=1)
     kind: StepKind
     text: str
+
+    @model_validator(mode="after")
+    def section_names_a_section(self) -> Self:
+        """A section step's text is the section read, so the dashboard can show it."""
+        if self.kind == "section":
+            SectionTitle.model_validate_json(self.text)
+        return self
 
 
 class Step(StepIn):

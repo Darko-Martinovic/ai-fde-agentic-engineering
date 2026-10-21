@@ -2,6 +2,10 @@ import pytest
 
 from backend import db
 
+SECTION_READ = (
+    '{"document": "manual", "document_title": "Claims manual", "number": 9,'
+    ' "title": "Repeat claims"}'
+)
 REFUSAL = "Refused (409): A payout over $1,000.00 waits for a handler's sign-off"
 
 
@@ -178,3 +182,24 @@ def test_only_the_latest_run_counts(client):
     assert claim["seconds"] == 5
     assert claim["tool_calls"] == 1
     assert claim["decision"] is None
+
+
+def test_sections_read_are_not_tool_calls(client):
+    insights(client)
+    add_steps(
+        "CLM-1005",
+        "CLM-1005-a",
+        [
+            (0, "tool_call", 'read_section {"document": "manual", "number": 9}'),
+            (1, "tool_result", "{}"),
+            (1, "section", SECTION_READ),
+            (2, "tool_call", "get_claim {}"),
+            (3, "tool_result", "{}"),
+        ],
+    )
+    [claim] = insights(client)["claims"]
+    assert claim["tool_calls"] == 2
+    assert {t["tool"] for t in insights(client)["tools"]} == {
+        "read_section",
+        "get_claim",
+    }
