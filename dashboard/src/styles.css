@@ -1387,3 +1387,28 @@ main {
   border-radius: 6px;
   background: var(--tone);
 }
+
+/* Sections the agent read */
+
+.sections-read {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sections-read summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sections-read details[open] {
+  padding-bottom: 8px;
+}
+
+.step__section {
+  margin: 0;
+  font-weight: 600;
+  color: var(--cerulean-ink);
+}

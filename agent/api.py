@@ -22,9 +22,14 @@ class Refused(Exception):
         self.detail = detail
 
 
-def send(method: str, path: str, body: dict[str, Any] | None = None) -> httpx.Response:
+def send(
+    method: str,
+    path: str,
+    body: dict[str, Any] | None = None,
+    query: dict[str, str] | None = None,
+) -> httpx.Response:
     with client() as backend:
-        response = backend.request(method, path, json=body)
+        response = backend.request(method, path, json=body, params=query)
     if response.is_client_error:
         raise Refused(response.status_code, response.json()["detail"])
     return response.raise_for_status()
@@ -50,8 +55,16 @@ def get_instructions() -> str:
     return send("GET", "/api/instructions").text
 
 
-def get_policy_wording() -> str:
-    return send("GET", "/api/policy-wording").text
+def list_sections() -> list[dict[str, Any]]:
+    return send("GET", "/api/documents/sections").json()
+
+
+def search_documents(query: str) -> list[dict[str, Any]]:
+    return send("GET", "/api/documents/search", query={"query": query}).json()
+
+
+def read_section(document: str, number: int) -> dict[str, Any]:
+    return send("GET", f"/api/documents/{document}/sections/{number}").json()
 
 
 def start_claim(claim_id: str) -> dict[str, Any]:

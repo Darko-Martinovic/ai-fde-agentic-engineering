@@ -19,7 +19,7 @@ from langgraph.types import Command
 
 from agent import api
 from agent.config import Model, current_model, setting
-from agent.tools import CLAIM_TOOLS, ClaimContext
+from agent.tools import CLAIM_TOOLS, ClaimContext, read_section
 
 # Our providers, and the LangChain integration that serves each one
 INTEGRATIONS = {"openrouter": "openai", "anthropic": "anthropic", "ollama": "ollama"}
@@ -80,7 +80,19 @@ class StepRecorder(AgentMiddleware[AgentState[Any], ClaimContext]):
         if isinstance(result, ToolMessage):
             context = cast(ClaimContext, request.runtime.context)
             record(context, "tool_result", str(result.text))
+            if (
+                request.tool_call["name"] == read_section.name
+                and result.status != "error"
+            ):
+                record(context, "section", section_read(str(result.text)))
         return result
+
+
+def section_read(result: str) -> str:
+    """The step for a section the agent read: the backend's section, less its text."""
+    section = json.loads(result)
+    del section["text"]
+    return json.dumps(section)
 
 
 def record(context: ClaimContext, kind: str, text: str) -> None:
@@ -93,9 +105,18 @@ def refusal(error: Exception, request: ToolCallRequest) -> str | None:
     return str(error) if isinstance(error, api.Refused) else None
 
 
+def contents() -> str:
+    """List the sections of the wording and the manual, for the agent to look up."""
+    lines = [
+        f"- {s['document_title']} {s['number']}. {s['title']}"
+        for s in api.list_sections()
+    ]
+    return "## The sections you can read\n\n" + "\n".join(lines)
+
+
 def instructions() -> str:
-    """Join the agent's instructions and the policy wording, both from the API."""
-    return f"{api.get_instructions()}\n\n{api.get_policy_wording()}"
+    """The agent's instructions and the documents' contents, both from the API."""
+    return f"{api.get_instructions()}\n\n{contents()}"
 
 
 def claim_agent(llm: BaseChatModel):

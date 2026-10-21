@@ -19,6 +19,7 @@ SEED_FILES = (
     "handlers.json",
     "company.json",
     "policy_wording.md",
+    "claims_manual.md",
 )
 
 
@@ -57,6 +58,7 @@ def seed(conn: sqlite3.Connection) -> None:
                 ("plans", json.dumps(read("plans.json"))),
                 ("company", json.dumps(read("company.json"))),
                 ("policy_wording", read("policy_wording.md")),
+                ("claims_manual", read("claims_manual.md")),
             ],
         )
 

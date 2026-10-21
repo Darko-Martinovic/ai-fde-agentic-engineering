@@ -1,4 +1,4 @@
-import type { ClaimStatus, DecisionKind } from "./api";
+import type { ClaimStatus, DecisionKind, SectionTitle } from "./api";
 
 const dollars = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -72,4 +72,8 @@ export function duration(seconds: number): string {
 export function percent(part: number, whole: number): string {
   if (whole === 0) return "—";
   return `${String(Math.round((part / whole) * 100))}%`;
+}
+
+export function sectionName(section: SectionTitle): string {
+  return `${section.document_title} ${String(section.number)}. ${section.title}`;
 }

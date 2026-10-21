@@ -34,11 +34,11 @@ The brief in `docs/HARNESS.md`, built on our own pilot: one run works the queue 
 
 **Success criteria**
 
-- [ ] A search for a third claim within 12 months finds manual section 9 first; a search for meals without receipts finds manual section 10
-- [ ] `read_section` returns one section's text, and a 404 for one that doesn't exist
-- [ ] A stub run that searches and reads a section shows it in "Sections read" on the claim page
-- [ ] The claim agent's prompt no longer holds the whole wording
-- [ ] A seeding test allows the manual and still never opens `data/evals/` or `data/security/`
+- [x] A search for a third claim within 12 months finds manual section 9 first; a search for meals without receipts finds manual section 10
+- [x] `read_section` returns one section's text, and a 404 for one that doesn't exist
+- [x] A stub run that searches and reads a section shows it in "Sections read" on the claim page
+- [x] The claim agent's prompt no longer holds the whole wording
+- [x] A seeding test allows the manual and still never opens `data/evals/` or `data/security/`
 
 ## Phase 3: Runs, to-do lists, failures and usage
 

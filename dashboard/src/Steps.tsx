@@ -1,11 +1,12 @@
-import type { Step, StepKind } from "./api";
+import { sectionOf, type Step, type StepKind } from "./api";
 import { Panel } from "./components";
-import { clock, pretty } from "./format";
+import { clock, pretty, sectionName } from "./format";
 
 const KIND_LABELS: Record<StepKind, string> = {
   tool_call: "Calls a tool",
   tool_result: "Tool result",
   reply: "Agent",
+  section: "Reads a section",
 };
 
 function StepBody({ step }: Readonly<{ step: Step }>) {
@@ -32,6 +33,9 @@ function StepBody({ step }: Readonly<{ step: Step }>) {
         {!refused && <pre className="mono">{pretty(step.text)}</pre>}
       </details>
     );
+  }
+  if (step.kind === "section") {
+    return <p className="step__section">{sectionName(sectionOf(step))}</p>;
   }
   return <p className="step__reply">{step.text}</p>;
 }

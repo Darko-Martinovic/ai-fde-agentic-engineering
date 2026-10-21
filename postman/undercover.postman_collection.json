@@ -305,6 +305,143 @@
               }
             }
           ]
+        },
+        {
+          "name": "List sections",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/documents/sections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                "sections"
+              ]
+            },
+            "description": "`list_sections`: the sections of the policy wording and the claims manual, by title."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const sections = pm.response.json();",
+                  "pm.test(\"28 sections, with each opening\", () => pm.expect(sections.length).to.eql(28));",
+                  "pm.test(\"manual 9 is repeat claims\", () => pm.expect(sections).to.deep.include({ document: \"manual\", document_title: \"Claims manual\", number: 9, title: \"Repeat claims\" }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search for meals without receipts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/documents/search?query=meals without receipts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "meals without receipts"
+                }
+              ]
+            },
+            "description": "`search_documents`: the sections that best match a query."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const hits = pm.response.json();",
+                  "pm.test(\"manual 10 first\", () => pm.expect([hits[0].document, hits[0].number]).to.eql([\"manual\", 10]));",
+                  "pm.test(\"at most three\", () => pm.expect(hits.length).to.be.at.most(3));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read manual section 9",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/documents/manual/sections/9",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                "manual",
+                "sections",
+                "9"
+              ]
+            },
+            "description": "`read_section`: one section's text."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"is repeat claims\", () => pm.expect(pm.response.json().text).to.include(\"third claim within any 12 month period\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read a section that isn't there",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/documents/manual/sections/99",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                "manual",
+                "sections",
+                "99"
+              ]
+            },
+            "description": "`read_section`: 404 for a missing section."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
