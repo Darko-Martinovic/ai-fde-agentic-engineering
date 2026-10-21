@@ -6,10 +6,10 @@ from multiprocessing.process import BaseProcess
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from agent.__main__ import main as work
-from agent.config import current_model
+from agent.config import current_model, model, models
 from backend.api import Db, load_claim, now
 from backend.store import claims, runs
 
@@ -17,10 +17,30 @@ router = APIRouter(prefix="/api/agent")
 
 
 class AgentState(BaseModel):
-    model: str
+    model: str | None
     running: bool
     mode: Literal["claim", "queue"] | None
     claim_id: str | None
+
+
+class ModelChoice(BaseModel):
+    spec: str
+    label: str
+    default: bool
+
+
+class RunClaimIn(BaseModel):
+    model: str
+
+    @field_validator("model")
+    @classmethod
+    def model_is_allowed(cls, spec: str) -> str:
+        """Only a model in models.toml runs."""
+        return model(spec).spec
+
+
+class RunQueueIn(RunClaimIn):
+    cap: int = Field(ge=1)
 
 
 class Run:
@@ -28,15 +48,17 @@ class Run:
 
     process: BaseProcess | None = None
     mode: Literal["claim", "queue"] | None = None
+    model: str | None = None
 
 
 RUN = Run()
 
 
-def start_process(claim_ids: list[str]) -> BaseProcess:
-    """Start the agent on the claims given, or on the whole queue if none are."""
+def start_process(arguments: list[str]) -> BaseProcess:
+    """Start the agent's command line, with these arguments, in a process of its
+    own."""
     process = multiprocessing.get_context("spawn").Process(
-        target=work, args=(claim_ids,), daemon=True
+        target=work, args=(arguments,), daemon=True
     )
     process.start()
     return process
@@ -47,11 +69,10 @@ def running() -> bool:
 
 
 def state(conn: sqlite3.Connection) -> AgentState:
-    model = current_model().label
     if not running():
-        return AgentState(model=model, running=False, mode=None, claim_id=None)
+        return AgentState(model=None, running=False, mode=None, claim_id=None)
     return AgentState(
-        model=model,
+        model=RUN.model,
         running=True,
         mode=RUN.mode,
         claim_id=claims.first_in_progress(conn),
@@ -67,14 +88,19 @@ def return_to_queue(conn: sqlite3.Connection) -> None:
 
 
 def launch(
-    conn: sqlite3.Connection, mode: Literal["claim", "queue"], claim_ids: list[str]
+    conn: sqlite3.Connection,
+    mode: Literal["claim", "queue"],
+    spec: str,
+    arguments: list[str],
 ) -> None:
-    """Start a run, first returning any claim an earlier run left in progress."""
+    """Start a run on a model, first returning any claim an earlier run left in
+    progress."""
     if running():
         raise HTTPException(409, "The agent is already running")
     return_to_queue(conn)
-    RUN.process = start_process(claim_ids)
+    RUN.process = start_process([*arguments, "--model", spec])
     RUN.mode = mode
+    RUN.model = model(spec).label
 
 
 @router.get("", operation_id="get_agent")
@@ -83,22 +109,32 @@ def get_agent(conn: Db) -> AgentState:
     return state(conn)
 
 
+@router.get("/models", operation_id="list_models")
+def list_models() -> list[ModelChoice]:
+    """List the models the agent may run on, marking the default (MODEL_NAME)."""
+    default = current_model().spec
+    return [
+        ModelChoice(spec=m.spec, label=m.label, default=m.spec == default)
+        for m in models().values()
+    ]
+
+
 @router.post("/claims/{claim_id}", operation_id="run_claim")
-def run_claim(claim_id: str, conn: Db) -> AgentState:
-    """Start the agent on one waiting claim."""
+def run_claim(claim_id: str, run: RunClaimIn, conn: Db) -> AgentState:
+    """Start the agent on one waiting claim, on a model."""
     claim = load_claim(conn, claim_id)
     if claim.status != "waiting":
         raise HTTPException(409, f"Claim {claim_id} is {claim.status}, not waiting")
-    launch(conn, "claim", [claim_id])
+    launch(conn, "claim", run.model, [claim_id])
     return state(conn)
 
 
 @router.post("/queue", operation_id="run_queue")
-def run_queue(conn: Db) -> AgentState:
-    """Start the agent on every waiting claim, in turn."""
+def run_queue(run: RunQueueIn, conn: Db) -> AgentState:
+    """Start the queue agent on up to `cap` waiting claims, on a model."""
     if claims.count_in(conn, "waiting") == 0:
         raise HTTPException(409, "No claims are waiting")
-    launch(conn, "queue", [])
+    launch(conn, "queue", run.model, ["--cap", str(run.cap)])
     return state(conn)
 
 
@@ -110,5 +146,6 @@ def stop_agent(conn: Db) -> AgentState:
         RUN.process.join(timeout=10)
     RUN.process = None
     RUN.mode = None
+    RUN.model = None
     return_to_queue(conn)
     return state(conn)

@@ -21,6 +21,8 @@ DecisionKind = Literal["approve", "decline", "refer"]
 
 
 DocumentName = Literal["wording", "manual"]
+# The agents with instructions of their own
+AgentName = Literal["queue", "claim"]
 
 
 class SectionTitle(BaseModel):
@@ -266,7 +268,7 @@ class Run(RunIn):
     finished_at: datetime | None
     summary: str | None
     todos: list[Todo]
-    claims_started: int
+    claims_started: list[str]
     usage: Usage
 
 

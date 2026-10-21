@@ -148,9 +148,17 @@ it("runs the agent on a waiting claim", async () => {
     }),
   );
   render(<ClaimPage claimId="CLM-1001" />);
-  fireEvent.click(await screen.findByRole("button", { name: "Run the agent" }));
+  const run = await screen.findByRole("button", { name: "Run the agent" });
+  await waitFor(() => {
+    expect(calledWith(fetchMock, "GET /api/agent/models")).toBe(true);
+  });
+  fireEvent.click(run);
   await waitFor(() => {
     expect(calledWith(fetchMock, "POST /api/agent/claims/CLM-1001")).toBe(true);
+  });
+  const sent = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+  expect(JSON.parse(sent?.[1]?.body as string)).toEqual({
+    model: "openrouter:deepseek/deepseek-v4.1-flash",
   });
 });
 

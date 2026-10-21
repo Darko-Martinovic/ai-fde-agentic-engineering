@@ -9,28 +9,8 @@ from langchain_openai import ChatOpenAI
 
 from agent import harness, middleware
 from agent.config import model
-from agent.tests.stub import FREE, StubModel
+from agent.tests.stub import FREE, StubModel, decide, stub, tool_call
 from agent.tools import CLAIM_TOOLS
-
-
-def tool_call(name, **args):
-    return AIMessage(
-        content="", tool_calls=[{"name": name, "args": args, "id": f"call-{name}"}]
-    )
-
-
-def stub(*replies):
-    return StubModel(messages=iter(replies))
-
-
-def decide(decision, payout):
-    return tool_call(
-        "decide_claim",
-        decision=decision,
-        payout=payout,
-        reasons="The delay was covered and the costs were reasonable.",
-        policy_section="Section 3, Trip Delay",
-    )
 
 
 def test_work_claim_approves_and_pays(backend, run):
@@ -161,7 +141,7 @@ def test_usage_is_recorded_on_the_run(backend, run):
 
 def test_instructions_list_the_sections_not_the_wording(backend):
     prompt = harness.instructions()
-    assert prompt.startswith("# UnderCover Agent")
+    assert prompt.startswith("# UnderCover claim agent")
     assert "- Claims manual 9. Repeat claims" in prompt
     assert "- Policy wording 3. Trip Delay" in prompt
     assert "# UnderCover Travel Insurance: Policy Wording" not in prompt

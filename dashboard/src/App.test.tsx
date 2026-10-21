@@ -1,14 +1,16 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { App } from "./App";
-import { IDLE, INSIGHTS, QUEUE, claim, mockFetch } from "./testing";
+import { IDLE, INSIGHTS, MODELS, QUEUE, claim, mockFetch } from "./testing";
 
 const ROUTES = {
   "GET /api/health": { status: "ok" },
   "GET /api/claims": QUEUE,
   "GET /api/agent": IDLE,
   "GET /api/claims/CLM-1001": claim(),
-  "GET /api/instructions": "# UnderCover Agent\n\nDecide claims.",
+  "GET /api/instructions/queue": "# UnderCover queue agent\n\nRun the queue.",
+  "GET /api/instructions/claim": "# UnderCover claim agent\n\nDecide claims.",
+  "GET /api/agent/models": MODELS,
   "GET /api/policy-wording": "# Policy Wording",
   "GET /api/insights": INSIGHTS,
 };
@@ -40,7 +42,7 @@ it("moves between pages", async () => {
   window.location.hash = "#/instructions";
   fireEvent(window, new HashChangeEvent("hashchange"));
   expect(
-    await screen.findByRole("heading", { name: "UnderCover Agent" }),
+    await screen.findByRole("heading", { name: "UnderCover queue agent" }),
   ).toBeDefined();
   expect(
     screen

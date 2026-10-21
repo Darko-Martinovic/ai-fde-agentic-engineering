@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { api } from "./api";
 import { parseRoute, type Route } from "./paths";
 
 export type Loader<T> = (signal: AbortSignal) => Promise<T>;
@@ -114,4 +115,38 @@ export function useTheme(): [Theme, (theme: Theme) => void] {
     }
   }, [theme]);
   return [theme, setTheme];
+}
+
+const MODEL_KEY = "undercover-model";
+
+function readModel(): string {
+  try {
+    return localStorage.getItem(MODEL_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** The models the agent may run on, and the one picked: the default (MODEL_NAME)
+ *  until someone picks another, which the queue and the claim pages share. */
+export function useModelChoice() {
+  const models = usePoll(api.listModels, null);
+  const [picked, setPicked] = useState(readModel);
+  const list = models.data ?? [];
+  const allowed = list.some((m) => m.spec === picked);
+  const fallback = list.find((m) => m.default)?.spec ?? "";
+  const pick = (spec: string) => {
+    setPicked(spec);
+    try {
+      localStorage.setItem(MODEL_KEY, spec);
+    } catch {
+      // Private windows can refuse storage; the pick holds on this page.
+    }
+  };
+  return {
+    models: list,
+    model: allowed ? picked : fallback,
+    error: models.error,
+    pick,
+  };
 }

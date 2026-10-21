@@ -67,8 +67,11 @@ def test_get_policy_wording(client):
 
 
 def test_get_instructions(client):
-    response = client.get("/api/instructions")
-    assert response.text.startswith("# UnderCover Agent")
+    claim = client.get("/api/instructions/claim").text
+    queue = client.get("/api/instructions/queue").text
+    assert claim.startswith("# UnderCover claim agent")
+    assert queue.startswith("# UnderCover queue agent")
+    assert client.get("/api/instructions/someone").status_code == 422
 
 
 def test_list_handlers(client):
@@ -106,6 +109,7 @@ def test_operations_are_documented(client):
         "finish_run",
         "record_usage",
         "get_agent",
+        "list_models",
         "run_claim",
         "run_queue",
         "stop_agent",

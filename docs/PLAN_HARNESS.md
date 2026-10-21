@@ -52,16 +52,16 @@ The brief in `docs/HARNESS.md`, built on our own pilot: one run works the queue 
 
 ## Phase 4: The queue agent
 
-**Builds:** `run_queue(cap, model)` with the queue agent's tools (`list_waiting_claims`, `write_todos` and `work_claim`, which hands a claim to a fresh claim agent and reports back in a line); the check for missed claims within the cap before the run finishes; the summary for the handlers; the command line's `--cap` and `--model`; the runner starting a capped run on a chosen model; and the queue agent's instructions as goals.
+**Builds:** `run_queue(cap, model)` with the queue agent's tools (`list_waiting_claims`, `write_todos` and `work_claim`, which hands a claim to a fresh claim agent and reports back in a line); the check for missed claims within the cap before the run finishes; the summary for the handlers; the command line's `--cap` and `--model`; the runner starting a capped run on a chosen model (`run_queue` and `run_claim` take a model, checked against `models.toml`, and `list_models` lists them); the queue agent's instructions as goals; and, brought forward from Phase 5, the run controls in the agent bar (model picker, claims field, Run, Run all, Stop) and the Instructions page showing both agents' instructions. `work_claim` calls go one at a time through a lock, so a model that calls the tool for several claims at once can't work them in parallel.
 
 **Success criteria**
 
-- [ ] Stub-model tests for the to-do list stored, the cap, a failed claim that doesn't stop the run, a failed claim tried again, a claim that fails twice left for a handler, and the check for missed claims
-- [ ] Every claim's steps land on that claim, and the queue agent's work lands on the run
+- [x] Stub-model tests for the to-do list stored, the cap, a failed claim that doesn't stop the run, a failed claim tried again, a claim that fails twice left for a handler, and the check for missed claims
+- [x] Every claim's steps land on that claim, and the queue agent's to-do list, usage and summary land on the run
 
 ## Phase 5: The live run view
 
-**Builds:** the run panel on the queue page (the to-do list, the claim being worked with its steps arriving live, progress and time left, tokens and cost, and the summary); the run controls (model picker from `list_models`, the cap, Run, Run all and Stop); failed attempts on the claim page; the Instructions page with the queue and claim instructions; and "Left for a handler" throughout. Insights stays as it is.
+**Builds:** the run panel on the queue page (the to-do list, the claim being worked with its steps arriving live, progress and time left, tokens and cost, and the summary), with the run's model. The run controls, failed attempts, the Instructions page and "Left for a handler" came in earlier phases. Insights stays as it is.
 
 **Success criteria**
 

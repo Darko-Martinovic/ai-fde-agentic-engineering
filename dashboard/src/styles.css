@@ -491,8 +491,19 @@ main {
   color: var(--raspberry-ink);
 }
 
+.agent-bar__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.field--narrow input {
+  width: 7ch;
+}
+
 .agent-bar__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 

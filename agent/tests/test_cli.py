@@ -1,3 +1,4 @@
+import pytest
 from langchain_core.messages import AIMessage
 
 import agent.__main__ as cli
@@ -7,8 +8,8 @@ from backend import db
 
 
 def reply_only(monkeypatch):
-    """Give every run a stub model that reads the claim and replies, deciding
-    nothing, so each claim fails and goes back in the queue."""
+    """Give every claim agent a stub model that reads the claim and replies,
+    deciding nothing, so each claim fails and goes back in the queue."""
 
     def stub(model):
         return StubModel(
@@ -26,6 +27,18 @@ def reply_only(monkeypatch):
     monkeypatch.setattr(harness, "chat_model", stub)
 
 
+def queue_runs(monkeypatch):
+    """Stand in for the queue agent, recording how it was started."""
+    started = []
+
+    def run_queue(cap, model):
+        started.append((cap, model.spec))
+        return "Worked the queue."
+
+    monkeypatch.setattr(cli, "run_queue", run_queue)
+    return started
+
+
 def test_one_claim(backend, monkeypatch, capsys):
     reply_only(monkeypatch)
     cli.main(["CLM-1001"])
@@ -36,19 +49,55 @@ def test_one_claim(backend, monkeypatch, capsys):
     assert run["summary"] == expected
 
 
-def test_the_queue(backend, monkeypatch, capsys):
+def test_claims_on_a_model(backend, monkeypatch):
     reply_only(monkeypatch)
+    cli.main(["CLM-1001", "CLM-1002", "--model", "ollama:qwen3.5:9b"])
+    run = backend.get("/api/runs/latest").json()
+    assert (run["cap"], run["model"]) == (2, "ollama:qwen3.5:9b")
+    assert run["claims_started"] == ["CLM-1001", "CLM-1002"]
+
+
+def test_the_queue_with_a_cap(backend, monkeypatch, capsys):
+    started = queue_runs(monkeypatch)
+    cli.main(["--cap", "5", "--model", "anthropic:claude-haiku-5-5"])
+    assert started == [(5, "anthropic:claude-haiku-5-5")]
+    assert capsys.readouterr().out == "Worked the queue.\n"
+
+
+def test_the_queue_without_a_cap_takes_every_waiting_claim(backend, monkeypatch):
+    started = queue_runs(monkeypatch)
+    cli.main([])
+    assert started == [(25, "openrouter:deepseek/deepseek-v4.1-flash")]
+
+
+def test_nothing_waiting(backend, monkeypatch, capsys):
+    started = queue_runs(monkeypatch)
     backend.get("/api/claims")
     conn = db.connect()
     with conn:
-        conn.execute(
-            "UPDATE claims SET status = 'decided'"
-            " WHERE claim_id NOT IN ('CLM-1003', 'CLM-1004')"
-        )
+        conn.execute("UPDATE claims SET status = 'decided'")
     conn.close()
     cli.main([])
-    lines = capsys.readouterr().out.splitlines()
-    assert [line.split(":")[0] for line in lines] == ["CLM-1003", "CLM-1004"]
-    run = backend.get("/api/runs/latest").json()
-    assert (run["mode"], run["cap"], run["claims_started"]) == ("queue", 2, 2)
-    assert run["summary"].splitlines() == lines
+    assert started == []
+    assert capsys.readouterr().out == "No claims are waiting.\n"
+
+
+@pytest.mark.parametrize("cap", ["0", "-1", "two"])
+def test_a_cap_must_be_one_or_more(backend, monkeypatch, cap):
+    started = queue_runs(monkeypatch)
+    with pytest.raises(SystemExit):
+        cli.main(["--cap", cap])
+    assert started == []
+
+
+def test_a_claim_that_is_not_waiting_is_reported_and_the_run_finished(
+    backend, monkeypatch, capsys
+):
+    reply_only(monkeypatch)
+    conn = db.connect()
+    with conn:
+        conn.execute("UPDATE claims SET status = 'decided' WHERE claim_id = 'CLM-1001'")
+    conn.close()
+    cli.main(["CLM-1001"])
+    assert capsys.readouterr().out.startswith("CLM-1001: ")
+    assert backend.get("/api/runs/latest").json()["status"] == "finished"

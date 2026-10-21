@@ -6,6 +6,7 @@ import type {
   Customer,
   Decision,
   Insights,
+  ModelChoice,
   Policy,
 } from "./api";
 
@@ -94,8 +95,21 @@ export const QUEUE: ClaimSummary[] = [
   }),
 ];
 
+export const MODELS: ModelChoice[] = [
+  {
+    spec: "openrouter:deepseek/deepseek-v4.1-flash",
+    label: "DeepSeek V4.1 Flash",
+    default: true,
+  },
+  {
+    spec: "anthropic:claude-haiku-5-5",
+    label: "Claude Haiku 5.5",
+    default: false,
+  },
+];
+
 export const IDLE: AgentState = {
-  model: "DeepSeek V4.1 Flash",
+  model: null,
   running: false,
   mode: null,
   claim_id: null,
@@ -298,6 +312,7 @@ export function claimRoutes(overrides: Routes = {}): Routes {
     "GET /api/customers/CUS-3001": CUSTOMER,
     "GET /api/handlers": HANDLERS,
     "GET /api/agent": IDLE,
+    "GET /api/agent/models": MODELS,
     ...overrides,
   };
 }

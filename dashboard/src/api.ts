@@ -161,10 +161,19 @@ export function sectionOf(step: Step): SectionTitle {
   return JSON.parse(step.text) as SectionTitle;
 }
 
+/** The two agents: the queue agent and the claim agent it hands claims to. */
+export type AgentName = "queue" | "claim";
+
+export interface ModelChoice {
+  spec: string;
+  label: string;
+  default: boolean;
+}
+
 export interface AgentState {
-  model: string;
+  model: string | null;
   running: boolean;
-  mode: "claim" | "queue" | null;
+  mode: AgentName | null;
   claim_id: string | null;
 }
 
@@ -282,8 +291,8 @@ export const api = {
     getJson<Customer>(`/api/customers/${id}`, signal),
   listHandlers: (signal?: AbortSignal) =>
     getJson<Handler[]>("/api/handlers", signal),
-  getInstructions: (signal?: AbortSignal) =>
-    getText("/api/instructions", signal),
+  getInstructions: (agent: AgentName, signal?: AbortSignal) =>
+    getText(`/api/instructions/${agent}`, signal),
   getPolicyWording: (signal?: AbortSignal) =>
     getText("/api/policy-wording", signal),
   getAgent: (signal?: AbortSignal) => getJson<AgentState>("/api/agent", signal),
@@ -291,8 +300,12 @@ export const api = {
     getJson<Insights>("/api/insights", signal),
   health: (signal?: AbortSignal) =>
     getJson<{ status: string }>("/api/health", signal),
-  runClaim: (id: string) => post<AgentState>(`/api/agent/claims/${id}`),
-  runQueue: () => post<AgentState>("/api/agent/queue"),
+  listModels: (signal?: AbortSignal) =>
+    getJson<ModelChoice[]>("/api/agent/models", signal),
+  runClaim: (id: string, model: string) =>
+    post<AgentState>(`/api/agent/claims/${id}`, { model }),
+  runQueue: (cap: number, model: string) =>
+    post<AgentState>("/api/agent/queue", { cap, model }),
   stopAgent: () => post<AgentState>("/api/agent/stop"),
   signOffClaim: (id: string, handlerId: string) =>
     post<Claim>(`/api/claims/${id}/sign-off`, { handler_id: handlerId }),
