@@ -1,9 +1,11 @@
 """Every tool the agent uses, and the context its tools read."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
 from langchain.tools import ToolRuntime, tool
+from pydantic import BaseModel, Field
 
 from agent import api
 
@@ -22,6 +24,20 @@ class ClaimContext(RunScope):
 
     claim_id: str
     thread_id: str
+
+
+@dataclass(frozen=True)
+class RunContext(RunScope):
+    """What the queue agent's tools know: its run, the run's cap, and how to hand
+    a claim to a claim agent and get its one-line report back."""
+
+    cap: int
+    work: Callable[[str], str]
+
+
+class Todo(BaseModel):
+    content: str = Field(description="What to do, such as 'Work CLM-1001'")
+    status: Literal["pending", "in_progress", "completed", "left_for_handler"]
 
 
 @tool
@@ -92,3 +108,39 @@ CLAIM_TOOLS = [
     decide_claim,
     pay_claim,
 ]
+
+
+def waiting_claims() -> list[dict[str, Any]]:
+    """Return the claims waiting in the queue, in claim id order."""
+    return [claim for claim in api.list_claims() if claim["status"] == "waiting"]
+
+
+@tool
+def list_waiting_claims() -> list[dict[str, Any]]:
+    """List the claims waiting in the queue, with each one's type, amount claimed
+    and the date it was submitted."""
+    return [
+        {
+            key: claim[key]
+            for key in ("claim_id", "claim_type", "amount_claimed", "submitted_on")
+        }
+        for claim in waiting_claims()
+    ]
+
+
+@tool
+def write_todos(todos: list[Todo], runtime: ToolRuntime[RunContext]) -> str:
+    """Write your to-do list for this run, replacing the one before. The claims
+    team watches it on the dashboard."""
+    api.write_todos(runtime.context.run_id, [todo.model_dump() for todo in todos])
+    return f"Your to-do list has {len(todos)} items."
+
+
+@tool
+def work_claim(claim_id: str, runtime: ToolRuntime[RunContext]) -> str:
+    """Hand one waiting claim to a claim agent, which works it from a clean start
+    and reports back in a line: the decision and payout, or what went wrong."""
+    return runtime.context.work(claim_id)
+
+
+QUEUE_TOOLS = [list_waiting_claims, write_todos, work_claim]

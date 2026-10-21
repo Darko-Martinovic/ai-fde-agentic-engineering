@@ -54,8 +54,8 @@ def get_customer(customer_id: str) -> dict[str, Any]:
     return send("GET", f"/api/customers/{customer_id}").json()
 
 
-def get_instructions() -> str:
-    return send("GET", "/api/instructions").text
+def get_instructions(agent: str) -> str:
+    return send("GET", f"/api/instructions/{agent}").text
 
 
 def list_sections() -> list[dict[str, Any]]:
@@ -83,6 +83,14 @@ def fail_claim(claim_id: str, thread_id: str, reason: str) -> dict[str, Any]:
 def start_run(mode: str, cap: int, model: str) -> dict[str, Any]:
     body = {"mode": mode, "cap": cap, "model": model}
     return send("POST", "/api/runs", body).json()
+
+
+def get_latest_run() -> dict[str, Any] | None:
+    return send("GET", "/api/runs/latest").json()
+
+
+def write_todos(run_id: int, todos: list[dict[str, str]]) -> None:
+    send("PUT", f"/api/runs/{run_id}/todos", {"todos": todos})
 
 
 def finish_run(run_id: int, summary: str) -> dict[str, Any]:

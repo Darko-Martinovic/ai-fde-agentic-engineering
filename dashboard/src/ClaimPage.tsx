@@ -10,7 +10,7 @@ import {
 import { ClaimType, ErrorNote, Loading, StatusBadge } from "./components";
 import { DecisionPanel } from "./Decisions";
 import { date, money } from "./format";
-import { useAction, usePoll } from "./hooks";
+import { useAction, useModelChoice, usePoll } from "./hooks";
 import { SectionsPanel } from "./Sections";
 import { StepsPanel } from "./Steps";
 import { paths } from "./paths";
@@ -37,6 +37,7 @@ function AgentControls({
   onChange: () => void;
 }>) {
   const { busy, error, run } = useAction(onChange);
+  const { model } = useModelChoice();
   const running = agent?.running ?? false;
   const action = agentAction(claim, agent);
 
@@ -46,10 +47,10 @@ function AgentControls({
         <button
           type="button"
           className="button button--primary"
-          disabled={busy || running}
+          disabled={busy || running || model === ""}
           title={running ? "The agent is working on another claim" : undefined}
           onClick={() => {
-            run(() => api.runClaim(claim.claim_id));
+            run(() => api.runClaim(claim.claim_id, model));
           }}
         >
           Run the agent

@@ -12,7 +12,7 @@ def test_start_a_run(client):
     assert run["status"] == "running"
     assert run["cap"] == 5
     assert run["todos"] == []
-    assert run["claims_started"] == 0
+    assert run["claims_started"] == []
     assert run["usage"] == {
         "model_calls": 0,
         "input_tokens": 0,
@@ -84,4 +84,4 @@ def test_claims_started_count_once(client):
     start(client, "CLM-1001", run_id)
     start(client, "CLM-1002", run_id)
     run = client.get("/api/runs/latest").json()
-    assert run["claims_started"] == 2
+    assert run["claims_started"] == ["CLM-1001", "CLM-1002"]

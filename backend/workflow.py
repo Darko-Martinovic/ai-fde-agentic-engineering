@@ -76,7 +76,7 @@ def start_claim(claim_id: str, start: StartIn, conn: Db) -> Claim:
     """Start work on a waiting claim in a run, within the run's cap."""
     require_status(load_claim(conn, claim_id), "waiting")
     run = require_running(conn, start.run_id)
-    started = runs.claims_started(conn, run.run_id)
+    started = run.claims_started
     if claim_id not in started and len(started) >= run.cap:
         raise HTTPException(
             409, f"Run {run.run_id} has reached its cap of {run.cap} claims"

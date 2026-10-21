@@ -1,6 +1,7 @@
 """Builds and runs the UnderCover Agent: its model, the middleware around it,
 and its runs."""
 
+import threading
 from collections.abc import Callable
 from typing import Any
 from uuid import uuid4
@@ -19,7 +20,13 @@ from langgraph.graph.state import CompiledStateGraph
 from agent import api
 from agent.config import Model
 from agent.middleware import StepRecorder, UsageRecorder, refusal
-from agent.tools import CLAIM_TOOLS, ClaimContext
+from agent.tools import (
+    CLAIM_TOOLS,
+    QUEUE_TOOLS,
+    ClaimContext,
+    RunContext,
+    waiting_claims,
+)
 from settings import setting
 
 # A claim agent's model calls before it's stopped, and the retries of a call
@@ -36,6 +43,14 @@ BY_STATE = {
     "left_for_handler": "failed twice, left for a handler",
 }
 BY_DECISION = {"decline": "declined", "refer": "referred to a handler"}
+# The queue agent's model calls: a few for each claim, and some to plan and sum up
+QUEUE_CALLS_A_CLAIM = 4
+QUEUE_CALLS = 10
+MISSED = (
+    "Before you finish: these claims are still waiting, and this run should work"
+    " them: {claims}. Work them, update your to-do list, then give your summary."
+)
+LEFT_WAITING = "Still waiting, though this run should have worked them: {claims}."
 STOPPED = (
     "The agent stopped before finishing the claim, having replied without a"
     f" decision or reached its limit of {MAX_MODEL_CALLS} model calls"
@@ -78,28 +93,47 @@ def contents() -> str:
 
 
 def instructions() -> str:
-    """The agent's instructions and the documents' contents, both from the API."""
-    return f"{api.get_instructions()}\n\n{contents()}"
+    """The claim agent's instructions and the documents' contents, from the API."""
+    return f"{api.get_instructions('claim')}\n\n{contents()}"
+
+
+def middleware(
+    model: Model, model_calls: int, *more: AgentMiddleware[Any, Any]
+) -> list[AgentMiddleware[Any, Any]]:
+    """What every agent has around its calls: usage recorded, provider errors
+    retried, its model calls capped and refusals given back as text."""
+    return [
+        UsageRecorder(model),
+        ModelRetryMiddleware(
+            max_retries=MODEL_RETRIES, on_failure="error", initial_delay=RETRY_DELAY
+        ),
+        ModelCallLimitMiddleware(run_limit=model_calls, exit_behavior="end"),
+        *more,
+        ToolErrorMiddleware(refusal),
+    ]
 
 
 def claim_agent(
     llm: BaseChatModel, model: Model
 ) -> CompiledStateGraph[Any, Any, Any, Any]:
-    middleware: list[AgentMiddleware[Any, Any]] = [
-        UsageRecorder(model),
-        ModelRetryMiddleware(
-            max_retries=MODEL_RETRIES, on_failure="error", initial_delay=RETRY_DELAY
-        ),
-        ModelCallLimitMiddleware(run_limit=MAX_MODEL_CALLS, exit_behavior="end"),
-        StepRecorder(),
-        ToolErrorMiddleware(refusal),
-    ]
     return create_agent(
         llm,
         tools=CLAIM_TOOLS,
         system_prompt=instructions(),
         context_schema=ClaimContext,
-        middleware=middleware,
+        middleware=middleware(model, MAX_MODEL_CALLS, StepRecorder()),
+    )
+
+
+def queue_agent(
+    llm: BaseChatModel, model: Model, cap: int
+) -> CompiledStateGraph[Any, Any, Any, Any]:
+    return create_agent(
+        llm,
+        tools=QUEUE_TOOLS,
+        system_prompt=api.get_instructions("queue"),
+        context_schema=RunContext,
+        middleware=middleware(model, QUEUE_CALLS_A_CLAIM * cap + QUEUE_CALLS),
     )
 
 
@@ -144,3 +178,59 @@ def work_claim(
     if api.get_claim(claim_id)["status"] == "in_progress":
         return failed(context, STOPPED)
     return report(api.get_claim(claim_id))
+
+
+def missed(run_id: int, cap: int) -> list[str]:
+    """The waiting claims the run should still have worked: those it tried that
+    went back in the queue, and new ones while it's under its cap."""
+    run = api.get_latest_run()
+    started = run["claims_started"] if run else []
+    waiting = [c["claim_id"] for c in waiting_claims()]
+    tried_again = [c for c in waiting if c in started]
+    new = [c for c in waiting if c not in started][: cap - len(started)]
+    return tried_again + new
+
+
+def drive(agent: CompiledStateGraph[Any, Any, Any, Any], context: RunContext) -> str:
+    """Drive the queue agent through its run, remind it once of any claims it
+    missed, and return its summary, with any claims still missed after that."""
+    ask = f"Work up to {context.cap} waiting claims in this run."
+    result = agent.invoke(
+        {"messages": [{"role": "user", "content": ask}]}, context=context
+    )
+    still_waiting = missed(context.run_id, context.cap)
+    if still_waiting:
+        reminder = MISSED.format(claims=", ".join(still_waiting))
+        messages = [*result["messages"], {"role": "user", "content": reminder}]
+        result = agent.invoke({"messages": messages}, context=context)
+    summary = str(result["messages"][-1].text)
+    still_waiting = missed(context.run_id, context.cap)
+    if still_waiting:
+        summary += "\n\n" + LEFT_WAITING.format(claims=", ".join(still_waiting))
+    return summary
+
+
+def run_queue(
+    cap: int,
+    model: Model,
+    llm: BaseChatModel | None = None,
+    claim_llm: BaseChatModel | None = None,
+) -> str:
+    """Work up to `cap` waiting claims with the queue agent, each by a claim agent
+    of its own, one at a time, and return the summary the run finished with. The
+    run is finished whatever happens, with what stopped it if something did."""
+    agent = queue_agent(llm or chat_model(model), model, cap)
+    run_id = api.start_run("queue", cap, model.spec)["run_id"]
+    one_at_a_time = threading.Lock()
+
+    def work(claim_id: str) -> str:
+        with one_at_a_time:
+            return work_claim(claim_id, run_id, model, claim_llm)
+
+    try:
+        summary = drive(agent, RunContext(run_id=run_id, cap=cap, work=work))
+    except Exception as error:
+        api.finish_run(run_id, f"The run stopped: {type(error).__name__}: {error}")
+        raise
+    api.finish_run(run_id, summary)
+    return summary

@@ -8,11 +8,12 @@ import {
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { QueuePage } from "./Queue";
-import { IDLE, QUEUE, calledWith, mockFetch } from "./testing";
+import { IDLE, MODELS, QUEUE, calledWith, mockFetch } from "./testing";
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  localStorage.clear();
 });
 
 function rows() {
@@ -101,6 +102,7 @@ it("runs the queue and stops the agent", async () => {
   const routes: Record<string, unknown> = {
     "GET /api/claims": QUEUE,
     "GET /api/agent": IDLE,
+    "GET /api/agent/models": MODELS,
     "POST /api/agent/queue": {
       ...IDLE,
       running: true,
@@ -119,12 +121,20 @@ it("runs the queue and stops the agent", async () => {
     mode: "queue",
     claim_id: "CLM-1001",
   };
-  fireEvent.click(screen.getByRole("button", { name: "Run queue" }));
+  await screen.findByRole("option", { name: "Claude Haiku 5.5" });
+  fireEvent.change(screen.getByLabelText("Model"), {
+    target: { value: "anthropic:claude-haiku-5-5" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Run 1" }));
   expect(
     await screen.findByText("Working through the queue, on CLM-1001"),
   ).toBeDefined();
-  expect(calledWith(fetchMock, "POST /api/agent/queue")).toBe(true);
-  expect(screen.getByRole("button", { name: "Run queue" })).toHaveProperty(
+  const sent = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+  expect(JSON.parse(sent?.[1]?.body as string)).toEqual({
+    cap: 1,
+    model: "anthropic:claude-haiku-5-5",
+  });
+  expect(screen.getByRole("button", { name: "Run 1" })).toHaveProperty(
     "disabled",
     true,
   );
@@ -139,6 +149,7 @@ it("shows why the agent didn't start", async () => {
   mockFetch({
     "GET /api/claims": QUEUE,
     "GET /api/agent": IDLE,
+    "GET /api/agent/models": MODELS,
     "POST /api/agent/queue": Response.json(
       { detail: "The agent is already running" },
       { status: 409 },
@@ -146,7 +157,8 @@ it("shows why the agent didn't start", async () => {
   });
   render(<QueuePage />);
   await screen.findByText("The agent is idle");
-  fireEvent.click(screen.getByRole("button", { name: "Run queue" }));
+  await screen.findByRole("option", { name: "DeepSeek V4.1 Flash (default)" });
+  fireEvent.click(screen.getByRole("button", { name: "Run all 1" }));
   await waitFor(() => {
     expect(screen.getByText("The agent is already running")).toBeDefined();
   });

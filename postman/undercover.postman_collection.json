@@ -277,21 +277,22 @@
           ]
         },
         {
-          "name": "Get instructions",
+          "name": "Get the claim agent's instructions",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/instructions",
+              "raw": "{{baseUrl}}/api/instructions/claim",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
-                "instructions"
+                "instructions",
+                "claim"
               ]
             },
-            "description": "`get_instructions`: the UnderCover Agent's instructions as Markdown."
+            "description": "`get_instructions`: the claim agent's instructions."
           },
           "event": [
             {
@@ -300,7 +301,38 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
-                  "pm.test(\"is the agent's instructions\", () => pm.expect(pm.response.text()).to.include(\"# UnderCover Agent\"));"
+                  "pm.test(\"is the claim agent's\", () => pm.expect(pm.response.text()).to.include(\"# UnderCover claim agent\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get the queue agent's instructions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/instructions/queue",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "instructions",
+                "queue"
+              ]
+            },
+            "description": "`get_instructions`: the queue agent's instructions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"is the queue agent's\", () => pm.expect(pm.response.text()).to.include(\"# UnderCover queue agent\"));"
                 ]
               }
             }
@@ -1256,7 +1288,7 @@
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "const run = pm.response.json();",
-                  "pm.test(\"four claims started\", () => pm.expect(run.claims_started).to.eql(4));"
+                  "pm.test(\"four claims started\", () => pm.expect(run.claims_started).to.eql([\"CLM-1001\", \"CLM-1002\", \"CLM-1004\", \"CLM-1010\"]));"
                 ]
               }
             }
@@ -1350,7 +1382,7 @@
     },
     {
       "name": "Agent",
-      "description": "Starts and stops the UnderCover Agent. Run CLM-1003 calls the model for a moment before Stop ends it.",
+      "description": "Starts and stops the UnderCover Agent. Run CLM-1003 calls the local Qwen model through Ollama, for nothing, for a moment before Stop ends it.",
       "item": [
         {
           "name": "Get agent",
@@ -1384,6 +1416,39 @@
           ]
         },
         {
+          "name": "List models",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent/models",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "agent",
+                "models"
+              ]
+            },
+            "description": "`list_models`: the models the agent may run on, with the default marked."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const models = pm.response.json();",
+                  "pm.test(\"one default\", () => pm.expect(models.filter((m) => m.default).length).to.eql(1));",
+                  "pm.test(\"includes local Qwen\", () => pm.expect(models.map((m) => m.spec)).to.include(\"ollama:qwen3.5:4b\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Run CLM-1001, already decided",
           "request": {
             "method": "POST",
@@ -1408,7 +1473,7 @@
             "description": "`run_claim` is refused for a claim that isn't waiting. Run after the Workflow folder, which decides CLM-1001.",
             "body": {
               "mode": "raw",
-              "raw": "{}"
+              "raw": "{\n  \"model\": \"ollama:qwen3.5:4b\"\n}"
             }
           },
           "event": [
@@ -1449,7 +1514,7 @@
             "description": "`run_claim`: starts the agent on one waiting claim. This calls the model in MODEL_NAME, or GPT-6 Luna by default; the next requests stop it within a second.",
             "body": {
               "mode": "raw",
-              "raw": "{}"
+              "raw": "{\n  \"model\": \"ollama:qwen3.5:4b\"\n}"
             }
           },
           "event": [
@@ -1461,7 +1526,8 @@
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "const agent = pm.response.json();",
                   "pm.test(\"running is true\", () => pm.expect(agent.running).to.eql(true));",
-                  "pm.test(\"mode is claim\", () => pm.expect(agent.mode).to.eql(\"claim\"));"
+                  "pm.test(\"mode is claim\", () => pm.expect(agent.mode).to.eql(\"claim\"));",
+                  "pm.test(\"on the model picked\", () => pm.expect(agent.model).to.eql(\"Qwen 3.5 4B (local)\"));"
                 ]
               }
             }
@@ -1491,7 +1557,7 @@
             "description": "`run_queue` is refused while a run is going.",
             "body": {
               "mode": "raw",
-              "raw": "{}"
+              "raw": "{\n  \"cap\": 5,\n  \"model\": \"ollama:qwen3.5:4b\"\n}"
             }
           },
           "event": [

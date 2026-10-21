@@ -8,12 +8,12 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
 
 from backend.api import Db
-from backend.models import DocumentName, Section, SectionTitle
+from backend.models import AgentName, DocumentName, Section, SectionTitle
 from backend.store import records
 
 router = APIRouter(prefix="/api")
 
-INSTRUCTIONS = Path(__file__).parent / "instructions.md"
+INSTRUCTIONS = Path(__file__).parent / "instructions"
 
 # Each document's title, and where it's stored when it's seeded
 TITLES: dict[DocumentName, str] = {
@@ -89,13 +89,13 @@ def get_policy_wording(conn: Db) -> str:
 
 
 @router.get(
-    "/instructions",
+    "/instructions/{agent}",
     operation_id="get_instructions",
     response_class=PlainTextResponse,
 )
-def get_instructions() -> str:
-    """Get the UnderCover Agent's instructions as Markdown."""
-    return INSTRUCTIONS.read_text(encoding="utf-8")
+def get_instructions(agent: AgentName) -> str:
+    """Get the instructions of the queue agent or the claim agent, as Markdown."""
+    return (INSTRUCTIONS / f"{agent}.md").read_text(encoding="utf-8")
 
 
 @router.get("/documents/sections", operation_id="list_sections")

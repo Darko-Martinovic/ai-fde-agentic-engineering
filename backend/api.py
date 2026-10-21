@@ -59,7 +59,7 @@ def load_run(conn: sqlite3.Connection, run_id: int) -> Run:
         dict(row)
         | {
             "todos": json.loads(row["todos"]),
-            "claims_started": len(runs.claims_started(conn, run_id)),
+            "claims_started": sorted(runs.claims_started(conn, run_id)),
             "usage": dict(runs.usage(conn, run_id)),
         }
     )
