@@ -5,7 +5,7 @@ one claim; and `--model provider:model` picks a model from models.toml."""
 import argparse
 import sys
 
-from agent import api
+from agent import api, tracing
 from agent.config import Model, current_model, model
 from agent.harness import run_queue, work_claim
 from agent.tools import waiting_claims
@@ -33,16 +33,29 @@ def parse(arguments: list[str]) -> argparse.Namespace:
     return parser.parse_args(arguments)
 
 
+def traced_claim(claim_id: str, run_id: int, chosen: Model) -> str:
+    """Work one claim in a trace of its own, and report in a line."""
+    return tracing.traced(
+        "work-claim",
+        claim_id,
+        lambda config: work_claim(claim_id, run_id, chosen, config=config),
+        run_id=str(run_id),
+        model=chosen.spec,
+    )
+
+
 def work_claims(claim_ids: list[str], chosen: Model) -> None:
-    """Work the claims named, in one run, finished with each claim's report."""
+    """Work the claims named, in one run, each a trace in the run's session,
+    finished with each claim's report."""
     run_id = api.start_run("claim", len(claim_ids), chosen.spec)["run_id"]
     reports = []
-    for claim_id in claim_ids:
-        try:
-            reports.append(work_claim(claim_id, run_id, chosen))
-        except api.Refused as refused:
-            reports.append(f"{claim_id}: {refused.detail}")
-        print(reports[-1], flush=True)
+    with tracing.session(run_id):
+        for claim_id in claim_ids:
+            try:
+                reports.append(traced_claim(claim_id, run_id, chosen))
+            except api.Refused as refused:
+                reports.append(f"{claim_id}: {refused.detail}")
+            print(reports[-1], flush=True)
     api.finish_run(run_id, "\n".join(reports))
 
 

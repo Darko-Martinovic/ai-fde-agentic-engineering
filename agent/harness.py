@@ -15,9 +15,10 @@ from langchain.agents.middleware import (
 )
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models import BaseChatModel
+from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
 
-from agent import api
+from agent import api, tracing
 from agent.config import Model
 from agent.middleware import StepRecorder, UsageRecorder, refusal
 from agent.tools import (
@@ -175,19 +176,32 @@ def failed(context: ClaimContext, reason: str) -> str:
 
 
 def work_claim(
-    claim_id: str, run_id: int, model: Model, llm: BaseChatModel | None = None
+    claim_id: str,
+    run_id: int,
+    model: Model,
+    llm: BaseChatModel | None = None,
+    config: RunnableConfig | None = None,
 ) -> str:
     """Work one claim in a run from a clean start, and report in a line: the
-    decision and payout, or what went wrong."""
+    decision and payout, or what went wrong. The claim agent runs with `config`,
+    under any agent it's working for, so its calls are traced with that agent's,
+    each with the claim and its thread."""
     context = ClaimContext(
         run_id=run_id, claim_id=claim_id, thread_id=f"{claim_id}-{uuid4().hex[:8]}"
     )
     agent = claim_agent(llm or chat_model(model), model)
     api.start_claim(claim_id, run_id, context.thread_id)
+    config = config or {}
+    claim = {"claim_id": claim_id, "thread_id": context.thread_id}
     try:
         agent.invoke(
             {"messages": [{"role": "user", "content": f"Claim {claim_id}"}]},
             context=context,
+            config={
+                **config,
+                "run_name": "claim-agent",
+                "metadata": {**config.get("metadata", {}), **claim},
+            },
         )
     except Exception as error:  # noqa: BLE001 - one bad claim never stops a run
         return failed(context, f"{type(error).__name__}: {error}")
@@ -210,19 +224,23 @@ def drive(
     agent: CompiledStateGraph[Any, Any, Any, Any],
     context: RunContext,
     started: list[str],
+    ask: str,
+    config: RunnableConfig,
 ) -> str:
     """Drive the queue agent through its run, which fills in the claims it
     started, remind it once of any claims it missed, and return its summary,
     with any claims still missed after that."""
-    ask = f"Work up to {context.cap} waiting claims in this run."
+    config = {**config, "run_name": "queue-agent"}
     result = agent.invoke(
-        {"messages": [{"role": "user", "content": ask}]}, context=context
+        {"messages": [{"role": "user", "content": ask}]},
+        context=context,
+        config=config,
     )
     still_waiting = missed(started, context.cap)
     if still_waiting:
         reminder = MISSED.format(claims=", ".join(still_waiting))
         messages = [*result["messages"], {"role": "user", "content": reminder}]
-        result = agent.invoke({"messages": messages}, context=context)
+        result = agent.invoke({"messages": messages}, context=context, config=config)
     summary = str(result["messages"][-1].text)
     still_waiting = missed(started, context.cap)
     if still_waiting:
@@ -238,7 +256,8 @@ def run_queue(
 ) -> str:
     """Work up to `cap` waiting claims with the queue agent, each by a claim agent
     of its own, one at a time, and return the summary the run finished with. The
-    run is finished whatever happens, with what stopped it if something did."""
+    run is one trace, the claim agents' work inside it. The run is finished
+    whatever happens, with what stopped it if something did."""
     agent = queue_agent(llm or chat_model(model), model, cap)
     run_id = api.start_run("queue", cap, model.spec)["run_id"]
     one_at_a_time = threading.Lock()
@@ -252,8 +271,15 @@ def run_queue(
             return report
 
     context = RunContext(run_id=run_id, cap=cap, work=work)
+    ask = f"Work up to {cap} waiting claims in this run."
     try:
-        summary = drive(agent, context, started)
+        summary = tracing.traced(
+            "run-queue",
+            ask,
+            lambda config: drive(agent, context, started, ask, config),
+            run_id=str(run_id),
+            model=model.spec,
+        )
     except Exception as error:
         api.finish_run(run_id, f"The run stopped: {type(error).__name__}: {error}")
         raise
