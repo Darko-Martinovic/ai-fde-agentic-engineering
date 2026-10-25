@@ -122,7 +122,7 @@ def approval(state: ClaimState):
     rejections = state.get("rejections", 0) + 1
     update = {"messages": [HumanMessage(note)], "rejections": rejections, "notes": [note]}
     if rejections >= MAX_REJECTIONS:
-        update["decision"] = "refer"
+        update |= {"decision": "refer", "payout": 0.0, "rationale": f"Referred after {rejections} rejections by a handler"}
     return update
 
 
