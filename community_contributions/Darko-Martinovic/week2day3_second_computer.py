@@ -3,7 +3,7 @@
 It shares nothing with the notebook but the repo and DATABASE_URL. It builds the same graph,
 finds a claim's paused thread in Supabase and resumes it with a handler's approval.
 
-    python week2day3_second_computer.py <thread id> <handler>
+    uv run python week2day3_second_computer.py <thread id> <handler>
 """
 
 import json
@@ -115,7 +115,7 @@ def decide(state: ClaimState):
 def approval(state: ClaimState):
     """Wait for a handler to approve or reject the payout."""
     print(f"{state['claim_id']} needs a handler to approve ${state['payout']:,.2f}")
-    answer = interrupt({"claim_id": state["claim_id"], "payout": state["payout"], "rationale": state["rationale"]})
+    answer = interrupt({"claim_id": state["claim_id"], "decision": state["decision"], "payout": state["payout"], "rationale": state["rationale"]})
     if answer["approved"]:
         return {"approved_by": answer["handler"]}
     note = f"{answer['handler']} rejected the payout of ${state['payout']:,.2f}: {answer['note']}"
@@ -146,19 +146,21 @@ def after_agent(state: ClaimState):
 
 
 def after_decide(state: ClaimState):
-    """Pay an approval, after a handler's approval if it's over the limit or a handler rejected it before."""
+    """Send any decision a handler rejected before back to a handler; otherwise pay an approval, after a handler's approval if it's over the limit."""
+    if state.get("rejections"):
+        return "approval"
     if state["decision"] != "approve":
         return END
-    if state["payout"] > APPROVAL_LIMIT or state.get("rejections"):
+    if state["payout"] > APPROVAL_LIMIT:
         return "approval"
     return "pay"
 
 
 def after_approval(state: ClaimState):
-    """Pay an approved payout, send a rejected one back to the agent, or stop at a referral."""
+    """Pay an approved payout, end a confirmed decline or referral, send a rejection back to the agent, or stop at the limit."""
     if state.get("approved_by"):
-        return "pay"
-    if state["decision"] == "refer":
+        return "pay" if state["decision"] == "approve" else END
+    if state.get("rejections", 0) >= MAX_REJECTIONS:
         return END
     return "agent"
 
@@ -184,5 +186,7 @@ if __name__ == "__main__":
     thread_id, handler = sys.argv[1:3]
     config = {"configurable": {"thread_id": thread_id}}
     state = graph.get_state(config)
+    if state.next != ("approval",):
+        sys.exit(f"{thread_id} isn't waiting for a handler's approval")
     print(f"Process {os.getpid()} found {thread_id} waiting at {state.next}: {state.interrupts[0].value['payout']:,.2f}")
     graph.invoke(Command(resume={"handler": handler, "approved": True}), config, durability="sync")
