@@ -60,6 +60,7 @@ labs/undercoverlab/agentcore/aws-targets.json
 *.sqlite3
 qdrant_data/
 customer_notes/
+week1day2_runs.json
 
 # Claims desks made by the Week 1 Day 5 labs
 labs/*_desk/
