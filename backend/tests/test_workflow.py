@@ -3,50 +3,7 @@ import pytest
 from backend import db
 from backend.store import claims
 from backend.tests.claim_starts import a_run, start
-
-
-def decide(client, claim_id, decision, payout):
-    return client.post(
-        f"/api/claims/{claim_id}/decision",
-        json={
-            "decision": decision,
-            "payout": payout,
-            "reasons": f"The agent's reasons to {decision}.",
-            "policy_section": "Section 3, Trip Delay",
-        },
-    )
-
-
-def pay(client, claim_id, amount):
-    return client.post(f"/api/claims/{claim_id}/payment", json={"amount": amount})
-
-
-def sign_off(client, claim_id, handler_id):
-    return client.post(
-        f"/api/claims/{claim_id}/sign-off", json={"handler_id": handler_id}
-    )
-
-
-def resolve(client, claim_id, handler_id, decision, payout):
-    return client.post(
-        f"/api/claims/{claim_id}/handler-decision",
-        json={
-            "handler_id": handler_id,
-            "decision": decision,
-            "payout": payout,
-            "reasons": "The handler's reasons.",
-        },
-    )
-
-
-def approved(client, claim_id, payout):
-    start(client, claim_id)
-    return decide(client, claim_id, "approve", payout)
-
-
-def referred(client, claim_id):
-    start(client, claim_id)
-    return decide(client, claim_id, "refer", 0)
+from backend.tests.workflow_steps import approved, decide, fail, pay, referred, resolve
 
 
 def test_start_claim(client):
@@ -193,11 +150,6 @@ def test_payment_over_the_limit_waits_for_sign_off(client):
     assert claim["status"] == "awaiting_sign_off"
     assert claim["payment"] is None
 
-    claim = sign_off(client, "CLM-1002", "HND-01").json()
-    assert claim["status"] == "decided"
-    assert claim["payment"]["amount"] == 1150
-    assert claim["payment"]["authorized_by"] == "HND-01"
-
 
 @pytest.mark.parametrize(
     ("payout", "status"),
@@ -207,22 +159,6 @@ def test_approval_limit(client, payout, status):
     approved(client, "CLM-1001", payout)
     pay(client, "CLM-1001", payout)
     assert client.get("/api/claims/CLM-1001").json()["status"] == status
-
-
-def test_sign_off_needs_a_claim_awaiting_sign_off(client):
-    approved(client, "CLM-1001", 420)
-    response = sign_off(client, "CLM-1001", "HND-01")
-    assert response.status_code == 409
-    assert response.json()["detail"] == (
-        "Claim CLM-1001 is in_progress, not awaiting_sign_off"
-    )
-
-
-def test_sign_off_by_unknown_handler(client):
-    approved(client, "CLM-1002", 1150)
-    response = sign_off(client, "CLM-1002", "HND-99")
-    assert response.status_code == 404
-    assert response.json()["detail"] == "Handler HND-99 not found"
 
 
 def test_resolve_referral_with_approval(client):
@@ -279,13 +215,6 @@ def test_queue_shows_decisions_and_payments(client):
     assert (queue["CLM-1002"]["payout"], queue["CLM-1002"]["paid"]) == (1150, None)
     assert queue["CLM-1010"]["decision"] == "decline"
     assert queue["CLM-1003"]["decision"] is None
-
-
-def fail(client, claim_id, reason="The model provider timed out"):
-    return client.post(
-        f"/api/claims/{claim_id}/failure",
-        json={"thread_id": f"{claim_id}-test", "reason": reason},
-    )
 
 
 def test_a_run_stops_at_its_cap(client):

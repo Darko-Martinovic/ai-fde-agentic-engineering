@@ -71,8 +71,9 @@ def running() -> bool:
 
 def state(conn: Connection) -> AgentState:
     if RUN.process is not None and not RUN.process.is_alive():
-        # The process ended on its own, or was killed outside Stop: put back
-        # any claim it left in progress and stop its run if it never finished
+        # The process ended on its own, or was killed outside Stop: stop its
+        # run if it never finished. A claim it left in progress keeps its saved
+        # progress, and the next run carries it on.
         clear(conn)
     if not running():
         return AgentState(model=None, running=False, mode=None, claim_id=None)
@@ -85,17 +86,10 @@ def state(conn: Connection) -> AgentState:
 
 
 def clear(conn: Connection) -> None:
-    """Forget the agent's process and put back what it left behind."""
+    """Forget the agent's process and mark any run still running as stopped."""
     RUN.process = None
     RUN.mode = None
     RUN.model = None
-    return_to_queue(conn)
-
-
-def return_to_queue(conn: Connection) -> None:
-    """Put claims left in progress back to waiting, clearing unpaid decisions,
-    and mark any run still running as stopped."""
-    claims.return_to_queue(conn)
     runs.stop_running(conn, now())
 
 
@@ -110,12 +104,12 @@ def launch(
     spec: str,
     arguments: list[str],
 ) -> None:
-    """Start a run on a model, first returning any claim an earlier run left in
-    progress. The agent's process starts once the request's work is committed,
-    so it finds the queue as this request left it."""
+    """Start a run on a model, first marking a run that never finished as
+    stopped. The agent's process starts once the request's work is committed, so
+    it finds the runs as this request left them."""
     if running():
         raise HTTPException(409, "The agent is already running")
-    return_to_queue(conn)
+    runs.stop_running(conn, now())
     RUN.mode = mode
     RUN.model = model(spec).label
     background.add_task(begin, [*arguments, "--model", spec])
@@ -160,7 +154,7 @@ def run_queue(run: RunQueueIn, conn: Db, background: BackgroundTasks) -> AgentSt
 
 @router.post("/stop", operation_id="stop_agent")
 def stop_agent(conn: Db) -> AgentState:
-    """Stop the agent and put any claim in progress back to waiting, with its steps."""
+    """Stop the agent, leaving the claim it was working in progress, as saved."""
     if RUN.process is not None:
         RUN.process.terminate()
         RUN.process.join(timeout=10)

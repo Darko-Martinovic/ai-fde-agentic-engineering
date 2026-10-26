@@ -101,7 +101,7 @@ def test_operations_are_documented(client):
         "list_steps",
         "decide_claim",
         "pay_claim",
-        "sign_off_claim",
+        "review_payout",
         "decide_as_handler",
         "fail_claim",
         "start_run",

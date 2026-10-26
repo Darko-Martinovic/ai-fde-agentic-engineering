@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.routing import APIRoute
 from pydantic import BaseModel
 
+from agent.service import app as agent_service
 from backend.main import app as backend
 
 Schema = dict[str, Any]
@@ -77,7 +78,7 @@ def broken_rules(app: FastAPI) -> list[str]:
     return found
 
 
-@pytest.mark.parametrize("app", [backend], ids=["backend"])
+@pytest.mark.parametrize("app", [backend, agent_service], ids=["backend", "agent"])
 def test_every_operation_keeps_the_api_rules(app):
     assert broken_rules(app) == []
 

@@ -8,11 +8,28 @@ import {
 } from "./api";
 import { DecisionBadge, Panel } from "./components";
 import { clock, date, money } from "./format";
+import { HandlerPicker } from "./HandlerPicker";
+import { useHandlerChoice, who } from "./handlers";
 import { useAction } from "./hooks";
+import { ReviewForm } from "./ReviewForm";
 
-function who(id: string, handlers: Handler[]): string {
-  if (id === "agent") return "UnderCover Agent";
-  return handlers.find((h) => h.handler_id === id)?.name ?? id;
+/** A handler's review of the decision's payout: who signed it off, or who
+ *  rejected it and why. */
+function ReviewLine({
+  decision,
+  handlers,
+}: Readonly<{ decision: Decision; handlers: Handler[] }>) {
+  if (!decision.review || !decision.reviewed_by || !decision.reviewed_at) {
+    return null;
+  }
+  const by = `${who(decision.reviewed_by, handlers)} at ${clock(decision.reviewed_at)}`;
+  return decision.review === "signed_off" ? (
+    <p className="decision__review">Signed off by {by}.</p>
+  ) : (
+    <p className="decision__review decision__review--rejected">
+      Rejected by {by}: {decision.review_note}
+    </p>
+  );
 }
 
 function DecisionCard({
@@ -37,78 +54,8 @@ function DecisionCard({
         {who(decision.decided_by, handlers)}, {date(decision.decided_at)} at{" "}
         {clock(decision.decided_at)}
       </p>
+      <ReviewLine decision={decision} handlers={handlers} />
     </article>
-  );
-}
-
-function HandlerPicker({
-  handlers,
-  value,
-  onChange,
-}: Readonly<{
-  handlers: Handler[];
-  value: string;
-  onChange: (id: string) => void;
-}>) {
-  return (
-    <label className="field">
-      <span>Handler</span>
-      <select
-        value={value}
-        onChange={(event) => {
-          onChange(event.target.value);
-        }}
-      >
-        {handlers.map((handler) => (
-          <option key={handler.handler_id} value={handler.handler_id}>
-            {handler.name}, {handler.role}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-/** The handler picked in a form: the first handler until someone picks one,
- *  including when the handlers arrive after the form. */
-function useHandlerChoice(handlers: Handler[]) {
-  const [picked, setPicked] = useState("");
-  return [picked || (handlers[0]?.handler_id ?? ""), setPicked] as const;
-}
-
-function SignOffForm({
-  claim,
-  handlers,
-  onDone,
-}: Readonly<{ claim: Claim; handlers: Handler[]; onDone: () => void }>) {
-  const [handlerId, setHandlerId] = useHandlerChoice(handlers);
-  const { busy, error, run } = useAction(onDone);
-  const payout = claim.decisions.at(-1)?.payout ?? 0;
-  const submit = (event: SyntheticEvent) => {
-    event.preventDefault();
-    run(() => api.signOffClaim(claim.claim_id, handlerId));
-  };
-  return (
-    <form className="action-form action-form--sign-off" onSubmit={submit}>
-      <h3>Sign off the payment</h3>
-      <p>
-        The agent approved {money(payout)}. A payout over $1,000.00 is paid once
-        a handler signs it off.
-      </p>
-      <HandlerPicker
-        handlers={handlers}
-        value={handlerId}
-        onChange={setHandlerId}
-      />
-      {error && <p className="form-error">{error}</p>}
-      <button
-        type="submit"
-        className="button button--primary"
-        disabled={busy || !handlerId}
-      >
-        Sign off {money(payout)}
-      </button>
-    </form>
   );
 }
 
@@ -226,6 +173,40 @@ function ReferralForm({
   );
 }
 
+/** The payment, with its sign-off if it had one, or that the agent is about to
+ *  pay an approval. */
+function PaymentNote({
+  claim,
+  handlers,
+}: Readonly<{ claim: Claim; handlers: Handler[] }>) {
+  const { payment } = claim;
+  const latest = claim.decisions.at(-1);
+  if (payment?.signed_off_at) {
+    return (
+      <p className="note note--success">
+        Paid {money(payment.amount)}, signed off by{" "}
+        {who(payment.authorized_by, handlers)} at {clock(payment.signed_off_at)}
+      </p>
+    );
+  }
+  if (payment) {
+    return (
+      <p className="note note--success">
+        Paid {money(payment.amount)} on {date(payment.paid_at)}, authorized by{" "}
+        {who(payment.authorized_by, handlers)}
+      </p>
+    );
+  }
+  if (claim.status !== "in_progress" || latest?.decision !== "approve") {
+    return null;
+  }
+  return latest.review === "rejected" ? (
+    <p className="note">Waiting for the agent to look at the claim again.</p>
+  ) : (
+    <p className="note">Waiting for the agent to pay it.</p>
+  );
+}
+
 export function DecisionPanel({
   claim,
   handlers,
@@ -243,14 +224,9 @@ export function DecisionPanel({
           handlers={handlers}
         />
       ))}
-      {claim.payment && (
-        <p className="note note--success">
-          Paid {money(claim.payment.amount)} on {date(claim.payment.paid_at)},
-          authorized by {who(claim.payment.authorized_by, handlers)}
-        </p>
-      )}
+      <PaymentNote claim={claim} handlers={handlers} />
       {claim.status === "awaiting_sign_off" && (
-        <SignOffForm claim={claim} handlers={handlers} onDone={onChange} />
+        <ReviewForm claim={claim} handlers={handlers} onDone={onChange} />
       )}
       {FOR_A_HANDLER.includes(claim.status) && (
         <ReferralForm claim={claim} handlers={handlers} onDone={onChange} />

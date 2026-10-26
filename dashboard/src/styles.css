@@ -1002,6 +1002,21 @@ main {
   justify-self: start;
 }
 
+.action-form__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.decision__review {
+  margin: 0;
+  color: var(--green-ink);
+}
+
+.decision__review--rejected {
+  color: var(--raspberry-ink);
+}
+
 .choice {
   display: flex;
   gap: 18px;

@@ -135,8 +135,8 @@ def test_stop(client, fake_process):
     }
     assert fake_process[0].alive is False
     claim = client.get("/api/claims/CLM-1001").json()
-    assert claim["status"] == "waiting"
-    assert claim["decisions"] == []
+    assert claim["status"] == "in_progress"
+    assert len(claim["decisions"]) == 1
     assert len(client.get("/api/claims/CLM-1001/steps").json()) == 1
 
 
@@ -157,12 +157,33 @@ def test_stop_keeps_decided_claims(client):
     assert len(claim["decisions"]) == 1
 
 
-def test_a_run_returns_claims_left_in_progress(client):
+def test_a_run_leaves_claims_in_progress_for_the_agent(client):
     start(client, "CLM-1004")
     client.post("/api/agent/queue", json=QUEUE)
-    assert client.get("/api/claims/CLM-1004").json()["status"] == "waiting"
-    start(client, "CLM-1001")
-    assert client.get("/api/agent").json()["claim_id"] == "CLM-1001"
+    assert client.get("/api/claims/CLM-1004").json()["status"] == "in_progress"
+    assert client.get("/api/agent").json()["claim_id"] == "CLM-1004"
+
+
+def test_run_and_stop_leave_a_handlers_review_alone(client):
+    start(client, "CLM-1003")
+    client.post(
+        "/api/claims/CLM-1003/decision",
+        json={
+            "decision": "approve",
+            "payout": 3750,
+            "reasons": "Covered.",
+            "policy_section": "Section 7, Emergency Medical",
+        },
+    )
+    client.post(
+        "/api/claims/CLM-1003/review",
+        json={"handler_id": "HND-01", "approved": True, "note": ""},
+    )
+    client.post("/api/agent/queue", json=QUEUE)
+    client.post("/api/agent/stop")
+    claim = client.get("/api/claims/CLM-1003").json()
+    assert claim["status"] == "in_progress"
+    assert claim["decisions"][-1]["review"] == "signed_off"
 
 
 def test_stop_marks_the_run_stopped(client, fake_process):
@@ -171,7 +192,7 @@ def test_stop_marks_the_run_stopped(client, fake_process):
     run = client.get("/api/runs/latest").json()
     assert run["status"] == "stopped"
     assert run["finished_at"] is not None
-    assert client.get("/api/claims/CLM-1001").json()["status"] == "waiting"
+    assert client.get("/api/claims/CLM-1001").json()["status"] == "in_progress"
 
 
 def test_a_model_not_allowed_is_refused(client, fake_process):
@@ -192,25 +213,25 @@ def test_list_models(client):
     ]
 
 
-def test_a_process_that_died_leaves_nothing_in_progress(client, fake_process):
+def test_a_process_that_died_has_its_run_stopped(client, fake_process):
     client.post("/api/agent/claims/CLM-1001", json=ON_A_MODEL)
     start(client, "CLM-1001")
     fake_process[0].alive = False
     assert client.get("/api/agent").json()["running"] is False
-    assert client.get("/api/claims/CLM-1001").json()["status"] == "waiting"
+    assert client.get("/api/claims/CLM-1001").json()["status"] == "in_progress"
     assert client.get("/api/runs/latest").json()["status"] == "stopped"
 
 
-def test_the_agent_starts_once_the_queue_is_put_back(client, monkeypatch):
-    """The agent's process finds what the request committed: the claim an earlier
-    run left in progress back in the queue."""
+def test_the_agent_starts_once_the_request_is_committed(client, monkeypatch):
+    """The agent's process finds what the request committed: the run an earlier
+    process never finished marked as stopped."""
     start(client, "CLM-1001")
     seen = []
 
     def start_and_look(arguments):
-        seen.append(client.get("/api/claims/CLM-1001").json()["status"])
+        seen.append(client.get("/api/runs/latest").json()["status"])
         return FakeProcess(arguments)
 
     monkeypatch.setattr(runner, "start_process", start_and_look)
     client.post("/api/agent/queue", json=QUEUE)
-    assert seen == ["waiting"]
+    assert seen == ["stopped"]

@@ -58,6 +58,7 @@ def test_the_graph_has_the_nodes_and_edges_of_the_plan(backend, memory_saver):
         ("tools", "pay"),
         ("tools", "__end__"),
         ("wait_for_sign_off", "pay"),
+        ("wait_for_sign_off", "agent"),
         ("pay", "__end__"),
     }
 

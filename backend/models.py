@@ -18,6 +18,7 @@ ClaimStatus = Literal[
 FOR_A_HANDLER: tuple[ClaimStatus, ...] = ("referred", "left_for_handler")
 StepKind = Literal["tool_call", "tool_result", "reply", "section", "failure"]
 DecisionKind = Literal["approve", "decline", "refer"]
+Review = Literal["signed_off", "rejected"]
 
 
 DocumentName = Literal["wording", "manual"]
@@ -102,6 +103,11 @@ class Decision(BaseModel):
     reasons: str
     policy_section: str | None
     decided_at: datetime
+    # A handler's review of a held payout: signed off, or rejected with a note
+    review: Review | None
+    reviewed_by: str | None
+    reviewed_at: datetime | None
+    review_note: str | None
 
 
 class PaymentIn(BaseModel):
@@ -112,10 +118,22 @@ class Payment(BaseModel):
     amount: float
     authorized_by: str
     paid_at: datetime
+    signed_off_at: datetime | None
 
 
-class SignOffIn(BaseModel):
+class ReviewIn(BaseModel):
+    """A handler's answer on a held payout: sign it off, or reject it with a note
+    that says what's wrong, which goes back to the agent."""
+
     handler_id: str
+    approved: bool
+    note: str
+
+    @model_validator(mode="after")
+    def a_rejection_says_why(self) -> Self:
+        if not self.approved and not self.note.strip():
+            raise ValueError("A rejection needs a note that says what's wrong")
+        return self
 
 
 class Item(BaseModel):
@@ -240,54 +258,3 @@ class Handler(BaseModel):
     role: str
     email: str
     can_approve_over_limit: bool
-
-
-RunStatus = Literal["running", "finished", "stopped"]
-TodoStatus = Literal["pending", "in_progress", "completed", "left_for_handler"]
-
-
-class Todo(BaseModel):
-    content: str = Field(min_length=1)
-    status: TodoStatus
-
-
-class RunIn(BaseModel):
-    mode: Literal["queue", "claim"]
-    cap: int = Field(ge=1)
-    model: str = Field(min_length=1)
-
-
-class Usage(BaseModel):
-    model_calls: int
-    input_tokens: int
-    output_tokens: int
-    cost: float
-    seconds: float
-
-
-class Run(RunIn):
-    run_id: int
-    status: RunStatus
-    started_at: datetime
-    finished_at: datetime | None
-    summary: str | None
-    todos: list[Todo]
-    claims_started: list[str]
-    usage: Usage
-
-
-class TodosIn(BaseModel):
-    todos: list[Todo]
-
-
-class FinishIn(BaseModel):
-    summary: str
-
-
-class UsageIn(BaseModel):
-    claim_id: str | None
-    model: str
-    input_tokens: int = Field(ge=0)
-    output_tokens: int = Field(ge=0)
-    cost: float = Field(ge=0)
-    seconds: float = Field(ge=0)

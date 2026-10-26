@@ -97,8 +97,10 @@ export const api = {
   runQueue: (cap: number, model: string) =>
     post<AgentState>("/api/agent/queue", { cap, model }),
   stopAgent: () => post<AgentState>("/api/agent/stop"),
-  signOffClaim: (id: string, handlerId: string) =>
-    post<Claim>(`/api/claims/${id}/sign-off`, { handler_id: handlerId }),
+  reviewPayout: (
+    id: string,
+    review: { handler_id: string; approved: boolean; note: string },
+  ) => post<Claim>(`/api/claims/${id}/review`, review),
   decideAsHandler: (
     id: string,
     resolution: {

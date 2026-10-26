@@ -29,7 +29,7 @@ dashboard ──/api──> backend (FastAPI) ──SQLAlchemy Core──> Supab
 
 The backend:
 
-- `db.py`: the tables as SQLAlchemy `Table` objects in one `MetaData`, and the engine. It is the only module that reads `DATABASE_URL`, `UNDERCOVER_DB` and `DATABASE_SCHEMA`. With `DATABASE_URL` set (and not empty) the engine is `postgresql+psycopg`, with `search_path` set to the schema on every connection, a pool of `DATABASE_CONNECTIONS` (4) with no overflow and `pool_pre_ping`. Without it, SQLite at `UNDERCOVER_DB` with `NullPool`, as today. The engine is made on first use (`functools.cache`), so a process that never touches the database, such as the agent's process the runner spawns, never opens a connection.
+- `db.py`: the tables as SQLAlchemy `Table` objects in one `MetaData`, and the engine. It is the only module that reads `DATABASE_URL`, `UNDERCOVER_DB` and `DATABASE_SCHEMA`. With `DATABASE_URL` set (and not empty) the engine is `postgresql+psycopg`, with `search_path` set to the schema on every connection, a pool of `DATABASE_CONNECTIONS` (3) with no overflow and `pool_pre_ping`. Without it, SQLite at `UNDERCOVER_DB` with `NullPool`, as today. The engine is made on first use (`functools.cache`), so a process that never touches the database, such as the agent's process the runner spawns, never opens a connection.
 - `store/` (`claims.py`, `records.py`, `runs.py`, `steps.py`): every query rewritten as a Core expression, written once for SQLite and Postgres. The function names and what they return stay, so the routes barely change. Records stay JSON text, as today.
 - `api.py`: the `Db` dependency yields a SQLAlchemy `Connection` inside `engine.begin()`, with `scope="function"`, so a request's work is committed before the response is sent and before a background task runs. Seeding stays with the dependency, done once a process (`seed.ready`, cached by engine), rather than in the app's lifespan: the tests use `TestClient(app)` without a `with`, which never runs a lifespan, and each test has a database of its own. A database without its tables, or without claims, is seeded afresh.
 - `runner.py`: Run starts the agent's process in a background task, so the process finds the queue as the request committed it.
@@ -47,7 +47,7 @@ The agent. The brief makes the service a fourth part beside `api.py`, `tools.py`
 - `graph.py` (new): the claim graph: its nodes, its edges and `claim_graph(llm, model, saver)`. This is what `middleware.py` did for the claim agent.
 - `recording.py` (new): what the agents record on the backend, a reply's steps and a model call's usage. The graph's nodes and the queue agent's `UsageRecorder` both use it, so it is a module of its own rather than a helper borrowed from either.
 - `middleware.py`: keeps `UsageRecorder` and `refusal` for the queue agent, which stays on `create_agent`. `StepRecorder` goes.
-- `checkpoints.py` (new): `saver()`, a context manager that opens a `psycopg_pool.ConnectionPool` on `DATABASE_URL` (1 to 4 connections, `autocommit=True`, `prepare_threshold=0`, `row_factory=dict_row`, `search_path` set to the schema), creates the schema, runs `setup()` and yields a `PostgresSaver`. It refuses to start without `DATABASE_URL`, since an agent without saved progress can't be picked up by the service. Tests pass an `InMemorySaver` instead and never open it.
+- `checkpoints.py` (new): `saver()`, a context manager that opens a `psycopg_pool.ConnectionPool` on `DATABASE_URL` (1 to `DATABASE_CONNECTIONS` connections, `autocommit=True`, `prepare_threshold=0`, `row_factory=dict_row`, `search_path` set to the schema), creates the schema, runs `setup()` and yields a `PostgresSaver`. It refuses to start without `DATABASE_URL`, since an agent without saved progress can't be picked up by the service. Tests pass an `InMemorySaver` instead and never open it.
 - `harness.py`: the model, the claim graph for each claim, `work_claim`, `carry_on` and `carry_on_stopped`. The claim agent's build moves to `graph.py`.
 - `queue_agent.py` (new): the queue agent on `create_agent`, its middleware and `run_queue`, moved out of `harness.py` to keep both under 300 lines.
 - `service.py` (new): the agent's service, a small FastAPI app with `health` and `resume_claim`, run with `uv run -m agent.service` on `AGENT_HOST` and `AGENT_PORT`.
@@ -137,7 +137,7 @@ Where the brief differs, we follow the brief:
 - The graph pauses when the backend says the claim waits for a sign-off, never on its own comparison with the limit.
 - The backend's `pay_claim` pays, and refuses a payout over the limit without a sign-off, in place of the lab's `payments` table.
 - Each attempt has its own thread id, in place of the claim id.
-- A pool of at most 4 connections in each process, in place of the lab's single connection, and the `undercover` schema.
+- A pool of at most 3 connections in each process (the brief allows 4), in place of the lab's single connection, and the `undercover` schema.
 
 ### Carrying on
 
@@ -179,7 +179,7 @@ Rules the backend enforces, as our Week 2 Day 3 challenge found they must be:
 - After a rejection, the agent's next decision always goes back to a handler: an approval of any size waits for a sign-off, and a decline or a referral is `referred`, for a handler to decide. A handler rejected the agent's work once, so the agent never closes the claim alone.
 - A second rejection refers the claim to a handler, with no payout and no resume. A handler then decides it with the form for referred claims.
 - A rejection needs a note (422 without one) and a known handler (404).
-- A claim that fails with an error after a rejection is left for a handler, keeping its decisions, rather than starting afresh.
+- A claim that fails with an error after a rejection is left for a handler, keeping its decisions, rather than starting afresh. So is one where the agent answers the note without recording a decision again.
 
 The sign-off and the rejection are one operation, `review_payout`, so a review is recorded and handed to the agent in one way. The dashboard's form gains a note and a Reject button beside Sign off.
 
@@ -200,7 +200,7 @@ The sign-off and the rejection are one operation, `review_payout`, so a review i
 ### The database
 
 - Tables: `claims`, `policies`, `customers`, `handlers`, `settings`, `steps`, `decisions`, `runs`, `attempts`, `usage`, `payments`, as today. `decisions` gains `signed_off_by` and `signed_off_at`, and `payments` gains `signed_off_at`. Integer ids stay, with `RETURNING` in place of `lastrowid`.
-- Connections: Supabase's free plan allows 15 through the session pooler. The backend, the agent's service and a run each hold at most 4, so at most 12.
+- Connections: Supabase's free plan allows 15 clients through the session pooler. The backend, the agent's service and a run each hold at most 3, so at most 9: the brief allows 4 each, but the pooler keeps server connections a while after a process ends, and a check in phase 4 hit its limit of 15 with 4 each while processes were restarted, so each process keeps one in hand.
 
 ### API
 
@@ -212,7 +212,7 @@ New and changed operations. Every operation keeps an `operation_id`, a one-line 
 | `decide_claim` | A repeat of the same decision returns the claim |
 | `decide_claim` after a rejection | Allowed on the claim in progress; an approval waits for a sign-off whatever its size, a decline or a referral is `referred` |
 | `pay_claim` | A repeat of the same amount returns the claim. Over the limit, or after a rejection, it needs a sign-off on the decision (409 without one, as today). The payment's `authorized_by` is the handler who signed off, or `agent`, and `signed_off_at` the time of the sign-off |
-| `review_payout` (was `sign_off_claim`) | `POST /api/claims/{claim_id}/review`, body `{handler_id, approved, note}` (`note` may be empty for a sign-off, never for a rejection). Records the review on the decision and moves the claim to `in_progress`, or to `referred` on a second rejection; pays nothing. A FastAPI background task then calls the agent's service, after the commit and the response, unless the claim was referred. If the service can't be reached, the backend logs a warning and the review stands |
+| `review_payout` (was `sign_off_claim`, in `backend/reviews.py` with `decide_as_handler`; the rules both routers follow are in `backend/claim_rules.py`) | `POST /api/claims/{claim_id}/review`, body `{handler_id, approved, note}` (`note` may be empty for a sign-off, never for a rejection). Records the review on the decision and moves the claim to `in_progress`, or to `referred` on a second rejection; pays nothing. A FastAPI background task then calls the agent's service, after the commit and the response, unless the claim was referred. If the service can't be reached, the backend logs a warning and the review stands |
 | `fail_claim` | Also refuses a claim that has a decision |
 | `get_claim`, `list_claims` | The claim gains `run_id` and `thread_id` (of its latest attempt) and `attempts`; the decision `review`, `reviewed_by`, `reviewed_at` and `review_note`; the payment `signed_off_at` |
 | `run_claim` | Accepts a claim in progress too, which the run carries on |
@@ -325,26 +325,26 @@ Replace the claim agent's `create_agent` and middleware with the graph, saved by
 
 `review_payout` in place of `sign_off_claim`, `backend/agent_service.py`, `agent/service.py` in `npm run dev`, `carry_on` for a reviewed thread, the review form and decision panel, the e2e stand-in, and the Postman workflow.
 
-- [ ] pytest, backend: signing off `CLM-1003`'s held 3,750.00 as `HND-01` returns it `in_progress` with the decision signed off by `HND-01` at a time and no payment; paying 3,750.00 decides it, with a payment authorized by `HND-01` at the time of the sign-off; the 404 and 409 rules still hold
-- [ ] pytest, backend: rejecting with a note returns the claim `in_progress` with the decision rejected, by whom, when and the note; a rejection with an empty note returns 422; the agent's next approval of 500.00 waits for a sign-off; its next decline is `referred`; a second rejection makes the claim `referred` and the service is not told
-- [ ] pytest, backend: a failure after a rejection leaves the claim for a handler with its decisions
-- [ ] pytest, backend: the agent's service is told once, for `CLM-1003`, and only after the sign-off is committed (the fake service reads the claim and finds the sign-off)
-- [ ] pytest, backend: when the service can't be reached, the sign-off returns 200 and stands, and a warning is logged
-- [ ] pytest, backend: `pay_claim` on a held claim with no sign-off returns 409 and records nothing
-- [ ] Stub model test, the whole sign-off: the graph pauses; after the sign-off, `resume_claim` returns 202 and the claim is `decided` with one payment by `HND-01`; the model isn't called again; the carry-on is a `carry-on` trace in the claim's session. A second `resume_claim` returns 409 and there is still one payment
-- [ ] Stub model test, a rejection: the graph pauses on 3,750.00; after a rejection with a note, `resume_claim` carries the claim on, the stub's next prompt ends with the handler's note, it approves 3,700.00, and the graph pauses again with the claim `awaiting_sign_off` and no payment; a sign-off then pays 3,700.00 once
-- [ ] `resume_claim` on a claim awaiting sign-off returns 409 and changes nothing
-- [ ] The OpenAPI rules test passes for the agent's service
-- [ ] With `npm run dev` running, `curl -s localhost:8002/api/health` returns `{"status":"ok"}`, beside the backend on 8000 and the dashboard on 5173
-- [ ] `grep -rn "UNDERCOVER_AGENT\|httpx" backend --include=*.py` finds them only in `backend/agent_service.py` and its test
-- [ ] vitest: the decision panel for an approval waiting for its payment, a signed-off claim waiting for its payment, a payment with its sign-off and a rejected decision with its note; the review form sends a sign-off, sends a rejection with its note, and won't reject without a note
-- [ ] e2e, sign-off and rejection: as in the design, against the stand-in on 8003
-- [ ] Browser: screenshots of a signed-off claim waiting for its payment, light and dark, in the brand, no console errors
-- [ ] Postman: the Workflow folder signs off, sees `in_progress`, pays, and repeats the decision and payment to see them return the claim; and rejects another held claim with a note
-- [ ] Live: after a reseed, `uv run -m agent CLM-1003` waits for sign-off; signing off on `/claims/CLM-1003` as Dana Whitfield shows Decided and "Paid", with the handler and the time, within five seconds, and the service logs the report line
-- [ ] Live: through Langfuse's API, `CLM-1003`'s session has a `work-claim` trace from before the sign-off and a `carry-on` trace from after it
-- [ ] Live: after a reseed, `uv run -m agent CLM-1011` waits for sign-off; rejecting it on the dashboard with a note naming the rule makes the agent decide again within a minute, and its new decision waits for a sign-off
-- [ ] `npm run check` passes
+- [x] pytest, backend: signing off `CLM-1003`'s held 3,750.00 as `HND-01` returns it `in_progress` with the decision signed off by `HND-01` at a time and no payment; paying 3,750.00 decides it, with a payment authorized by `HND-01` at the time of the sign-off; the 404 and 409 rules still hold
+- [x] pytest, backend: rejecting with a note returns the claim `in_progress` with the decision rejected, by whom, when and the note; a rejection with an empty note returns 422; the agent's next approval of 500.00 waits for a sign-off; its next decline is `referred`; a second rejection makes the claim `referred` and the service is not told
+- [x] pytest, backend: a failure after a rejection leaves the claim for a handler with its decisions
+- [x] pytest, backend: the agent's service is told once, for `CLM-1003`, and only after the sign-off is committed (the fake service reads the claim and finds the sign-off)
+- [x] pytest, backend: when the service can't be reached, the sign-off returns 200 and stands, and a warning is logged
+- [x] pytest, backend: `pay_claim` on a held claim with no sign-off returns 409 and records nothing
+- [x] Stub model test, the whole sign-off: the graph pauses; after the sign-off, `resume_claim` returns 202 and the claim is `decided` with one payment by `HND-01`; the model isn't called again; the carry-on is a `carry-on` trace in the claim's session. A second `resume_claim` returns 409 and there is still one payment
+- [x] Stub model test, a rejection: the graph pauses on 3,750.00; after a rejection with a note, `resume_claim` carries the claim on, the stub's next prompt ends with the handler's note, it approves 3,700.00, and the graph pauses again with the claim `awaiting_sign_off` and no payment; a sign-off then pays 3,700.00 once
+- [x] `resume_claim` on a claim awaiting sign-off returns 409 and changes nothing
+- [x] The OpenAPI rules test passes for the agent's service
+- [x] With `npm run dev` running, `curl -s localhost:8002/api/health` returns `{"status":"ok"}`, beside the backend on 8000 and the dashboard on 5173
+- [x] `grep -rn "UNDERCOVER_AGENT\|httpx" backend --include=*.py` finds them only in `backend/agent_service.py` and its test
+- [x] vitest: the decision panel for an approval waiting for its payment, a signed-off claim waiting for its payment, a payment with its sign-off and a rejected decision with its note; the review form sends a sign-off, sends a rejection with its note, and won't reject without a note
+- [x] e2e, sign-off and rejection: as in the design, against the stand-in on 8003
+- [x] Browser: screenshots of the review form, a payment after a sign-off and a rejected payout (`docs/screenshots/durable-*.png`), in the brand, no console errors; the signed-off claim waiting for its payment is taken in phase 5, with the service stopped
+- [x] Postman: the Workflow folder signs off, sees `in_progress`, pays, and repeats the decision and payment to see them return the claim; and rejects another held claim with a note
+- [x] Live: after a reseed, `uv run -m agent CLM-1003` waits for sign-off; signing off on `/claims/CLM-1003` as Dana Whitfield shows Decided and "Paid", with the handler and the time, within five seconds, and the service logs the report line
+- [x] Live: through Langfuse's API, `CLM-1003`'s session has a `work-claim` trace from before the sign-off and a `carry-on` trace from after it
+- [x] Live: after a reseed, `uv run -m agent CLM-1011` waits for sign-off; rejecting it on the dashboard with a note naming the rule makes the agent decide again within a minute, and its new decision waits for a sign-off
+- [x] `npm run check` passes
 
 ## Phase 5: Work survives a restart
 
