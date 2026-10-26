@@ -68,13 +68,14 @@ The whole comparison cost $2.06. The full report, with every claim each model go
 
 ### Labs and challenges
 
-Each challenge is a notebook in [community_contributions/Darko-Martinovic](community_contributions/Darko-Martinovic), kept with its outputs: Days 1 and 2 ran on Claude Haiku 5.5, Day 3 on GPT-6 Luna.
+Each challenge is a notebook in [community_contributions/Darko-Martinovic](community_contributions/Darko-Martinovic), kept with its outputs: Days 1 and 2 ran on Claude Haiku 5.5, Days 3 and 4 on GPT-6 Luna.
 
 | Day | Challenge | What it found |
 |---|---|---|
 | 1 | The payout tool with the full policy wording against a concise one, 3 runs each on the 25 harder claims, as Langfuse experiments | The concise wording saved 16% of the input tokens but dropped accuracy from 0.89 to 0.80 and raised the cost of mistakes from $130 to $1,212 a run |
 | 2 | A word lookup in place of Qdrant, a notes file per customer and a research sub-agent, on the 25 even harder claims | The word lookup got every claim right, against 0.96 for Qdrant, and was cheaper. Notes kept from one run to the next dropped accuracy to 0.84 |
 | 3 | The lab's graph with a rejection: the handler's answer carries `approved` and a `note` | On CLM-1011 a note that names the rule fixed both wrong payouts in five runs; a rejection with no reason made a right payout wrong |
+| 4 | The swarm's dispatcher with a `score_run` node, then checkpointed in Supabase, killed partway and picked up | With `max_concurrency=5` it saved no result before the kill, so every claim it had started was worked again; the claim agents still cost only a few model calls, picking up from their own saved steps |
 
 ### Day 3: durable state
 
@@ -147,3 +148,4 @@ My contributions to Ed's repo, in `community_contributions/Darko-Martinovic/`:
 | [#37](https://github.com/ed-donner/undercover/pull/37) | Week 2 Day 2 | Challenge: word lookup, customer notes and a research sub-agent |
 | [#52](https://github.com/ed-donner/undercover/pull/52) | Week 2 Day 3 | Challenge: a handler can reject a payout |
 | [#56](https://github.com/ed-donner/undercover/pull/56) | Week 2 Day 3 | Durable state, with a handler who can sign off or reject (`DURABLE.md`) |
+| [#57](https://github.com/ed-donner/undercover/pull/57) | Week 2 Day 4 | Challenge: `score_run`, and a restart partway through a dispatch |
