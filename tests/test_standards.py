@@ -27,8 +27,9 @@ ANSWER_KEY = re.compile(r"[\"'][^\"']*evals")
 API_PATH = re.compile(r"[\"']/api/")
 RUNS_SQL = re.compile(r"\.execute(many|script)?\(")
 SQL = re.compile(r"\b(SELECT|INSERT INTO|DELETE FROM)\b|\bUPDATE \w+ SET\b")
-# What may write SQL: the store, and the schema
-SQL_OWNERS = ("backend/db.py",)
+# What may write SQL: the store, the schema, and the agent's own tables, those of
+# LangGraph's checkpointer, which it makes in the same schema
+SQL_OWNERS = ("backend/db.py", "agent/checkpoints.py")
 HTTP_CLIENT = re.compile(r"^\s*(import|from) httpx")
 
 

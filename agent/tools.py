@@ -1,10 +1,13 @@
 """Every tool the agent uses, and the context its tools read."""
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
 from langchain.tools import ToolRuntime, tool
+from langchain_core.messages import ToolMessage
+from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from agent import api
@@ -143,10 +146,11 @@ def decide_claim(
     reasons: str,
     policy_section: str,
     runtime: ToolRuntime[ClaimContext],
-) -> dict[str, Any]:
+) -> Command[Any]:
     """Record your decision on the claim: the payout, two or three sentences of
-    reasons and the section of the policy wording it rests on."""
-    return api.decide_claim(
+    reasons and the section of the policy wording it rests on. It's the last
+    thing you do on the claim."""
+    claim = api.decide_claim(
         runtime.context.claim_id,
         {
             "decision": decision,
@@ -155,12 +159,18 @@ def decide_claim(
             "policy_section": policy_section,
         },
     )
-
-
-@tool
-def pay_claim(amount: float, runtime: ToolRuntime[ClaimContext]) -> dict[str, Any]:
-    """Pay the approved claim its payout. Payouts over $1,000 wait for sign-off."""
-    return api.pay_claim(runtime.context.claim_id, amount)
+    recorded = ToolMessage(
+        json.dumps(claim, ensure_ascii=False),
+        name=decide_claim.name,
+        tool_call_id=runtime.tool_call_id,
+    )
+    return Command(
+        update={
+            "messages": [recorded],
+            "decision": decision,
+            "status": claim["status"],
+        }
+    )
 
 
 CLAIM_TOOLS = [
@@ -171,7 +181,6 @@ CLAIM_TOOLS = [
     read_section,
     calculate_payout,
     decide_claim,
-    pay_claim,
 ]
 
 

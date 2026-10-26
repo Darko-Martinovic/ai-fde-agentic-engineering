@@ -88,12 +88,15 @@ def start_claim(claim_id: str, start: StartIn, conn: Db) -> Claim:
 @router.post("/failure", operation_id="fail_claim")
 def fail_claim(claim_id: str, failure: FailureIn, conn: Db) -> Claim:
     """Record that work on a claim failed before it was decided: the claim goes
-    back in the queue, or is left for a handler when it has failed twice."""
-    require_status(load_claim(conn, claim_id), "in_progress")
+    back in the queue, or is left for a handler when it has failed twice. A claim
+    with a decision is never failed: the agent carries it on."""
+    claim = load_claim(conn, claim_id)
+    require_status(claim, "in_progress")
+    if claim.decisions:
+        raise HTTPException(409, f"Claim {claim_id} has a decision")
     failures = steps.count_of(conn, claim_id, "failure") + 1
     status = "left_for_handler" if failures >= MAX_FAILURES else "waiting"
     step = {"thread_id": failure.thread_id, "kind": "failure", "text": failure.reason}
-    claims.clear_decisions(conn, claim_id)
     steps.add(conn, claim_id, step | {"recorded_at": now()})
     claims.set_status(conn, claim_id, status)
     return load_claim(conn, claim_id)
@@ -115,31 +118,50 @@ def list_steps(claim_id: str, conn: Db) -> list[Step]:
     return [Step.model_validate(dict(row)) for row in steps.of_claim(conn, claim_id)]
 
 
+def repeated_decision(claim: Claim, decision: DecisionIn) -> Claim:
+    """The agent's decision the claim already has, as when the agent carries on
+    after a restart, is done: return the claim. Any other decision is refused."""
+    recorded = claim.decisions[-1]
+    if (recorded.decided_by, recorded.decision, recorded.payout) != (
+        "agent",
+        decision.decision,
+        round(decision.payout, 2),
+    ):
+        raise HTTPException(409, f"Claim {claim.claim_id} already has a decision")
+    return claim
+
+
 @router.post("/decision", operation_id="decide_claim")
 def decide_claim(claim_id: str, decision: DecisionIn, conn: Db) -> Claim:
     """Approve, decline or refer a claim in progress, with the payout and reasons."""
+    seen = found(claims.revision(conn, claim_id), "Claim", claim_id)
     claim = load_claim(conn, claim_id)
-    require_status(claim, "in_progress")
     if claim.decisions:
-        raise HTTPException(409, f"Claim {claim_id} already has a decision")
+        return repeated_decision(claim, decision)
+    require_status(claim, "in_progress")
     if decision.decision == "approve":
         over_limit = decision.payout > approval_limit(conn)
         status = "awaiting_sign_off" if over_limit else "in_progress"
     else:
         status = STATUS_AFTER[decision.decision]
+    if not claims.move(conn, claim_id, seen, status):
+        # Another request decided the claim first, as when the agent asks twice
+        # at once: this one is a repeat of it, or refused
+        return repeated_decision(load_claim(conn, claim_id), decision)
     add_decision(conn, claim_id, "agent", decision, decision.policy_section)
-    claims.set_status(conn, claim_id, status)
     return load_claim(conn, claim_id)
 
 
 @router.post("/payment", operation_id="pay_claim")
 def pay_claim(claim_id: str, payment: PaymentIn, conn: Db) -> Claim:
-    """Pay an approved claim its payout, if no handler's sign-off is needed."""
+    """Pay an approved claim its payout, if no handler's sign-off is needed. A
+    payment already made, as after a restart, is done."""
+    seen = found(claims.revision(conn, claim_id), "Claim", claim_id)
     claim = load_claim(conn, claim_id)
     approval = claim.decisions[-1] if claim.decisions else None
     limit = approval_limit(conn)
     if claim.payment:
-        raise HTTPException(409, f"Claim {claim_id} is already paid")
+        return repeated_payment(claim, payment)
     if approval is None or approval.decision != "approve":
         raise HTTPException(409, f"Claim {claim_id} is not approved")
     if approval.payout > limit:
@@ -148,9 +170,18 @@ def pay_claim(claim_id: str, payment: PaymentIn, conn: Db) -> Claim:
         )
     if round(payment.amount, 2) != approval.payout:
         raise HTTPException(409, f"The approved payout is ${approval.payout:,.2f}")
+    if not claims.move(conn, claim_id, seen, "decided"):
+        return repeated_payment(load_claim(conn, claim_id), payment)
     add_payment(conn, claim_id, approval.payout, "agent")
-    claims.set_status(conn, claim_id, "decided")
     return load_claim(conn, claim_id)
+
+
+def repeated_payment(claim: Claim, payment: PaymentIn) -> Claim:
+    """A payment the claim already has, as after a restart, is done: return the
+    claim. Another amount, or a payment on a claim that has moved on, is refused."""
+    if claim.payment is None or claim.payment.amount != round(payment.amount, 2):
+        raise HTTPException(409, f"Claim {claim.claim_id} is already paid")
+    return claim
 
 
 @router.post("/sign-off", operation_id="sign_off_claim")

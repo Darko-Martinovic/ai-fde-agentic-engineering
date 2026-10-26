@@ -10,6 +10,10 @@ from settings import ROOT, setting
 
 # models.toml gives prices per million tokens
 PER_MILLION = 1_000_000
+# The retries of a model call that fails at the provider, the first after this
+# many seconds, for every agent
+MODEL_RETRIES = 2
+RETRY_DELAY = 1.0
 
 
 @dataclass(frozen=True)

@@ -1,13 +1,15 @@
 """Run the UnderCover Agent. `uv run -m agent` works the waiting claims with the
 queue agent, `--cap 5` stopping it at five; `uv run -m agent CLM-1001` works
-one claim; and `--model provider:model` picks a model from models.toml."""
+one claim; and `--model provider:model` picks a model from models.toml. Each
+claim graph saves its progress with the Postgres checkpointer."""
 
 import argparse
 import sys
 
-from agent import api
+from agent import api, checkpoints
 from agent.config import Model, current_model, model
-from agent.harness import run_queue, work_claim
+from agent.harness import work_claim
+from agent.queue_agent import run_queue
 from agent.tools import waiting_claims
 
 
@@ -35,15 +37,16 @@ def parse(arguments: list[str]) -> argparse.Namespace:
 
 def work_claims(claim_ids: list[str], chosen: Model) -> None:
     """Work the claims named, in one run, finished with each claim's report."""
-    run_id = api.start_run("claim", len(claim_ids), chosen.spec)["run_id"]
-    reports = []
-    for claim_id in claim_ids:
-        try:
-            reports.append(work_claim(claim_id, run_id, chosen))
-        except api.Refused as refused:
-            reports.append(f"{claim_id}: {refused.detail}")
-        print(reports[-1], flush=True)
-    api.finish_run(run_id, "\n".join(reports))
+    with checkpoints.saver() as saver:
+        run_id = api.start_run("claim", len(claim_ids), chosen.spec)["run_id"]
+        reports = []
+        for claim_id in claim_ids:
+            try:
+                reports.append(work_claim(claim_id, run_id, chosen, saver))
+            except api.Refused as refused:
+                reports.append(f"{claim_id}: {refused.detail}")
+            print(reports[-1], flush=True)
+        api.finish_run(run_id, "\n".join(reports))
 
 
 def main(arguments: list[str]) -> None:
@@ -58,7 +61,8 @@ def main(arguments: list[str]) -> None:
         print("No claims are waiting.")
         return
     cap = waiting if options.cap is None else options.cap
-    print(run_queue(cap, chosen), flush=True)
+    with checkpoints.saver() as saver:
+        print(run_queue(cap, chosen, saver), flush=True)
 
 
 if __name__ == "__main__":

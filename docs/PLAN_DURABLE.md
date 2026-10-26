@@ -48,7 +48,8 @@ The agent. The brief makes the service a fourth part beside `api.py`, `tools.py`
 - `recording.py` (new): what the agents record on the backend, a reply's steps and a model call's usage. The graph's nodes and the queue agent's `UsageRecorder` both use it, so it is a module of its own rather than a helper borrowed from either.
 - `middleware.py`: keeps `UsageRecorder` and `refusal` for the queue agent, which stays on `create_agent`. `StepRecorder` goes.
 - `checkpoints.py` (new): `saver()`, a context manager that opens a `psycopg_pool.ConnectionPool` on `DATABASE_URL` (1 to 4 connections, `autocommit=True`, `prepare_threshold=0`, `row_factory=dict_row`, `search_path` set to the schema), creates the schema, runs `setup()` and yields a `PostgresSaver`. It refuses to start without `DATABASE_URL`, since an agent without saved progress can't be picked up by the service. Tests pass an `InMemorySaver` instead and never open it.
-- `harness.py`: the model, `work_claim`, `carry_on`, `carry_on_stopped`, the queue agent and `run_queue`. It shrinks: the claim agent's build moves to `graph.py`.
+- `harness.py`: the model, the claim graph for each claim, `work_claim`, `carry_on` and `carry_on_stopped`. The claim agent's build moves to `graph.py`.
+- `queue_agent.py` (new): the queue agent on `create_agent`, its middleware and `run_queue`, moved out of `harness.py` to keep both under 300 lines.
 - `service.py` (new): the agent's service, a small FastAPI app with `health` and `resume_claim`, run with `uv run -m agent.service` on `AGENT_HOST` and `AGENT_PORT`.
 - `tracing.py`: claim sessions (below).
 - `__main__.py`: opens the saver, builds the claim graph and works the claims or the queue.
@@ -104,8 +105,8 @@ The nodes:
 
 | Node | What it does |
 | --- | --- |
-| `agent` | Calls the model, with the claim instructions as the system message and the tools bound, as `create_agent`'s model node does. Records the reply and its tool calls as steps and the call's usage on the run, and adds one to `model_calls`. Raises `TooManyModelCalls` before a 31st call. Provider errors are retried twice by the node's `RetryPolicy`, LangGraph's own way, in place of `ModelRetryMiddleware` |
-| `tools` | `ToolNode(CLAIM_TOOLS)`. `handle_tool_errors` gives the backend's refusals back to the model as text, as `ToolErrorMiddleware` does today; `wrap_tool_call` records each tool result, and each section read, as steps |
+| `agent` | Calls the model, with the claim instructions as the system message and the tools bound, as `create_agent`'s model node does. Records the reply and its tool calls as steps and the call's usage on the run, and adds one to `model_calls`. Raises `TooManyModelCalls` before a 31st call. Provider errors are retried twice by the model's own `with_retry`, in place of `ModelRetryMiddleware`, so only the model call is tried again, never the recording around it |
+| `tools` | `ToolNode(CLAIM_TOOLS)` with `wrap_tool_call`, which gives the backend's refusals (and a tool called the wrong way) back to the model as text, as `ToolErrorMiddleware` does today, and records each tool result, and each section read, as steps. The refusals are handled in the wrapper, not with `handle_tool_errors`: with a wrapper, ToolNode 1.2 gives every error back to the model, so a broken backend would no longer fail the claim |
 | `wait_for_sign_off` | Pauses with `interrupt()`; nothing comes before it, since a resumed node runs again from the top. The resume value is the handler's review: a sign-off moves on to `pay`; a rejection adds the handler's note to the messages, clears `decision` and `status`, and the graph goes back to `agent` |
 | `pay` | Pays the decision's payout with `pay_claim` and sets `status` from the reply |
 
@@ -161,6 +162,8 @@ As today, two processes can't tell a stopped claim from one the other is working
 
 - `decide_claim` on a claim with a decision returns the claim when the decision and payout are the same, and refuses anything else with 409.
 - `pay_claim` on a claim already paid returns the claim when the amount is the same, and refuses a different amount with 409.
+
+- Two requests at once can't both record: each claim keeps a `revision`, and a decision or payment moves the claim on only from the revision it read (`claims.move`, a conditional `UPDATE`, as `claims.start` does). The one that loses reads the claim again and is a repeat or a refusal. This matters because ToolNode runs a reply's tool calls side by side, so a reply with `decide_claim` twice reaches the backend twice at once; the graph's `decision` and `status` keep the latest value for the same reason.
 
 A restart can still record a step twice on the timeline, when the agent was stopped between recording the step and saving the checkpoint. That is the only repeat.
 
@@ -247,7 +250,7 @@ Its lifespan opens the saver; a dependency builds the claim graph on `MODEL_NAME
 - One owner for each setting: `DATABASE_URL` and the schema are read by `backend/db.py` and `agent/checkpoints.py`, the backend's and the agent's own connection, since neither imports the other; the schema name and pool size are written once, in `.env.defaults`.
 - All SQL stays in `backend/store/`, now as Core expressions; `db.py` holds the schema.
 - Modules keep to their jobs: rules in `payout.py`, the graph in `graph.py`, saving progress in `checkpoints.py`, recording in `recording.py`, the service only receives the backend's call and hands it to the harness. `harness.py` stays under 300 lines.
-- The framework's own way: `StateGraph`, `ToolNode` with `handle_tool_errors` and `wrap_tool_call`, `RetryPolicy`, `Command` from a tool, `interrupt()` and `Command(resume=...)`, `PostgresSaver` on a `ConnectionPool`, `durability="sync"`, FastAPI's `BackgroundTasks`, lifespan and dependency `scope`, SQLAlchemy Core, Langfuse's `CallbackHandler` and `propagate_attributes`.
+- The framework's own way: `StateGraph`, `ToolNode` with `wrap_tool_call`, the model's `with_retry`, `Command` from a tool, `interrupt()` and `Command(resume=...)`, `PostgresSaver` on a `ConnectionPool`, `durability="sync"`, FastAPI's `BackgroundTasks`, lifespan and dependency `scope`, SQLAlchemy Core, Langfuse's `CallbackHandler` and `propagate_attributes`.
 - Instructions stay goals. What must always happen in order, paying after the decision and after a sign-off, is done by the graph.
 - No defensive code beyond the brief: the harness keeps its one catch around a claim, and the backend catches only a failure to reach the agent's service, because the sign-off must stand.
 
@@ -299,24 +302,24 @@ Bring in `backend/payout.py`, the `calculate_payout` operation and tool, and the
 
 Replace the claim agent's `create_agent` and middleware with the graph, saved by the Postgres checkpointer. Remove the `pay_claim` tool and update the instructions. In the backend: idempotent decision and payment, `fail_claim` refusing a decided claim, and the claim's `thread_id` and `attempts`. The sign-off still pays until phase 4, so a paused thread is left behind.
 
-- [ ] A pytest test checks the graph's nodes and edges against the tables above
-- [ ] The claim agent's tools are `get_claim`, `get_policy`, `get_customer`, `search_documents`, `read_section`, `calculate_payout` and `decide_claim`
-- [ ] pytest, backend: approving `CLM-1001` for 420.00 leaves it `in_progress`; the same decision again returns the claim with one decision; 400.00 returns 409. Paying 420.00 decides it; paying 420.00 again returns the claim with one payment; 400.00 returns 409
-- [ ] pytest, backend: `fail_claim` on a decided approval in progress returns 409 and changes nothing
-- [ ] Stub model test, within the limit: the stub works out and approves 420.00; the graph pays it with no `pay_claim` tool call, the model isn't called after the decision, and the report is "CLM-1001: approved $420.00, paid"
-- [ ] Stub model test, over the limit: the stub approves `CLM-1003` for 3,750.00; the report says waiting for a handler's sign-off, `get_state` shows `next` as `("wait_for_sign_off",)`, and there is no payment
-- [ ] Stub model test: with the stored limit raised to 5,000, the same approval is paid at once, since the graph follows the backend
-- [ ] Stub model tests: a decline and a referral end with no payment and no `pay` step in the state history
-- [ ] The existing harness tests pass on the graph: steps in order, section steps, a refusal going back to the model, a read of section 15 or of a `handbook` going back to the model
-- [ ] Stub model test: a stub that calls `get_claim` forever stops at 30 model calls with "TooManyModelCalls", and the claim is back in the queue
-- [ ] Stub model test: a provider error is retried twice; a third failure puts the claim back in the queue, the next attempt is on a new thread, and a second failure leaves it for a handler
-- [ ] Stub model test: when paying raises an error, the claim stays `in_progress` with its decision and the report ends "not paid yet"
-- [ ] A test checks every claim graph invoke passes `durability="sync"` and a Langfuse handler
-- [ ] Usage: a stub run records one usage row per model call on the run, with the claim
-- [ ] `curl -s localhost:8000/api/instructions/claim | grep -c pay_claim` prints 0
-- [ ] Live: after a reseed, `uv run -m agent CLM-1001` approves and pays with no `pay_claim` call in its steps; Supabase MCP shows the checkpointer's tables in `undercover` and rows in `undercover.checkpoints` for the claim's thread
-- [ ] Live: after a reseed, `uv run -m agent CLM-1003` reports waiting for sign-off; Supabase MCP shows an `__interrupt__` write in `undercover.checkpoint_writes` for its thread
-- [ ] `npm run check` passes
+- [x] A pytest test checks the graph's nodes and edges against the tables above
+- [x] The claim agent's tools are `get_claim`, `get_policy`, `get_customer`, `search_documents`, `read_section`, `calculate_payout` and `decide_claim`
+- [x] pytest, backend: approving `CLM-1001` for 420.00 leaves it `in_progress`; the same decision again returns the claim with one decision; 400.00 returns 409. Paying 420.00 decides it; paying 420.00 again returns the claim with one payment; 400.00 returns 409
+- [x] pytest, backend: `fail_claim` on a decided approval in progress returns 409 and changes nothing
+- [x] Stub model test, within the limit: the stub works out and approves 420.00; the graph pays it with no `pay_claim` tool call, the model isn't called after the decision, and the report is "CLM-1001: approved $420.00, paid"
+- [x] Stub model test, over the limit: the stub approves `CLM-1003` for 3,750.00; the report says waiting for a handler's sign-off, `get_state` shows `next` as `("wait_for_sign_off",)`, and there is no payment
+- [x] Stub model test: with the stored limit raised to 5,000, the same approval is paid at once, since the graph follows the backend
+- [x] Stub model tests: a decline and a referral end with no payment and no `pay` step in the state history
+- [x] The existing harness tests pass on the graph: steps in order, section steps, a refusal going back to the model, a read of section 15 or of a `handbook` going back to the model
+- [x] Stub model test: a stub that calls `get_claim` forever stops at 30 model calls with "TooManyModelCalls", and the claim is back in the queue
+- [x] Stub model test: a provider error is retried twice; a third failure puts the claim back in the queue, the next attempt is on a new thread, and a second failure leaves it for a handler
+- [x] Stub model test: when paying raises an error, the claim stays `in_progress` with its decision and the report ends "not paid yet"
+- [x] A test checks every claim graph invoke passes `durability="sync"` and a Langfuse handler
+- [x] Usage: a stub run records one usage row per model call on the run, with the claim
+- [x] `curl -s localhost:8000/api/instructions/claim | grep -c pay_claim` prints 0
+- [x] Live: after a reseed, `uv run -m agent CLM-1001` approves and pays with no `pay_claim` call in its steps; Supabase MCP shows the checkpointer's tables in `undercover` and rows in `undercover.checkpoints` for the claim's thread
+- [x] Live: after a reseed, `uv run -m agent CLM-1003` reports waiting for sign-off; Supabase MCP shows an `__interrupt__` write in `undercover.checkpoint_writes` for its thread
+- [x] `npm run check` passes
 
 ## Phase 4: A sign-off or a rejection picks the claim back up
 

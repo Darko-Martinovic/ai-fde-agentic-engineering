@@ -81,6 +81,25 @@ def start(conn: Connection, claim_id: str) -> bool:
     return taken.rowcount == 1
 
 
+def revision(conn: Connection, claim_id: str) -> int | None:
+    """How many times the claim's decision or payment has changed, or None if
+    there's no such claim. Read it before the claim, to move the claim on."""
+    found = select(db.claims.c.revision).where(db.claims.c.claim_id == claim_id)
+    return conn.execute(found).scalar_one_or_none()
+
+
+def move(conn: Connection, claim_id: str, seen: int, status: str) -> bool:
+    """Move a claim to a new state if nothing has changed its decision or payment
+    since revision `seen`, in one step so two changes at once can't both be
+    made. Return whether this one was."""
+    moved = conn.execute(
+        update(db.claims)
+        .where(db.claims.c.claim_id == claim_id, db.claims.c.revision == seen)
+        .values(status=status, revision=db.claims.c.revision + 1)
+    )
+    return moved.rowcount == 1
+
+
 def set_status(conn: Connection, claim_id: str, status: str) -> None:
     conn.execute(
         update(db.claims).where(db.claims.c.claim_id == claim_id).values(status=status)
@@ -98,11 +117,6 @@ def return_to_queue(conn: Connection) -> None:
         .where(db.claims.c.status == "in_progress")
         .values(status="waiting")
     )
-
-
-def clear_decisions(conn: Connection, claim_id: str) -> None:
-    """Remove a claim's decisions, as when work on it failed before it was final."""
-    conn.execute(delete(db.decisions).where(db.decisions.c.claim_id == claim_id))
 
 
 def decisions(conn: Connection, claim_id: str) -> list[dict[str, Any]]:
