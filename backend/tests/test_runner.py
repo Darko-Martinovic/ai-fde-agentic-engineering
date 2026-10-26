@@ -145,7 +145,7 @@ def test_stop(client, fake_process):
     assert len(client.get("/api/claims/CLM-1001/steps").json()) == 1
 
 
-def test_stop_keeps_decided_claims(client):
+def test_stop_leaves_a_held_claim_as_it_is(client):
     start(client, "CLM-1002")
     client.post(
         "/api/claims/CLM-1002/decision",

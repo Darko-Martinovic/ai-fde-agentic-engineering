@@ -1,6 +1,6 @@
 # Process
 
-`uv sync` and `npm install` at the repo root install everything, including a git pre-commit hook. `npm run dev` starts the backend and the dashboard.
+`uv sync` and `npm install` at the repo root install everything, including a git pre-commit hook. `npm run dev` starts the backend, the agent's service and the dashboard. With `DATABASE_URL` in `.env`, the records and the agent's saved progress are on Supabase, and `uv run -m backend.seed` reseeds Supabase. The tests never read `.env` and need no network: they use SQLite and save the agent's progress in memory.
 
 `npm run check` runs every check:
 
