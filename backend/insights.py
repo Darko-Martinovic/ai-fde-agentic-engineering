@@ -1,7 +1,6 @@
 """What the agent's work on the queue adds up to, for the Insights page."""
 
 import json
-import sqlite3
 from collections import Counter, defaultdict, deque
 from dataclasses import dataclass
 from datetime import datetime
@@ -10,6 +9,7 @@ from typing import Any
 
 from fastapi import APIRouter
 from pydantic import BaseModel
+from sqlalchemy import Connection, RowMapping
 
 from backend.api import Db
 from backend.models import FOR_A_HANDLER, ClaimStatus, DecisionKind
@@ -81,12 +81,12 @@ class Records:
     """The records Insights adds up, each keyed by claim."""
 
     claims: dict[str, dict[str, Any]]
-    decisions: dict[str, sqlite3.Row]
-    payments: dict[str, sqlite3.Row]
+    decisions: dict[str, RowMapping]
+    payments: dict[str, RowMapping]
     limit: float
 
     @classmethod
-    def load(cls, conn: sqlite3.Connection) -> "Records":
+    def load(cls, conn: Connection) -> "Records":
         return cls(
             claims={
                 row["claim_id"]: json.loads(row["data"]) | {"status": row["status"]}
@@ -104,19 +104,19 @@ class Records:
             return True
         return payment is not None and payment["authorized_by"] == "agent"
 
-    def approvals(self) -> list[sqlite3.Row]:
+    def approvals(self) -> list[RowMapping]:
         return [d for d in self.decisions.values() if d["decision"] == "approve"]
 
 
-def latest_runs(conn: sqlite3.Connection) -> dict[str, list[sqlite3.Row]]:
+def latest_runs(conn: Connection) -> dict[str, list[RowMapping]]:
     """Return the steps of each claim's latest run, in order."""
-    runs: dict[str, dict[str, list[sqlite3.Row]]] = defaultdict(dict)
+    runs: dict[str, dict[str, list[RowMapping]]] = defaultdict(dict)
     for step in steps.every_step(conn):
         runs[step["claim_id"]].setdefault(step["thread_id"], []).append(step)
     return {claim_id: list(threads.values())[-1] for claim_id, threads in runs.items()}
 
 
-def tool_calls(run: list[sqlite3.Row]) -> list[tuple[str, bool]]:
+def tool_calls(run: list[RowMapping]) -> list[tuple[str, bool]]:
     """Pair each tool call with its result: the tool and whether it was refused."""
     pending: deque[str] = deque()
     calls: list[tuple[str, bool]] = []
@@ -132,7 +132,7 @@ def sections(policy_section: str | None) -> list[str]:
     return [s.strip() for s in (policy_section or "").split(";") if s.strip()]
 
 
-def claim_work(records: Records, claim_id: str, run: list[sqlite3.Row]) -> ClaimWork:
+def claim_work(records: Records, claim_id: str, run: list[RowMapping]) -> ClaimWork:
     """One claim's latest run: its time, its tool calls and its outcome."""
     calls = tool_calls(run)
     started = datetime.fromisoformat(run[0]["recorded_at"])
@@ -151,7 +151,7 @@ def claim_work(records: Records, claim_id: str, run: list[sqlite3.Row]) -> Claim
     )
 
 
-def tool_use(runs: dict[str, list[sqlite3.Row]]) -> list[ToolUse]:
+def tool_use(runs: dict[str, list[RowMapping]]) -> list[ToolUse]:
     """Each tool's calls and refusals, the most called first."""
     used: dict[str, Counter[bool]] = defaultdict(Counter)
     for run in runs.values():

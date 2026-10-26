@@ -1,84 +1,78 @@
 """The agent's runs, the claims each run started, and what its model calls used."""
 
-import sqlite3
-from typing import Any, cast
+from typing import Any
 
-USAGE = """
-SELECT COUNT(*) AS model_calls,
-    COALESCE(SUM(input_tokens), 0) AS input_tokens,
-    COALESCE(SUM(output_tokens), 0) AS output_tokens,
-    COALESCE(SUM(cost), 0) AS cost,
-    COALESCE(SUM(seconds), 0) AS seconds
-FROM usage WHERE run_id = ?
-"""
+from sqlalchemy import Connection, RowMapping, func, insert, select, update
+
+from backend import db
 
 
-def add(conn: sqlite3.Connection, run: dict[str, Any]) -> int:
+def add(conn: Connection, run: dict[str, Any]) -> int:
     """Record a new run, given as mode, cap, model and started_at; return its id."""
-    cursor = conn.execute(
-        "INSERT INTO runs (mode, cap, model, status, started_at, todos)"
-        " VALUES (:mode, :cap, :model, 'running', :started_at, '[]')",
-        run,
-    )
-    return cast(int, cursor.lastrowid)
+    added = insert(db.runs).values(status="running", todos="[]", **run)
+    return conn.execute(added.returning(db.runs.c.run_id)).scalar_one()
 
 
-def run(conn: sqlite3.Connection, run_id: int) -> sqlite3.Row | None:
-    return conn.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+def run(conn: Connection, run_id: int) -> RowMapping | None:
+    found = select(db.runs).where(db.runs.c.run_id == run_id)
+    return conn.execute(found).mappings().first()
 
 
-def latest(conn: sqlite3.Connection) -> int | None:
-    return conn.execute("SELECT MAX(run_id) FROM runs").fetchone()[0]
+def latest(conn: Connection) -> int | None:
+    return conn.execute(select(func.max(db.runs.c.run_id))).scalar_one()
 
 
-def set_todos(conn: sqlite3.Connection, run_id: int, todos: str) -> None:
-    conn.execute("UPDATE runs SET todos = ? WHERE run_id = ?", (todos, run_id))
+def set_todos(conn: Connection, run_id: int, todos: str) -> None:
+    conn.execute(update(db.runs).where(db.runs.c.run_id == run_id).values(todos=todos))
 
 
 def finish(
-    conn: sqlite3.Connection, run_id: int, status: str, summary: str | None, at: str
+    conn: Connection, run_id: int, status: str, summary: str | None, at: str
 ) -> None:
     conn.execute(
-        "UPDATE runs SET status = ?, summary = ?, finished_at = ? WHERE run_id = ?",
-        (status, summary, at, run_id),
+        update(db.runs)
+        .where(db.runs.c.run_id == run_id)
+        .values(status=status, summary=summary, finished_at=at)
     )
 
 
-def stop_running(conn: sqlite3.Connection, at: str) -> None:
+def stop_running(conn: Connection, at: str) -> None:
     """Mark every run still running as stopped."""
     conn.execute(
-        "UPDATE runs SET status = 'stopped', finished_at = ? WHERE status = 'running'",
-        (at,),
+        update(db.runs)
+        .where(db.runs.c.status == "running")
+        .values(status="stopped", finished_at=at)
     )
 
 
 def add_attempt(
-    conn: sqlite3.Connection, run_id: int, claim_id: str, thread_id: str, at: str
+    conn: Connection, run_id: int, claim_id: str, thread_id: str, at: str
 ) -> None:
     conn.execute(
-        "INSERT INTO attempts (run_id, claim_id, thread_id, started_at)"
-        " VALUES (?, ?, ?, ?)",
-        (run_id, claim_id, thread_id, at),
+        insert(db.attempts).values(
+            run_id=run_id, claim_id=claim_id, thread_id=thread_id, started_at=at
+        )
     )
 
 
-def claims_started(conn: sqlite3.Connection, run_id: int) -> set[str]:
-    rows = conn.execute(
-        "SELECT DISTINCT claim_id FROM attempts WHERE run_id = ?", (run_id,)
-    ).fetchall()
-    return {row["claim_id"] for row in rows}
+def claims_started(conn: Connection, run_id: int) -> set[str]:
+    found = select(db.attempts.c.claim_id).where(db.attempts.c.run_id == run_id)
+    return set(conn.execute(found).scalars())
 
 
-def add_usage(conn: sqlite3.Connection, run_id: int, usage: dict[str, Any]) -> None:
+def add_usage(conn: Connection, run_id: int, usage: dict[str, Any]) -> None:
     """Record one model call, given as claim_id, model, input_tokens,
     output_tokens, cost, seconds and recorded_at."""
-    conn.execute(
-        "INSERT INTO usage (run_id, claim_id, model, input_tokens, output_tokens,"
-        " cost, seconds, recorded_at) VALUES (:run_id, :claim_id, :model,"
-        " :input_tokens, :output_tokens, :cost, :seconds, :recorded_at)",
-        {"run_id": run_id} | usage,
-    )
+    conn.execute(insert(db.usage).values(run_id=run_id, **usage))
 
 
-def usage(conn: sqlite3.Connection, run_id: int) -> sqlite3.Row:
-    return conn.execute(USAGE, (run_id,)).fetchone()
+def usage(conn: Connection, run_id: int) -> RowMapping:
+    used = db.usage.c
+    found = select(
+        func.count().label("model_calls"),
+        func.coalesce(func.sum(used.input_tokens), 0).label("input_tokens"),
+        func.coalesce(func.sum(used.output_tokens), 0).label("output_tokens"),
+        func.coalesce(func.sum(used.cost), 0).label("cost"),
+        func.coalesce(func.sum(used.seconds), 0).label("seconds"),
+    ).where(used.run_id == run_id)
+    return conn.execute(found).mappings().one()

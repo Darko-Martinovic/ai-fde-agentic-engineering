@@ -2,30 +2,31 @@
 loading a claim or a run."""
 
 import json
-import sqlite3
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException
+from sqlalchemy import Connection
 
 from backend import db
 from backend.models import Claim, Policy, Run
-from backend.seed import ensure_seeded
+from backend.seed import ready
 from backend.store import claims, records, runs
 
 
-def database() -> Iterator[sqlite3.Connection]:
-    """Open the database for one request, seeding it on first use."""
-    conn = db.connect()
-    ensure_seeded(conn)
-    try:
+def database() -> Iterator[Connection]:
+    """The database for one request, in one transaction, seeded on first use. A
+    request's work is committed when it succeeds and undone when it fails."""
+    engine = db.engine()
+    ready(engine)
+    with engine.begin() as conn:
         yield conn
-    finally:
-        conn.close()
 
 
-Db = Annotated[sqlite3.Connection, Depends(database)]
+# Scoped to the route, so a request's work is committed before its response is
+# sent and before any background task runs
+Db = Annotated[Connection, Depends(database, scope="function")]
 
 
 def now() -> str:
@@ -39,7 +40,7 @@ def found[T](record: T | None, label: str, key: str) -> T:
     return record
 
 
-def load_claim(conn: sqlite3.Connection, claim_id: str) -> Claim:
+def load_claim(conn: Connection, claim_id: str) -> Claim:
     """Load one claim with its state, its decisions and its payment."""
     row = found(claims.claim(conn, claim_id), "Claim", claim_id)
     return Claim.model_validate(
@@ -52,7 +53,7 @@ def load_claim(conn: sqlite3.Connection, claim_id: str) -> Claim:
     )
 
 
-def load_policy(conn: sqlite3.Connection, policy_id: str) -> Policy:
+def load_policy(conn: Connection, policy_id: str) -> Policy:
     """Load one policy with its plan's limits, its add-ons and the benefits the
     deductible applies to."""
     policy: dict[str, Any] = found(records.policy(conn, policy_id), "Policy", policy_id)
@@ -69,12 +70,12 @@ def load_policy(conn: sqlite3.Connection, policy_id: str) -> Policy:
     )
 
 
-def company(conn: sqlite3.Connection) -> dict[str, Any]:
+def company(conn: Connection) -> dict[str, Any]:
     """The company's rules, such as the payout approval limit."""
     return json.loads(records.stored(conn, "company"))
 
 
-def load_run(conn: sqlite3.Connection, run_id: int) -> Run:
+def load_run(conn: Connection, run_id: int) -> Run:
     """Load one run with its to-do list, the claims it started and its usage."""
     row = found(runs.run(conn, run_id), "Run", str(run_id))
     return Run.model_validate(
@@ -87,7 +88,7 @@ def load_run(conn: sqlite3.Connection, run_id: int) -> Run:
     )
 
 
-def require_running(conn: sqlite3.Connection, run_id: int) -> Run:
+def require_running(conn: Connection, run_id: int) -> Run:
     """Load a run that is still running, or refuse."""
     run = load_run(conn, run_id)
     if run.status != "running":

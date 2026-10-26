@@ -1,7 +1,7 @@
 import pytest
 
-from backend import db
 from backend.tests.claim_starts import start
+from backend.tests.direct_changes import add_steps
 
 SECTION_READ = (
     '{"document": "manual", "document_title": "Claims manual", "number": 9,'
@@ -14,19 +14,6 @@ def insights(client):
     response = client.get("/api/insights")
     assert response.status_code == 200
     return response.json()
-
-
-def add_steps(claim_id, thread_id, steps):
-    """Record steps at set times, given as (second, kind, text)."""
-    with db.connect() as conn:
-        conn.executemany(
-            "INSERT INTO steps (claim_id, thread_id, kind, text, recorded_at)"
-            " VALUES (?, ?, ?, ?, ?)",
-            [
-                (claim_id, thread_id, kind, text, f"2026-10-19T10:00:{s:02d}+00:00")
-                for s, kind, text in steps
-            ],
-        )
 
 
 def decide(client, claim_id, decision, payout, section="Section 3, Trip Delay"):

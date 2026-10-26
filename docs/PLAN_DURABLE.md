@@ -31,7 +31,8 @@ The backend:
 
 - `db.py`: the tables as SQLAlchemy `Table` objects in one `MetaData`, and the engine. It is the only module that reads `DATABASE_URL`, `UNDERCOVER_DB` and `DATABASE_SCHEMA`. With `DATABASE_URL` set (and not empty) the engine is `postgresql+psycopg`, with `search_path` set to the schema on every connection, a pool of `DATABASE_CONNECTIONS` (4) with no overflow and `pool_pre_ping`. Without it, SQLite at `UNDERCOVER_DB` with `NullPool`, as today. The engine is made on first use (`functools.cache`), so a process that never touches the database, such as the agent's process the runner spawns, never opens a connection.
 - `store/` (`claims.py`, `records.py`, `runs.py`, `steps.py`): every query rewritten as a Core expression, written once for SQLite and Postgres. The function names and what they return stay, so the routes barely change. Records stay JSON text, as today.
-- `api.py`: the `Db` dependency yields a SQLAlchemy `Connection` inside `engine.begin()`, with `scope="function"`, so a request's work is committed before the response is sent and before a background task runs. Seeding moves out of the dependency into the app's lifespan.
+- `api.py`: the `Db` dependency yields a SQLAlchemy `Connection` inside `engine.begin()`, with `scope="function"`, so a request's work is committed before the response is sent and before a background task runs. Seeding stays with the dependency, done once a process (`seed.ready`, cached by engine), rather than in the app's lifespan: the tests use `TestClient(app)` without a `with`, which never runs a lifespan, and each test has a database of its own. A database without its tables, or without claims, is seeded afresh.
+- `runner.py`: Run starts the agent's process in a background task, so the process finds the queue as the request committed it.
 - `seed.py`: on Postgres, creates the schema if it's missing; on both, drops and creates the backend's tables and loads `data/`. It leaves the checkpointer's tables alone, since a reseeded claim always gets a new thread. `uv run -m backend.seed` seeds whichever database the settings name, Supabase when `.env` has `DATABASE_URL`.
 - `payout.py` (new): the payout rules from `labs/week2day1_payout.py`, as plain functions of a policy, the plans and the company's settings. It reads nothing from `data/` and imports only `models.py`.
 - `claims.py`: gains the `calculate_payout` operation (a claim's payout belongs with the claim).
@@ -279,20 +280,20 @@ Bring in `backend/payout.py`, the `calculate_payout` operation and tool, and the
 
 `uv add sqlalchemy psycopg-pool`. Rewrite `backend/db.py` and `backend/store/` with SQLAlchemy Core, seed on startup and with `uv run -m backend.seed` on either database, and point the backend at Supabase when `DATABASE_URL` is set.
 
-- [ ] `grep -rn "sqlite3" backend` finds nothing outside `backend/db.py`
-- [ ] pytest, without connecting: with `DATABASE_URL` set to a Postgres address, the engine is `postgresql+psycopg`, a pool of 4 with no overflow, with `search_path` set to `undercover`; without it, SQLite at `UNDERCOVER_DB`
-- [ ] `DATABASE_URL=postgresql://nobody:x@127.0.0.1:1/none npm run check:python` passes: the tests remove it and never connect
-- [ ] pytest: the backend seeds an empty SQLite file on startup, and two runs started together come back from `get_latest_run` in the order they started
-- [ ] `uv run -m backend.seed`, with `DATABASE_URL` in `.env`, reseeds Supabase, and twice in a row gives the same result
-- [ ] Supabase MCP: `list_tables` for `undercover` shows the backend's eleven tables and none in `public`; `select status, count(*) from undercover.claims group by status` gives 25 `waiting`
-- [ ] With `npm run dev` running on Supabase: `curl -s localhost:8000/api/claims` returns 25 claims, `CLM-1001` first, and `/api/claims/CLM-1001` its story, items and documents
-- [ ] Walked through with curl on Supabase: start `CLM-1004` in a run and decline it, and it is `decided`; Supabase MCP shows its row in `undercover.decisions`; a reseed puts it back to `waiting`
-- [ ] Supabase MCP, with the dashboard open for 30 seconds: `select count(*) from pg_stat_activity where usename = 'postgres'` is at most 5
-- [ ] Supabase MCP: `get_advisors` (security) lists nothing about the `undercover` schema
-- [ ] Browser: the queue shows 25 claims and Insights loads, with no console errors
-- [ ] Postman collection passes against Supabase after a reseed
-- [ ] Live: `uv run -m agent CLM-1001` decides the claim, and Supabase MCP shows its decision and steps in `undercover`
-- [ ] `npm run check` passes with `.env` in place and with it moved out of the way
+- [x] `grep -rn "sqlite3" backend` finds nothing outside `backend/db.py`
+- [x] pytest, without connecting: with `DATABASE_URL` set to a Postgres address, the engine is `postgresql+psycopg`, a pool of 4 with no overflow, with `search_path` set to `undercover`; without it, SQLite at `UNDERCOVER_DB`
+- [x] `DATABASE_URL=postgresql://nobody:x@127.0.0.1:1/none npm run check:python` passes: the tests remove it and never connect
+- [x] pytest: the backend seeds an empty SQLite file on startup, and two runs started together come back from `get_latest_run` in the order they started
+- [x] `uv run -m backend.seed`, with `DATABASE_URL` in `.env`, prints "Reset the undercover schema on Postgres", and twice in a row gives the same result
+- [x] Supabase MCP: `list_tables` for `undercover` shows the backend's eleven tables and none in `public`; `select status, count(*) from undercover.claims group by status` gives 25 `waiting`
+- [x] With `npm run dev` running on Supabase: `curl -s localhost:8000/api/claims` returns 25 claims, `CLM-1001` first, and `/api/claims/CLM-1001` its story, items and documents
+- [x] Walked through with curl on Supabase: start `CLM-1004` in a run and decline it, and it is `decided`; Supabase MCP shows its row in `undercover.decisions`; a reseed puts it back to `waiting`
+- [x] Supabase MCP, with the dashboard open for 30 seconds: `select count(*) from pg_stat_activity where usename = 'postgres'` is at most 5
+- [x] Supabase MCP: `get_advisors` (security) lists nothing about the `undercover` schema, and `list_tables` shows row level security on for each table
+- [x] Browser: the queue shows 25 claims and Insights loads, with no console errors
+- [x] Postman collection passes against Supabase after a reseed
+- [x] Live: `uv run -m agent CLM-1001` decides the claim, and Supabase MCP shows its decision and steps in `undercover`
+- [x] `npm run check` passes with `.env` in place and with it moved out of the way
 
 ## Phase 3: The claim agent as a graph that saves its progress
 

@@ -1,142 +1,185 @@
 """The claims, their decisions and their payments."""
 
 import json
-import sqlite3
 from typing import Any
 
-QUEUE = """
-WITH latest AS (
-    SELECT claim_id, decision, payout FROM decisions
-    WHERE decision_id IN (SELECT MAX(decision_id) FROM decisions GROUP BY claim_id)
-)
-SELECT claims.data, claims.status, customers.data AS customer,
-    latest.decision, latest.payout, payments.amount AS paid
-FROM claims
-JOIN customers USING (customer_id)
-LEFT JOIN latest USING (claim_id)
-LEFT JOIN payments USING (claim_id)
-ORDER BY claim_id
-"""
+from sqlalchemy import Connection, RowMapping, delete, func, select, update
+from sqlalchemy import insert as insert_into
+
+from backend import db
 
 
-def queue(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+def queue(conn: Connection) -> list[RowMapping]:
     """Every claim with its customer, its latest decision and its payment."""
-    return conn.execute(QUEUE).fetchall()
+    decision = db.decisions.c
+    latest = (
+        select(decision.claim_id, decision.decision, decision.payout)
+        .where(
+            decision.decision_id.in_(
+                select(func.max(decision.decision_id)).group_by(decision.claim_id)
+            )
+        )
+        .subquery()
+    )
+    found = (
+        select(
+            db.claims.c.data,
+            db.claims.c.status,
+            db.customers.c.data.label("customer"),
+            latest.c.decision,
+            latest.c.payout,
+            db.payments.c.amount.label("paid"),
+        )
+        .join(db.customers, db.customers.c.customer_id == db.claims.c.customer_id)
+        .outerjoin(latest, latest.c.claim_id == db.claims.c.claim_id)
+        .outerjoin(db.payments, db.payments.c.claim_id == db.claims.c.claim_id)
+        .order_by(db.claims.c.claim_id)
+    )
+    return list(conn.execute(found).mappings())
 
 
-def claim(conn: sqlite3.Connection, claim_id: str) -> sqlite3.Row | None:
+def claim(conn: Connection, claim_id: str) -> RowMapping | None:
     """A claim's record and state, or None if there's no such claim."""
-    return conn.execute(
-        "SELECT data, status FROM claims WHERE claim_id = ?", (claim_id,)
-    ).fetchone()
+    found = select(db.claims.c.data, db.claims.c.status).where(
+        db.claims.c.claim_id == claim_id
+    )
+    return conn.execute(found).mappings().first()
 
 
-def every_claim(conn: sqlite3.Connection) -> list[sqlite3.Row]:
-    return conn.execute("SELECT claim_id, status, data FROM claims").fetchall()
+def every_claim(conn: Connection) -> list[RowMapping]:
+    found = select(db.claims.c.claim_id, db.claims.c.status, db.claims.c.data)
+    return list(conn.execute(found).mappings())
 
 
-def count(conn: sqlite3.Connection) -> int:
-    return conn.execute("SELECT COUNT(*) FROM claims").fetchone()[0]
+def count(conn: Connection) -> int:
+    return conn.execute(select(func.count()).select_from(db.claims)).scalar_one()
 
 
-def count_in(conn: sqlite3.Connection, status: str) -> int:
+def count_in(conn: Connection, status: str) -> int:
     """How many claims are in one state."""
-    return conn.execute(
-        "SELECT COUNT(*) FROM claims WHERE status = ?", (status,)
-    ).fetchone()[0]
+    found = select(func.count()).where(db.claims.c.status == status)
+    return conn.execute(found).scalar_one()
 
 
-def first_in_progress(conn: sqlite3.Connection) -> str | None:
-    row = conn.execute(
-        "SELECT claim_id FROM claims WHERE status = 'in_progress' ORDER BY claim_id"
-    ).fetchone()
-    return row["claim_id"] if row else None
+def first_in_progress(conn: Connection) -> str | None:
+    found = (
+        select(db.claims.c.claim_id)
+        .where(db.claims.c.status == "in_progress")
+        .order_by(db.claims.c.claim_id)
+    )
+    return conn.execute(found).scalars().first()
 
 
-def start(conn: sqlite3.Connection, claim_id: str) -> bool:
+def start(conn: Connection, claim_id: str) -> bool:
     """Move a waiting claim to in progress, in one step so two starts can't both
     take it. Return whether this start took it."""
-    cursor = conn.execute(
-        "UPDATE claims SET status = 'in_progress'"
-        " WHERE claim_id = ? AND status = 'waiting'",
-        (claim_id,),
+    taken = conn.execute(
+        update(db.claims)
+        .where(db.claims.c.claim_id == claim_id, db.claims.c.status == "waiting")
+        .values(status="in_progress")
     )
-    return cursor.rowcount == 1
+    return taken.rowcount == 1
 
 
-def set_status(conn: sqlite3.Connection, claim_id: str, status: str) -> None:
-    conn.execute("UPDATE claims SET status = ? WHERE claim_id = ?", (status, claim_id))
-
-
-def return_to_queue(conn: sqlite3.Connection) -> None:
-    """Put claims in progress back to waiting, clearing their unpaid decisions."""
+def set_status(conn: Connection, claim_id: str, status: str) -> None:
     conn.execute(
-        "DELETE FROM decisions WHERE claim_id IN"
-        " (SELECT claim_id FROM claims WHERE status = 'in_progress')"
+        update(db.claims).where(db.claims.c.claim_id == claim_id).values(status=status)
     )
-    conn.execute("UPDATE claims SET status = 'waiting' WHERE status = 'in_progress'")
 
 
-def clear_decisions(conn: sqlite3.Connection, claim_id: str) -> None:
+def return_to_queue(conn: Connection) -> None:
+    """Put claims in progress back to waiting, clearing their unpaid decisions."""
+    in_progress = select(db.claims.c.claim_id).where(
+        db.claims.c.status == "in_progress"
+    )
+    conn.execute(delete(db.decisions).where(db.decisions.c.claim_id.in_(in_progress)))
+    conn.execute(
+        update(db.claims)
+        .where(db.claims.c.status == "in_progress")
+        .values(status="waiting")
+    )
+
+
+def clear_decisions(conn: Connection, claim_id: str) -> None:
     """Remove a claim's decisions, as when work on it failed before it was final."""
-    conn.execute("DELETE FROM decisions WHERE claim_id = ?", (claim_id,))
+    conn.execute(delete(db.decisions).where(db.decisions.c.claim_id == claim_id))
 
 
-def decisions(conn: sqlite3.Connection, claim_id: str) -> list[dict[str, Any]]:
-    rows = conn.execute(
-        "SELECT decided_by, decision, payout, reasons, policy_section, decided_at"
-        " FROM decisions WHERE claim_id = ? ORDER BY decision_id",
-        (claim_id,),
-    ).fetchall()
-    return [dict(row) for row in rows]
+def decisions(conn: Connection, claim_id: str) -> list[dict[str, Any]]:
+    decision = db.decisions.c
+    found = (
+        select(
+            decision.decided_by,
+            decision.decision,
+            decision.payout,
+            decision.reasons,
+            decision.policy_section,
+            decision.decided_at,
+        )
+        .where(decision.claim_id == claim_id)
+        .order_by(decision.decision_id)
+    )
+    return [dict(row) for row in conn.execute(found).mappings()]
 
 
-def agent_decisions(conn: sqlite3.Connection) -> list[sqlite3.Row]:
-    return conn.execute(
-        "SELECT claim_id, decision, payout, policy_section FROM decisions"
-        " WHERE decided_by = 'agent'"
-    ).fetchall()
+def agent_decisions(conn: Connection) -> list[RowMapping]:
+    decision = db.decisions.c
+    found = (
+        select(
+            decision.claim_id,
+            decision.decision,
+            decision.payout,
+            decision.policy_section,
+        )
+        .where(decision.decided_by == "agent")
+        .order_by(decision.decision_id)
+    )
+    return list(conn.execute(found).mappings())
 
 
-def add_decision(
-    conn: sqlite3.Connection, claim_id: str, decision: dict[str, Any]
-) -> None:
+def add_decision(conn: Connection, claim_id: str, decision: dict[str, Any]) -> None:
     """Record a decision, given as decided_by, decision, payout, reasons,
     policy_section and decided_at."""
-    conn.execute(
-        "INSERT INTO decisions (claim_id, decided_by, decision, payout, reasons,"
-        " policy_section, decided_at) VALUES (:claim_id, :decided_by, :decision,"
-        " :payout, :reasons, :policy_section, :decided_at)",
-        {"claim_id": claim_id} | decision,
+    conn.execute(insert_into(db.decisions).values(claim_id=claim_id, **decision))
+
+
+def payment(conn: Connection, claim_id: str) -> dict[str, Any] | None:
+    paid = db.payments.c
+    found = select(paid.amount, paid.authorized_by, paid.paid_at).where(
+        paid.claim_id == claim_id
     )
-
-
-def payment(conn: sqlite3.Connection, claim_id: str) -> dict[str, Any] | None:
-    row = conn.execute(
-        "SELECT amount, authorized_by, paid_at FROM payments WHERE claim_id = ?",
-        (claim_id,),
-    ).fetchone()
+    row = conn.execute(found).mappings().first()
     return dict(row) if row else None
 
 
-def payments(conn: sqlite3.Connection) -> list[sqlite3.Row]:
-    return conn.execute(
-        "SELECT claim_id, amount, authorized_by FROM payments"
-    ).fetchall()
+def payments(conn: Connection) -> list[RowMapping]:
+    paid = db.payments.c
+    found = select(paid.claim_id, paid.amount, paid.authorized_by)
+    return list(conn.execute(found).mappings())
 
 
 def add_payment(
-    conn: sqlite3.Connection, claim_id: str, amount: float, by: str, at: str
+    conn: Connection, claim_id: str, amount: float, by: str, at: str
 ) -> None:
-    conn.execute("INSERT INTO payments VALUES (?, ?, ?, ?)", (claim_id, amount, by, at))
+    conn.execute(
+        insert_into(db.payments).values(
+            claim_id=claim_id, amount=amount, authorized_by=by, paid_at=at
+        )
+    )
 
 
-def insert(conn: sqlite3.Connection, claims: list[dict[str, Any]]) -> None:
+def insert(conn: Connection, claims: list[dict[str, Any]]) -> None:
     """Store the claims seeded from data/, each waiting in the queue."""
-    conn.executemany(
-        "INSERT INTO claims VALUES (?, ?, ?, 'waiting', ?)",
+    conn.execute(
+        insert_into(db.claims),
         [
-            (c["claim_id"], c["policy_id"], c["customer_id"], json.dumps(c))
+            {
+                "claim_id": c["claim_id"],
+                "policy_id": c["policy_id"],
+                "customer_id": c["customer_id"],
+                "status": "waiting",
+                "data": json.dumps(c),
+            }
             for c in claims
         ],
     )

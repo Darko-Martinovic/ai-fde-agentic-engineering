@@ -1,8 +1,7 @@
 """How a claim moves through the queue, and the rule that holds large payments."""
 
-import sqlite3
-
 from fastapi import APIRouter, HTTPException
+from sqlalchemy import Connection
 
 from backend.api import Db, company, found, load_claim, now, require_running
 from backend.models import (
@@ -26,12 +25,12 @@ STATUS_AFTER = {"decline": "decided", "refer": "referred"}
 MAX_FAILURES = 2
 
 
-def approval_limit(conn: sqlite3.Connection) -> float:
+def approval_limit(conn: Connection) -> float:
     """Return the payout above which a handler must sign off."""
     return company(conn)["payout_approval_limit"]
 
 
-def check_handler(conn: sqlite3.Connection, handler_id: str) -> None:
+def check_handler(conn: Connection, handler_id: str) -> None:
     found(records.handler(conn, handler_id), "Handler", handler_id)
 
 
@@ -44,7 +43,7 @@ def require_status(claim: Claim, *statuses: str) -> None:
 
 
 def add_decision(
-    conn: sqlite3.Connection,
+    conn: Connection,
     claim_id: str,
     decided_by: str,
     decision: DecisionIn | HandlerDecisionIn,
@@ -65,7 +64,7 @@ def add_decision(
 
 
 def add_payment(
-    conn: sqlite3.Connection, claim_id: str, amount: float, authorized_by: str
+    conn: Connection, claim_id: str, amount: float, authorized_by: str
 ) -> None:
     claims.add_payment(conn, claim_id, round(amount, 2), authorized_by, now())
 
@@ -80,10 +79,9 @@ def start_claim(claim_id: str, start: StartIn, conn: Db) -> Claim:
         raise HTTPException(
             409, f"Run {run.run_id} has reached its cap of {run.cap} claims"
         )
-    with conn:
-        if not claims.start(conn, claim_id):
-            raise HTTPException(409, f"Claim {claim_id} has just been started")
-        runs.add_attempt(conn, run.run_id, claim_id, start.thread_id, now())
+    if not claims.start(conn, claim_id):
+        raise HTTPException(409, f"Claim {claim_id} has just been started")
+    runs.add_attempt(conn, run.run_id, claim_id, start.thread_id, now())
     return load_claim(conn, claim_id)
 
 
@@ -95,10 +93,9 @@ def fail_claim(claim_id: str, failure: FailureIn, conn: Db) -> Claim:
     failures = steps.count_of(conn, claim_id, "failure") + 1
     status = "left_for_handler" if failures >= MAX_FAILURES else "waiting"
     step = {"thread_id": failure.thread_id, "kind": "failure", "text": failure.reason}
-    with conn:
-        claims.clear_decisions(conn, claim_id)
-        steps.add(conn, claim_id, step | {"recorded_at": now()})
-        claims.set_status(conn, claim_id, status)
+    claims.clear_decisions(conn, claim_id)
+    steps.add(conn, claim_id, step | {"recorded_at": now()})
+    claims.set_status(conn, claim_id, status)
     return load_claim(conn, claim_id)
 
 
@@ -107,8 +104,7 @@ def record_step(claim_id: str, step: StepIn, conn: Db) -> Step:
     """Record one step the agent took on a claim."""
     load_claim(conn, claim_id)
     row = step.model_dump() | {"recorded_at": now()}
-    with conn:
-        steps.add(conn, claim_id, row)
+    steps.add(conn, claim_id, row)
     return Step.model_validate(row)
 
 
@@ -131,9 +127,8 @@ def decide_claim(claim_id: str, decision: DecisionIn, conn: Db) -> Claim:
         status = "awaiting_sign_off" if over_limit else "in_progress"
     else:
         status = STATUS_AFTER[decision.decision]
-    with conn:
-        add_decision(conn, claim_id, "agent", decision, decision.policy_section)
-        claims.set_status(conn, claim_id, status)
+    add_decision(conn, claim_id, "agent", decision, decision.policy_section)
+    claims.set_status(conn, claim_id, status)
     return load_claim(conn, claim_id)
 
 
@@ -153,9 +148,8 @@ def pay_claim(claim_id: str, payment: PaymentIn, conn: Db) -> Claim:
         )
     if round(payment.amount, 2) != approval.payout:
         raise HTTPException(409, f"The approved payout is ${approval.payout:,.2f}")
-    with conn:
-        add_payment(conn, claim_id, approval.payout, "agent")
-        claims.set_status(conn, claim_id, "decided")
+    add_payment(conn, claim_id, approval.payout, "agent")
+    claims.set_status(conn, claim_id, "decided")
     return load_claim(conn, claim_id)
 
 
@@ -165,9 +159,8 @@ def sign_off_claim(claim_id: str, sign_off: SignOffIn, conn: Db) -> Claim:
     claim = load_claim(conn, claim_id)
     check_handler(conn, sign_off.handler_id)
     require_status(claim, "awaiting_sign_off")
-    with conn:
-        add_payment(conn, claim_id, claim.decisions[-1].payout, sign_off.handler_id)
-        claims.set_status(conn, claim_id, "decided")
+    add_payment(conn, claim_id, claim.decisions[-1].payout, sign_off.handler_id)
+    claims.set_status(conn, claim_id, "decided")
     return load_claim(conn, claim_id)
 
 
@@ -178,9 +171,8 @@ def decide_as_handler(claim_id: str, resolution: HandlerDecisionIn, conn: Db) ->
     claim = load_claim(conn, claim_id)
     check_handler(conn, resolution.handler_id)
     require_status(claim, *FOR_A_HANDLER)
-    with conn:
-        add_decision(conn, claim_id, resolution.handler_id, resolution, None)
-        if resolution.decision == "approve":
-            add_payment(conn, claim_id, resolution.payout, resolution.handler_id)
-        claims.set_status(conn, claim_id, "decided")
+    add_decision(conn, claim_id, resolution.handler_id, resolution, None)
+    if resolution.decision == "approve":
+        add_payment(conn, claim_id, resolution.payout, resolution.handler_id)
+    claims.set_status(conn, claim_id, "decided")
     return load_claim(conn, claim_id)

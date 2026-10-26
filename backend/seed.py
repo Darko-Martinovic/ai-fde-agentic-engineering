@@ -1,12 +1,15 @@
-"""Load UnderCover's records from data/ into the database."""
+"""Load UnderCover's records from data/ into the database: `uv run -m
+backend.seed` resets the database the settings name, Supabase when .env has
+DATABASE_URL."""
 
 import json
-import sqlite3
+from functools import cache
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import Connection, Engine
+
 from backend import db
-from backend.config import database_path
 from backend.store import claims, records
 
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -30,38 +33,46 @@ def read(name: str) -> Any:
     return json.loads(text) if name.endswith(".json") else text
 
 
-def seed(conn: sqlite3.Connection) -> None:
+def seed(conn: Connection) -> None:
     """Load every record, with each claim waiting in the queue."""
-    with conn:
-        claims.insert(conn, read("claims.json"))
-        records.insert(
-            conn,
-            policies=read("policies.json"),
-            customers=read("customers.json"),
-            handler_records=read("handlers.json"),
-            settings={
-                "plans": json.dumps(read("plans.json")),
-                "company": json.dumps(read("company.json")),
-                "policy_wording": read("policy_wording.md"),
-                "claims_manual": read("claims_manual.md"),
-            },
-        )
+    claims.insert(conn, read("claims.json"))
+    records.insert(
+        conn,
+        policies=read("policies.json"),
+        customers=read("customers.json"),
+        handler_records=read("handlers.json"),
+        settings={
+            "plans": json.dumps(read("plans.json")),
+            "company": json.dumps(read("company.json")),
+            "policy_wording": read("policy_wording.md"),
+            "claims_manual": read("claims_manual.md"),
+        },
+    )
 
 
-def ensure_seeded(conn: sqlite3.Connection) -> None:
-    """Seed the database if it has no claims yet."""
-    if claims.count(conn) == 0:
-        seed(conn)
+def fresh(conn: Connection) -> None:
+    """Drop the backend's tables and seed them afresh, leaving any other tables,
+    such as the agent's checkpoints, alone."""
+    db.drop_tables(conn)
+    db.create_tables(conn)
+    seed(conn)
+
+
+@cache
+def ready(engine: Engine) -> None:
+    """Seed the records the first time this process finds a database without
+    them, or without any claims, as after a seed that failed partway."""
+    with engine.begin() as conn:
+        if not db.has_tables(conn) or claims.count(conn) == 0:
+            fresh(conn)
 
 
 def reset() -> None:
-    """Delete the database and seed a fresh one."""
-    database_path().unlink(missing_ok=True)
-    conn = db.connect()
-    seed(conn)
-    conn.close()
+    """Reset the database the settings name to the records in data/."""
+    with db.engine().begin() as conn:
+        fresh(conn)
 
 
 if __name__ == "__main__":
     reset()
-    print(f"Reset {database_path()}")
+    print(f"Reset {db.where(db.engine())}")

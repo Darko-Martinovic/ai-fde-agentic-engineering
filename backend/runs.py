@@ -15,8 +15,7 @@ router = APIRouter(prefix="/api/runs")
 @router.post("", operation_id="start_run")
 def start_run(run: RunIn, conn: Db) -> Run:
     """Start a run of the agent on a model, capped at a number of claims."""
-    with conn:
-        run_id = runs.add(conn, run.model_dump() | {"started_at": now()})
+    run_id = runs.add(conn, run.model_dump() | {"started_at": now()})
     return load_run(conn, run_id)
 
 
@@ -31,8 +30,7 @@ def get_latest_run(conn: Db) -> Run | None:
 def write_todos(run_id: int, todos: TodosIn, conn: Db) -> Run:
     """Replace a running run's to-do list."""
     require_running(conn, run_id)
-    with conn:
-        runs.set_todos(conn, run_id, json.dumps(todos.model_dump()["todos"]))
+    runs.set_todos(conn, run_id, json.dumps(todos.model_dump()["todos"]))
     return load_run(conn, run_id)
 
 
@@ -40,8 +38,7 @@ def write_todos(run_id: int, todos: TodosIn, conn: Db) -> Run:
 def finish_run(run_id: int, finish: FinishIn, conn: Db) -> Run:
     """Finish a running run with its summary for the handlers."""
     require_running(conn, run_id)
-    with conn:
-        runs.finish(conn, run_id, "finished", finish.summary, now())
+    runs.finish(conn, run_id, "finished", finish.summary, now())
     return load_run(conn, run_id)
 
 
@@ -49,6 +46,5 @@ def finish_run(run_id: int, finish: FinishIn, conn: Db) -> Run:
 def record_usage(run_id: int, usage: UsageIn, conn: Db) -> Run:
     """Record what one model call in a run used: tokens, cost and time."""
     load_run(conn, run_id)
-    with conn:
-        runs.add_usage(conn, run_id, usage.model_dump() | {"recorded_at": now()})
+    runs.add_usage(conn, run_id, usage.model_dump() | {"recorded_at": now()})
     return load_run(conn, run_id)
