@@ -7,7 +7,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
 
-from agent import api, harness
+from agent import api, config
 from agent.tests.stub import FREE
 from backend.main import app
 
@@ -17,7 +17,7 @@ def backend(tmp_path, monkeypatch):
     """Point the agent at the real backend, in process, on a fresh database."""
     monkeypatch.setenv("UNDERCOVER_DB", str(tmp_path / "undercover.db"))
     monkeypatch.setattr(api, "client", lambda: TestClient(app))
-    monkeypatch.setattr(harness, "RETRY_DELAY", 0)
+    monkeypatch.setattr(config, "RETRY_DELAY", 0)
     return TestClient(app)
 
 

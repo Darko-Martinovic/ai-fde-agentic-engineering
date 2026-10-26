@@ -3,12 +3,11 @@
 import dataclasses
 
 import pytest
-from langchain_core.messages import AIMessage
 
 import bench.__main__ as cli
 from agent import harness
 from agent.config import Model
-from agent.tests.stub import FREE, decide, stub, tool_call
+from agent.tests.stub import FREE, decide, stub
 from bench.plan import Estimate, Trial
 from bench.report import write_report
 from bench.run import Repeat, load_results, run_repeat, save_results
@@ -16,8 +15,8 @@ from bench.run import Repeat, load_results, run_repeat, save_results
 # CLM-1001 approved and paid as the handlers did; CLM-1005 approved, where they
 # declined it
 SCRIPTS = [
-    [decide("approve", 420), tool_call("pay_claim", amount=420), AIMessage("Paid.")],
-    [decide("approve", 243), tool_call("pay_claim", amount=243), AIMessage("Paid.")],
+    [decide("approve", 420)],
+    [decide("approve", 243)],
 ]
 
 
@@ -32,7 +31,7 @@ def test_a_run_is_scored_against_the_answers(key, models):
     result = run_repeat(Trial(FREE, "tiny", 1), 1, key)
     assert (result.worked, result.decisions_right, result.payouts_right) == (2, 1, 1)
     assert result.undecided == 0
-    assert result.model_calls == 6
+    assert result.model_calls == 2
     assert result.misses == [
         {
             "claim_id": "CLM-1005",

@@ -1,7 +1,5 @@
 import json
 
-from langchain_core.messages import AIMessage
-
 from agent import harness
 from agent.tests.stub import FREE, decide, stub, tool_call
 from agent.tools import CLAIM_TOOLS
@@ -25,11 +23,10 @@ def test_the_claim_agents_tools_are_named_after_operations():
         "read_section",
         "calculate_payout",
         "decide_claim",
-        "pay_claim",
     ]
 
 
-def test_the_agent_works_out_the_payout_with_the_rules(backend, run):
+def test_the_agent_works_out_the_payout_with_the_rules(backend, run, memory_saver):
     llm = stub(
         tool_call(
             "calculate_payout",
@@ -38,10 +35,8 @@ def test_the_agent_works_out_the_payout_with_the_rules(backend, run):
             paid_by_others=0,
         ),
         decide("approve", 420.0),
-        tool_call("pay_claim", amount=420.0),
-        AIMessage(content="Approved and paid $420.00."),
     )
-    assert harness.work_claim("CLM-1001", run, FREE, llm).endswith("paid")
+    assert harness.work_claim("CLM-1001", run, FREE, memory_saver, llm).endswith("paid")
     steps = backend.get("/api/claims/CLM-1001/steps").json()
     assert steps[0]["text"].startswith("calculate_payout ")
     worked_out = json.loads(steps[1]["text"])

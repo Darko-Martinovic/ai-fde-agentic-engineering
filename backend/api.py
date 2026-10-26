@@ -43,12 +43,17 @@ def found[T](record: T | None, label: str, key: str) -> T:
 def load_claim(conn: Connection, claim_id: str) -> Claim:
     """Load one claim with its state, its decisions and its payment."""
     row = found(claims.claim(conn, claim_id), "Claim", claim_id)
+    attempts = runs.attempts(conn, claim_id)
+    latest = attempts[-1] if attempts else {"run_id": None, "thread_id": None}
     return Claim.model_validate(
         json.loads(row["data"])
         | {
             "status": row["status"],
             "decisions": claims.decisions(conn, claim_id),
             "payment": claims.payment(conn, claim_id),
+            "run_id": latest["run_id"],
+            "thread_id": latest["thread_id"],
+            "attempts": len(attempts),
         }
     )
 

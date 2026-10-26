@@ -51,6 +51,9 @@ claims = Table(
     text_column("customer_id"),
     text_column("status"),
     text_column("data"),
+    # Counts the changes to the claim's decision and payment, so two at once
+    # can't both be recorded
+    Column("revision", Integer, nullable=False, default=0),
 )
 policies = Table(
     "policies",

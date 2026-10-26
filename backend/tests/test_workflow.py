@@ -1,5 +1,7 @@
 import pytest
 
+from backend import db
+from backend.store import claims
 from backend.tests.claim_starts import a_run, start
 
 
@@ -140,12 +142,26 @@ def test_pay_claim(client):
     assert claim["payment"]["authorized_by"] == "agent"
 
 
-def test_pay_twice(client):
+def test_paying_again_is_done(client):
+    """A step can run again after a restart: the same payment returns the claim,
+    paid once, and another amount is refused."""
     approved(client, "CLM-1001", 420)
     pay(client, "CLM-1001", 420)
-    response = pay(client, "CLM-1001", 420)
+    again = pay(client, "CLM-1001", 420)
+    assert again.status_code == 200
+    assert again.json()["payment"]["amount"] == 420
+    response = pay(client, "CLM-1001", 400)
     assert response.status_code == 409
     assert response.json()["detail"] == "Claim CLM-1001 is already paid"
+
+
+def test_deciding_again_is_done(client):
+    approved(client, "CLM-1001", 420)
+    again = decide(client, "CLM-1001", "approve", 420)
+    assert again.status_code == 200
+    assert len(again.json()["decisions"]) == 1
+    assert again.json()["status"] == "in_progress"
+    assert decide(client, "CLM-1001", "approve", 400).status_code == 409
 
 
 def test_pay_another_amount(client):
@@ -181,7 +197,6 @@ def test_payment_over_the_limit_waits_for_sign_off(client):
     assert claim["status"] == "decided"
     assert claim["payment"]["amount"] == 1150
     assert claim["payment"]["authorized_by"] == "HND-01"
-    assert pay(client, "CLM-1002", 1150).status_code == 409
 
 
 @pytest.mark.parametrize(
@@ -303,10 +318,9 @@ def test_a_claim_needs_a_running_run(client):
 
 
 def test_a_failure_puts_the_claim_back_in_the_queue(client):
-    approved(client, "CLM-1001", 420)
+    start(client, "CLM-1001")
     claim = fail(client, "CLM-1001").json()
     assert claim["status"] == "waiting"
-    assert claim["decisions"] == []
     steps = client.get("/api/claims/CLM-1001/steps").json()
     assert steps[-1]["kind"] == "failure"
     assert steps[-1]["text"] == "The model provider timed out"
@@ -318,6 +332,26 @@ def test_a_second_failure_leaves_the_claim_for_a_handler(client):
     start(client, "CLM-1001")
     assert fail(client, "CLM-1001").json()["status"] == "left_for_handler"
     assert start(client, "CLM-1001").status_code == 409
+
+
+def test_a_claim_with_a_decision_is_never_failed(client):
+    approved(client, "CLM-1001", 420)
+    response = fail(client, "CLM-1001")
+    assert response.status_code == 409
+    claim = client.get("/api/claims/CLM-1001").json()
+    assert (claim["status"], len(claim["decisions"])) == ("in_progress", 1)
+
+
+def test_a_claim_shows_its_latest_attempt(client):
+    run_id = a_run(client)
+    assert client.get("/api/claims/CLM-1001").json()["attempts"] == 0
+    start(client, "CLM-1001", run_id)
+    claim = client.get("/api/claims/CLM-1001").json()
+    assert (claim["run_id"], claim["thread_id"], claim["attempts"]) == (
+        run_id,
+        "CLM-1001-test",
+        1,
+    )
 
 
 def test_only_a_claim_in_progress_can_fail(client):
@@ -334,3 +368,13 @@ def test_a_handler_decides_a_claim_left_for_them(client):
     claim = resolve(client, "CLM-1004", "HND-01", "approve", 74).json()
     assert claim["status"] == "decided"
     assert claim["payment"]["authorized_by"] == "HND-01"
+
+
+def test_a_claim_moves_on_once_from_what_was_seen(client):
+    """Two changes at once that both read the same revision: only one is made."""
+    start(client, "CLM-1001")
+    with db.engine().begin() as conn:
+        seen = claims.revision(conn, "CLM-1001") or 0
+        assert claims.move(conn, "CLM-1001", seen, "decided")
+        assert not claims.move(conn, "CLM-1001", seen, "referred")
+    assert client.get("/api/claims/CLM-1001").json()["status"] == "decided"

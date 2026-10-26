@@ -31,7 +31,7 @@ def queue_runs(monkeypatch):
     """Stand in for the queue agent, recording how it was started."""
     started = []
 
-    def run_queue(cap, model):
+    def run_queue(cap, model, saver):
         started.append((cap, model.spec))
         return "Worked the queue."
 

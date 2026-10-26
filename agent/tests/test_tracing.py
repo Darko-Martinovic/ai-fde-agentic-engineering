@@ -1,30 +1,26 @@
 from langchain_core.messages import AIMessage
 
 import agent.__main__ as cli
-from agent import harness, tracing
+from agent import harness, queue_agent, tracing
 from agent.tests.stub import FREE, StubModel, decide, stub, tool_call
 
 TYPE = "langfuse.observation.type"
 INPUT = "langfuse.observation.input"
 OUTPUT = "langfuse.observation.output"
 SESSION = "session.id"
+# The queue agent's middleware hooks, which are left out of its trace
 HOOKS = {
     "ModelCallLimitMiddleware.before_model",
     "ModelCallLimitMiddleware.after_model",
-    "StepRecorder.after_model",
 }
 
 
 def approves(monkeypatch):
-    """Give every claim agent a stub model that approves $420.00 and pays it."""
+    """Give every claim agent a stub model that reads the claim and approves
+    $420.00, which the graph pays."""
 
     def model(chosen):
-        return stub(
-            tool_call("get_claim"),
-            decide("approve", 420.0),
-            tool_call("pay_claim", amount=420.0),
-            AIMessage(content="Approved and paid $420.00."),
-        )
+        return stub(tool_call("get_claim"), decide("approve", 420.0))
 
     monkeypatch.setattr(harness, "chat_model", model)
 
@@ -62,9 +58,10 @@ def test_a_claim_named_is_a_trace_of_its_own(backend, monkeypatch, traces):
     metadata = "langfuse.observation.metadata.thread_id"
     assert agent.attributes[metadata] == f'"{thread_id}"'
     generations = [s for s in spans if s.attributes[TYPE] == "generation"]
-    assert len(generations) == 4
+    assert len(generations) == 2
     tools = [s.name for s in spans if s.attributes[TYPE] == "tool"]
-    assert tools == ["get_claim", "decide_claim", "pay_claim"]
+    assert tools == ["get_claim", "decide_claim"]
+    assert {"agent", "tools", "pay"} <= {span.name for span in spans}
 
 
 def test_each_claim_has_a_session_of_its_own(backend, monkeypatch, traces):
@@ -77,15 +74,15 @@ def test_each_claim_has_a_session_of_its_own(backend, monkeypatch, traces):
         assert root.attributes[SESSION] == claim[0]["thread_id"]
 
 
-def test_middleware_hooks_are_not_sent(backend, monkeypatch, traces):
-    approves(monkeypatch)
-    cli.work_claims(["CLM-1001"], FREE)
+def test_middleware_hooks_are_not_sent(backend, traces, memory_saver):
+    queue_llm = stub(AIMessage(content="Nothing to do."), AIMessage(content="Done."))
+    queue_agent.run_queue(1, FREE, memory_saver, queue_llm, stub())
     names = {span.name for span in traces()}
     assert names >= HOOKS
     assert {span.name for span in traces() if tracing.sent(span)} == names - HOOKS
 
 
-def test_a_queue_runs_claims_are_traces_of_their_own(backend, traces):
+def test_a_queue_runs_claims_are_traces_of_their_own(backend, traces, memory_saver):
     queue_llm = stub(
         tool_call("work_claim", claim_id="CLM-1001"),
         tool_call("work_claim", claim_id="CLM-1004"),
@@ -93,12 +90,9 @@ def test_a_queue_runs_claims_are_traces_of_their_own(backend, traces):
     )
     claim_llm = stub(
         decide("approve", 420.0),
-        tool_call("pay_claim", amount=420.0),
-        AIMessage(content="Approved and paid $420.00."),
         decide("decline", 0.0),
-        AIMessage(content="Declined."),
     )
-    summary = harness.run_queue(2, FREE, queue_llm, claim_llm)
+    summary = queue_agent.run_queue(2, FREE, memory_saver, queue_llm, claim_llm)
     spans = traces()
     [run] = [root for root in roots(spans) if root.name == "run-queue"]
     assert run.attributes[INPUT] == "Work up to 2 waiting claims in this run."
@@ -134,7 +128,7 @@ def test_naming_the_agents_leaves_the_conversation_alone(backend, monkeypatch):
     approves(monkeypatch)
     cli.work_claims(["CLM-1001"], FREE)
     replies = [m for m in seen[-1] if isinstance(m, AIMessage)]
-    assert len(replies) == 3
+    assert len(replies) == 1
     assert all(reply.name is None for reply in replies)
 
 

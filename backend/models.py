@@ -158,6 +158,10 @@ class Claim(BaseModel):
     status: ClaimStatus
     decisions: list[Decision]
     payment: Payment | None
+    # The latest attempt at the claim: its run and thread, and how many there were
+    run_id: int | None
+    thread_id: str | None
+    attempts: int
 
 
 class Plan(BaseModel):

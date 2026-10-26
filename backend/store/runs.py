@@ -55,6 +55,17 @@ def add_attempt(
     )
 
 
+def attempts(conn: Connection, claim_id: str) -> list[RowMapping]:
+    """A claim's attempts, each with its run and thread, the latest last."""
+    attempt = db.attempts.c
+    found = (
+        select(attempt.run_id, attempt.thread_id)
+        .where(attempt.claim_id == claim_id)
+        .order_by(attempt.attempt_id)
+    )
+    return list(conn.execute(found).mappings())
+
+
 def claims_started(conn: Connection, run_id: int) -> set[str]:
     found = select(db.attempts.c.claim_id).where(db.attempts.c.run_id == run_id)
     return set(conn.execute(found).scalars())

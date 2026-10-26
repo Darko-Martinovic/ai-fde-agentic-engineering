@@ -994,7 +994,7 @@
                 "payment"
               ]
             },
-            "description": "`pay_claim`: paying a claim twice is refused.",
+            "description": "`pay_claim`: the same payment again, as after a restart, is done: it returns the claim, paid once.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"amount\": 420\n}"
@@ -1006,8 +1006,92 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const claim = pm.response.json();",
+                  "pm.test(\"paid once, $420\", () => pm.expect(claim.payment.amount).to.eql(420));",
+                  "pm.test(\"claim is decided\", () => pm.expect(claim.status).to.eql(\"decided\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pay CLM-1001 another amount",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1001/payment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1001",
+                "payment"
+              ]
+            },
+            "description": "`pay_claim`: a different amount on a paid claim is refused.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 400\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
                   "pm.test(\"status is 409\", () => pm.response.to.have.status(409));",
                   "pm.test(\"refused\", () => pm.expect(pm.response.json().detail).to.eql(\"Claim CLM-1001 is already paid\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve CLM-1001 again",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1001/decision",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1001",
+                "decision"
+              ]
+            },
+            "description": "`decide_claim`: the same decision again, as after a restart, is done: it returns the claim with one decision.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"approve\",\n  \"payout\": 420,\n  \"reasons\": \"The agent's reasons, in two or three sentences.\",\n  \"policy_section\": \"Section 3, Trip Delay\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"one decision\", () => pm.expect(pm.response.json().decisions).to.have.length(1));"
                 ]
               }
             }
