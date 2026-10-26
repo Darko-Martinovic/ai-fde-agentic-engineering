@@ -146,3 +146,4 @@ My contributions to Ed's repo, in `community_contributions/Darko-Martinovic/`:
 | [#30](https://github.com/ed-donner/undercover/pull/30) | Week 2 Day 1 | Challenge: concise wording with the payout tool |
 | [#37](https://github.com/ed-donner/undercover/pull/37) | Week 2 Day 2 | Challenge: word lookup, customer notes and a research sub-agent |
 | [#52](https://github.com/ed-donner/undercover/pull/52) | Week 2 Day 3 | Challenge: a handler can reject a payout |
+| [#56](https://github.com/ed-donner/undercover/pull/56) | Week 2 Day 3 | Durable state, with a handler who can sign off or reject (`DURABLE.md`) |
