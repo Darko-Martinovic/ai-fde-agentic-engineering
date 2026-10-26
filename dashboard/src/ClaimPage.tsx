@@ -15,15 +15,18 @@ import { SectionsPanel } from "./Sections";
 import { StepsPanel } from "./Steps";
 import { paths } from "./paths";
 
-type AgentAction = "run" | "stop" | null;
+type AgentAction = "run" | "stop" | "carry_on" | null;
 
-/** What the agent can do on this claim now: run on it, or stop working on it. A
- *  claim a stopped run left in progress keeps its saved progress for the next
- *  run to carry on. */
+// Running the agent on a waiting claim, or carrying on with one left in progress
+const RUN_LABEL = { run: "Run the agent", carry_on: "Carry on" } as const;
+
+/** What the agent can do on this claim now: run on it, stop working on it, or
+ *  carry on with it from its saved progress after a run that was stopped. */
 function agentAction(claim: Claim, agent: AgentState | null): AgentAction {
   const running = agent?.running ?? false;
   if (claim.status === "waiting") return "run";
   if (running && agent?.claim_id === claim.claim_id) return "stop";
+  if (!running && claim.status === "in_progress") return "carry_on";
   return null;
 }
 
@@ -43,7 +46,7 @@ function AgentControls({
 
   return (
     <div className="agent-controls">
-      {action === "run" && (
+      {(action === "run" || action === "carry_on") && (
         <button
           type="button"
           className="button button--primary"
@@ -53,7 +56,7 @@ function AgentControls({
             run(() => api.runClaim(claim.claim_id, model));
           }}
         >
-          Run the agent
+          {RUN_LABEL[action]}
         </button>
       )}
       {action === "stop" && (

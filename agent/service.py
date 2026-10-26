@@ -73,15 +73,8 @@ def resume_claim(
 
 
 def report(carry: Carrier, claim_id: str, run_id: int) -> None:
-    """Carry the claim on and print its report, as the command line does. If the
-    claim can't even be picked up, say so: it stays in progress, and the next
-    run carries it on."""
-    try:
-        print(carry(claim_id, run_id), flush=True)
-    except Exception as error:  # noqa: BLE001 - the report line is all a background task has
-        print(
-            f"{claim_id}: not picked up ({type(error).__name__}: {error})", flush=True
-        )
+    """Carry the claim on and print its report, as the command line does."""
+    print(carry(claim_id, run_id), flush=True)
 
 
 app.include_router(router)

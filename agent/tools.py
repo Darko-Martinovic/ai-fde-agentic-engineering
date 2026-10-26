@@ -11,6 +11,7 @@ from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from agent import api
+from agent.claims import waiting_claims
 
 
 @dataclass(frozen=True)
@@ -182,11 +183,6 @@ CLAIM_TOOLS = [
     calculate_payout,
     decide_claim,
 ]
-
-
-def waiting_claims() -> list[dict[str, Any]]:
-    """Return the claims waiting in the queue, in claim id order."""
-    return [claim for claim in api.list_claims() if claim["status"] == "waiting"]
 
 
 @tool

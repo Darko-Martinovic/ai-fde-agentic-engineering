@@ -2,6 +2,7 @@
 the middleware around it, and its run, handing each claim to a claim agent."""
 
 import threading
+from collections.abc import Callable
 from typing import Any
 
 from langchain.agents import create_agent
@@ -17,10 +18,11 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
 
 from agent import api, config, tracing
+from agent.claims import waiting_claims
 from agent.config import Model
-from agent.harness import chat_model, work_claim
+from agent.harness import carry_on_stopped, chat_model, work_claim
 from agent.middleware import UsageRecorder, refusal
-from agent.tools import QUEUE_TOOLS, RunContext, waiting_claims
+from agent.tools import QUEUE_TOOLS, RunContext
 
 # The queue agent's model calls: a few for each claim, and some to plan and sum up
 QUEUE_CALLS_A_CLAIM = 4
@@ -97,6 +99,28 @@ def drive(
     return summary
 
 
+def one_at_a_time(
+    run_id: int,
+    model: Model,
+    saver: BaseCheckpointSaver[Any],
+    claim_llm: BaseChatModel | None,
+    started: list[str],
+) -> Callable[[str], str]:
+    """How the queue agent's work_claim tool works a claim: by a claim agent of
+    its own, one at a time even when the model asks for several at once, noting
+    each claim the run started."""
+    lock = threading.Lock()
+
+    def work(claim_id: str) -> str:
+        with lock:
+            report = work_claim(claim_id, run_id, model, saver, claim_llm)
+            if claim_id not in started:
+                started.append(claim_id)
+            return report
+
+    return work
+
+
 def run_queue(
     cap: int,
     model: Model,
@@ -105,25 +129,19 @@ def run_queue(
     claim_llm: BaseChatModel | None = None,
 ) -> str:
     """Work up to `cap` waiting claims with the queue agent, each by a claim agent
-    of its own, one at a time, and return the summary the run finished with. The
-    run is one `run-queue` trace; each claim's work is a trace of its own, in the
-    claim's session. The run is finished whatever happens, with what stopped it
-    if something did."""
+    of its own, one at a time, and return the queue agent's summary. It first
+    carries on any claim left in progress, and the run is finished with their
+    reports and the summary. The run is one `run-queue` trace; each claim's work
+    is a trace of its own, in the claim's session. The run is finished whatever
+    happens, with what stopped it if something did."""
     agent = queue_agent(llm or chat_model(model), model, cap)
     run_id = api.start_run("queue", cap, model.spec)["run_id"]
-    one_at_a_time = threading.Lock()
     started: list[str] = []
-
-    def work(claim_id: str) -> str:
-        with one_at_a_time:
-            report = work_claim(claim_id, run_id, model, saver, claim_llm)
-            if claim_id not in started:
-                started.append(claim_id)
-            return report
-
+    work = one_at_a_time(run_id, model, saver, claim_llm, started)
     context = RunContext(run_id=run_id, cap=cap, work=work)
     ask = f"Work up to {cap} waiting claims in this run."
     try:
+        carried = carry_on_stopped(run_id, model, saver, claim_llm)
         summary = tracing.traced(
             "run-queue",
             ask,
@@ -134,5 +152,7 @@ def run_queue(
     except Exception as error:
         api.finish_run(run_id, f"The run stopped: {type(error).__name__}: {error}")
         raise
-    api.finish_run(run_id, summary)
+    # The run's record holds the claims carried on, which were printed as they
+    # came, before the queue agent's summary
+    api.finish_run(run_id, "\n".join([*carried.values(), summary]))
     return summary

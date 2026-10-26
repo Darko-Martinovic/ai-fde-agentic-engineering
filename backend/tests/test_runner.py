@@ -76,12 +76,17 @@ def test_one_run_at_a_time(client):
         assert response.json()["detail"] == "The agent is already running"
 
 
-def test_run_needs_a_waiting_claim(client):
-    start(client, "CLM-1001")
+def test_run_needs_a_claim_waiting_or_left_in_progress(client, fake_process):
+    set_status("decided", "CLM-1001")
     response = client.post("/api/agent/claims/CLM-1001", json=ON_A_MODEL)
     assert response.status_code == 409
-    assert response.json()["detail"] == "Claim CLM-1001 is in_progress, not waiting"
+    assert response.json()["detail"] == (
+        "Claim CLM-1001 is decided, not waiting or in_progress"
+    )
     assert client.post("/api/agent/claims/CLM-9999", json=ON_A_MODEL).status_code == 404
+    start(client, "CLM-1002")
+    assert client.post("/api/agent/claims/CLM-1002", json=ON_A_MODEL).status_code == 200
+    assert fake_process[0].arguments == ["CLM-1002", "--model", SPEC]
 
 
 def test_run_queue(client, fake_process):

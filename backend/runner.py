@@ -135,10 +135,12 @@ def list_models() -> list[ModelChoice]:
 def run_claim(
     claim_id: str, run: RunClaimIn, conn: Db, background: BackgroundTasks
 ) -> AgentState:
-    """Start the agent on one waiting claim, on a model."""
+    """Start the agent on one claim, waiting or left in progress, on a model."""
     claim = load_claim(conn, claim_id)
-    if claim.status != "waiting":
-        raise HTTPException(409, f"Claim {claim_id} is {claim.status}, not waiting")
+    if claim.status not in ("waiting", "in_progress"):
+        raise HTTPException(
+            409, f"Claim {claim_id} is {claim.status}, not waiting or in_progress"
+        )
     launch(conn, background, "claim", run.model, [claim_id])
     return state(conn)
 

@@ -350,21 +350,21 @@ Replace the claim agent's `create_agent` and middleware with the graph, saved by
 
 `carry_on` for a claim stopped partway, every run first finishing a stopped run and carrying on claims in progress, and Stop leaving the claim in progress. The tests stop the agent with `KeyboardInterrupt`, which the harness doesn't catch, so the claim is left as a crash leaves it.
 
-- [ ] Stub model test: the stub reads the claim and its policy, then raises `KeyboardInterrupt`; the claim is `in_progress`, attempts 1. A new graph on the same saver with a new stub carries it on: same thread, attempts 1, the new stub's first prompt holds the two earlier tool results, the steps carry on under the same thread with no failure step, and one decision
-- [ ] Stub model test: stopped just after the backend records the decision, the claim carries on and is paid once
-- [ ] Stub model test: stopped just after the backend records the payment, the `pay` step runs again and there is still one payment
-- [ ] Stub model test: a claim in progress with no checkpoint starts from the beginning on its own thread, attempts unchanged
-- [ ] Stub model test: 20 model calls before the stop and an endless `get_claim` after it stop at 30 in all
-- [ ] Stub model test: a claim that fails with an error while carried on goes back in the queue, and the next `work_claim` is attempt 2 on a new thread
-- [ ] Stub model test, a queue run: one claim stopped partway and one signed off while the agent was away are carried on and reported before the queue agent starts, and neither counts toward the cap
-- [ ] Stub model test: when the latest run is still running, a new run finishes it with "The run stopped before it finished."
-- [ ] With nothing waiting, `uv run -m agent` still carries on a claim in progress, then prints "No claims are waiting."
-- [ ] pytest, runner: Stop ends the process and marks the run stopped, and the claim stays `in_progress` with its steps; `run_claim` accepts a claim in progress
-- [ ] `uv run -m bench --estimate` still works, and the bench tests pass
-- [ ] Live: after a reseed, start `uv run -m agent --cap 1`; once the claim shows at least four steps, kill the agent's process. `uv run -m agent --cap 1` again prints that claim's report first: same thread, attempts 1, one decision, steps from both runs under that thread, and the stopped run says "The run stopped before it finished."
-- [ ] Live: after a reseed, with only the backend and dashboard running (no service), `uv run -m agent CLM-1003` waits for sign-off; signing off leaves it In progress and the backend logs a warning; the next `uv run -m agent --cap 1` pays it first, with the sign-off on the payment
-- [ ] Live, dashboard: Run 1, then Stop partway; the claim shows In progress; Run 1 again carries it on to a decision
-- [ ] `npm run check` passes
+- [x] Stub model test: the stub reads the claim and its policy, then raises `KeyboardInterrupt`; the claim is `in_progress`, attempts 1. A new graph on the same saver with a new stub carries it on: same thread, attempts 1, the new stub's first prompt holds the two earlier tool results, the steps carry on under the same thread with no failure step, and one decision
+- [x] Stub model test: stopped just after the backend records the decision, the claim carries on and is paid once
+- [x] Stub model test: stopped just after the backend records the payment, the `pay` step runs again and there is still one payment
+- [x] Stub model test: a claim in progress with no checkpoint starts from the beginning on its own thread, attempts unchanged
+- [x] Stub model test: 20 model calls before the stop and an endless `get_claim` after it stop at 30 in all
+- [x] Stub model test: a claim that fails with an error while carried on goes back in the queue, and the next `work_claim` is attempt 2 on a new thread
+- [x] Stub model test, a queue run: one claim stopped partway and one signed off while the agent was away are carried on and reported before the queue agent starts, and neither counts toward the cap
+- [x] Stub model test: when the latest run is still running, a new run finishes it with "The run stopped before it finished."
+- [x] With nothing waiting, `uv run -m agent` still carries on a claim in progress, then prints "No claims are waiting."
+- [x] pytest, runner: Stop ends the process and marks the run stopped, and the claim stays `in_progress` with its steps; `run_claim` accepts a claim in progress
+- [x] `uv run -m bench --estimate` still works, and the bench tests pass
+- [x] Live: after a reseed, start `uv run -m agent --cap 1`; once the claim shows at least four steps, kill the agent's process. `uv run -m agent --cap 1` again prints that claim's report first: same thread, attempts 1, one decision, steps from both runs under that thread, and the stopped run says "The run stopped before it finished."
+- [x] Live: after a reseed, with only the backend and dashboard running (no service), `uv run -m agent CLM-1003` waits for sign-off; signing off leaves it In progress and the backend logs a warning; the next `uv run -m agent --cap 1` pays it first, with the sign-off on the payment
+- [x] Live, dashboard: Run 1, then Stop partway; the claim shows In progress; Run 1 again carries it on to a decision
+- [x] `npm run check` passes
 
 ## Phase 6: A trial on five claims, and the documents
 
