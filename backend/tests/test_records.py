@@ -87,6 +87,7 @@ def test_operations_are_documented(client):
         "health",
         "list_claims",
         "get_claim",
+        "calculate_payout",
         "get_policy",
         "get_customer",
         "get_policy_wording",

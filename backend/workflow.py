@@ -1,11 +1,10 @@
 """How a claim moves through the queue, and the rule that holds large payments."""
 
-import json
 import sqlite3
 
 from fastapi import APIRouter, HTTPException
 
-from backend.api import Db, found, load_claim, now, require_running
+from backend.api import Db, company, found, load_claim, now, require_running
 from backend.models import (
     FOR_A_HANDLER,
     Claim,
@@ -29,7 +28,7 @@ MAX_FAILURES = 2
 
 def approval_limit(conn: sqlite3.Connection) -> float:
     """Return the payout above which a handler must sign off."""
-    return json.loads(records.stored(conn, "company"))["payout_approval_limit"]
+    return company(conn)["payout_approval_limit"]
 
 
 def check_handler(conn: sqlite3.Connection, handler_id: str) -> None:

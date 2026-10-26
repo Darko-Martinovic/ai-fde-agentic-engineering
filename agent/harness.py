@@ -175,39 +175,46 @@ def failed(context: ClaimContext, reason: str) -> str:
     return f"{report(claim)} ({reason})"
 
 
-def work_claim(
-    claim_id: str,
-    run_id: int,
-    model: Model,
-    llm: BaseChatModel | None = None,
-    config: RunnableConfig | None = None,
+def run_claim_agent(
+    agent: CompiledStateGraph[Any, Any, Any, Any],
+    context: ClaimContext,
+    config: RunnableConfig,
 ) -> str:
-    """Work one claim in a run from a clean start, and report in a line: the
-    decision and payout, or what went wrong. The claim agent runs with `config`,
-    under any agent it's working for, so its calls are traced with that agent's,
-    each with the claim and its thread."""
+    """Run the claim agent on its claim and report in a line: the decision and
+    payout, or what went wrong, failing a claim it left undecided."""
+    claim = {"claim_id": context.claim_id, "thread_id": context.thread_id}
+    metadata = {**config.get("metadata", {}), **claim}
+    try:
+        agent.invoke(
+            {"messages": [{"role": "user", "content": f"Claim {context.claim_id}"}]},
+            context=context,
+            config={**config, "run_name": "claim-agent", "metadata": metadata},
+        )
+    except Exception as error:  # noqa: BLE001 - one bad claim never stops a run
+        return failed(context, f"{type(error).__name__}: {error}")
+    if api.get_claim(context.claim_id)["status"] == "in_progress":
+        return failed(context, STOPPED)
+    return report(api.get_claim(context.claim_id))
+
+
+def work_claim(
+    claim_id: str, run_id: int, model: Model, llm: BaseChatModel | None = None
+) -> str:
+    """Work one claim in a run from a clean start, in a trace of its own in the
+    claim's session, and report in a line."""
     context = ClaimContext(
         run_id=run_id, claim_id=claim_id, thread_id=f"{claim_id}-{uuid4().hex[:8]}"
     )
     agent = claim_agent(llm or chat_model(model), model)
     api.start_claim(claim_id, run_id, context.thread_id)
-    config = config or {}
-    claim = {"claim_id": claim_id, "thread_id": context.thread_id}
-    try:
-        agent.invoke(
-            {"messages": [{"role": "user", "content": f"Claim {claim_id}"}]},
-            context=context,
-            config={
-                **config,
-                "run_name": "claim-agent",
-                "metadata": {**config.get("metadata", {}), **claim},
-            },
-        )
-    except Exception as error:  # noqa: BLE001 - one bad claim never stops a run
-        return failed(context, f"{type(error).__name__}: {error}")
-    if api.get_claim(claim_id)["status"] == "in_progress":
-        return failed(context, STOPPED)
-    return report(api.get_claim(claim_id))
+    return tracing.claim_trace(
+        "work-claim",
+        claim_id,
+        context.thread_id,
+        lambda config: run_claim_agent(agent, context, config),
+        run_id=str(run_id),
+        model=model.spec,
+    )
 
 
 def missed(started: list[str], cap: int) -> list[str]:
@@ -256,8 +263,9 @@ def run_queue(
 ) -> str:
     """Work up to `cap` waiting claims with the queue agent, each by a claim agent
     of its own, one at a time, and return the summary the run finished with. The
-    run is one trace, the claim agents' work inside it. The run is finished
-    whatever happens, with what stopped it if something did."""
+    run is one `run-queue` trace; each claim's work is a trace of its own, in the
+    claim's session. The run is finished whatever happens, with what stopped it
+    if something did."""
     agent = queue_agent(llm or chat_model(model), model, cap)
     run_id = api.start_run("queue", cap, model.spec)["run_id"]
     one_at_a_time = threading.Lock()

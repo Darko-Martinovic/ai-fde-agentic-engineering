@@ -139,6 +139,256 @@
               }
             }
           ]
+        },
+        {
+          "name": "Work out CLM-1001's payout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1001/payout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1001",
+                "payout"
+              ]
+            },
+            "description": "`calculate_payout`: the payout on a claim under UnderCover's payout rules, step by step. It records nothing.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"benefit\": \"trip_delay\",\n  \"lines\": [\n    {\n      \"description\": \"Airport hotel, one night\",\n      \"amount\": 245,\n      \"quantity\": 1,\n      \"kind\": \"hotel\",\n      \"nights\": 1,\n      \"hours\": 0\n    },\n    {\n      \"description\": \"Dinner and breakfast\",\n      \"amount\": 95,\n      \"quantity\": 1,\n      \"kind\": \"expense\",\n      \"nights\": 0,\n      \"hours\": 0\n    },\n    {\n      \"description\": \"Taxis\",\n      \"amount\": 80,\n      \"quantity\": 1,\n      \"kind\": \"expense\",\n      \"nights\": 0,\n      \"hours\": 0\n    }\n  ],\n  \"paid_by_others\": 0\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const result = pm.response.json();",
+                  "pm.test(\"pays $420, no deductible on Trip Delay\", () => pm.expect(result.payout).to.eql(420));",
+                  "pm.test(\"needs no sign-off\", () => pm.expect(result.needs_sign_off).to.eql(false));",
+                  "pm.test(\"a step for each line\", () => pm.expect(result.calculation).to.have.length(3));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Work out CLM-1003's payout, over the limit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1003/payout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1003",
+                "payout"
+              ]
+            },
+            "description": "`calculate_payout`: a payout over the approval limit needs a handler's sign-off.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"benefit\": \"emergency_medical\",\n  \"lines\": [\n    {\n      \"description\": \"Emergency room visit and cast\",\n      \"amount\": 3800,\n      \"quantity\": 1,\n      \"kind\": \"expense\",\n      \"nights\": 0,\n      \"hours\": 0\n    }\n  ],\n  \"paid_by_others\": 0\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const result = pm.response.json();",
+                  "pm.test(\"the deductible comes off\", () => pm.expect(result.payout).to.eql(3750));",
+                  "pm.test(\"needs sign-off\", () => pm.expect(result.needs_sign_off).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Work out CLM-1007's payout, the per-item limit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1007/payout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1007",
+                "payout"
+              ]
+            },
+            "description": "`calculate_payout`: a smartphone on Economy without Electronics Plus is limited to the plan's per-item limit.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"benefit\": \"baggage\",\n  \"lines\": [\n    {\n      \"description\": \"Smartphone\",\n      \"amount\": 1099,\n      \"quantity\": 1,\n      \"kind\": \"electronics\",\n      \"nights\": 0,\n      \"hours\": 0\n    }\n  ],\n  \"paid_by_others\": 0\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const result = pm.response.json();",
+                  "pm.test(\"limited to $150\", () => pm.expect(result.calculation[0].step).to.eql(\"Smartphone, limited to $150.00\"));",
+                  "pm.test(\"pays $50 after the deductible\", () => pm.expect(result.payout).to.eql(50));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Work out a payout under an unknown benefit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1001/payout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1001",
+                "payout"
+              ]
+            },
+            "description": "`calculate_payout`: an unknown benefit gives a 422.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"benefit\": \"pets\",\n  \"lines\": [\n    {\n      \"description\": \"Dog\",\n      \"amount\": 10,\n      \"quantity\": 1,\n      \"kind\": \"item\",\n      \"nights\": 0,\n      \"hours\": 0\n    }\n  ],\n  \"paid_by_others\": 0\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Work out a hotel's payout without its nights",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1001/payout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1001",
+                "payout"
+              ]
+            },
+            "description": "`calculate_payout`: a hotel line needs its nights, or its limit would be nothing; a 422 says so.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"benefit\": \"trip_delay\",\n  \"lines\": [\n    {\n      \"description\": \"Airport hotel\",\n      \"amount\": 245,\n      \"quantity\": 1,\n      \"kind\": \"hotel\",\n      \"nights\": 0,\n      \"hours\": 0\n    }\n  ],\n  \"paid_by_others\": 0\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Work out an unknown claim's payout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-9999/payout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-9999",
+                "payout"
+              ]
+            },
+            "description": "`calculate_payout`: a claim that doesn't exist gives a 404.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"benefit\": \"baggage\",\n  \"lines\": [\n    {\n      \"description\": \"Coat\",\n      \"amount\": 100,\n      \"quantity\": 1,\n      \"kind\": \"item\",\n      \"nights\": 0,\n      \"hours\": 0\n    }\n  ],\n  \"paid_by_others\": 0\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

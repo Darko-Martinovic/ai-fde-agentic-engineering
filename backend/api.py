@@ -5,14 +5,14 @@ import json
 import sqlite3
 from collections.abc import Iterator
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException
 
 from backend import db
-from backend.models import Claim, Run
+from backend.models import Claim, Policy, Run
 from backend.seed import ensure_seeded
-from backend.store import claims, runs
+from backend.store import claims, records, runs
 
 
 def database() -> Iterator[sqlite3.Connection]:
@@ -50,6 +50,28 @@ def load_claim(conn: sqlite3.Connection, claim_id: str) -> Claim:
             "payment": claims.payment(conn, claim_id),
         }
     )
+
+
+def load_policy(conn: sqlite3.Connection, policy_id: str) -> Policy:
+    """Load one policy with its plan's limits, its add-ons and the benefits the
+    deductible applies to."""
+    policy: dict[str, Any] = found(records.policy(conn, policy_id), "Policy", policy_id)
+    plans = json.loads(records.stored(conn, "plans"))
+    plan = next(p for p in plans["plans"] if p["plan"] == policy["plan"])
+    add_ons = [a for a in plans["add_ons"] if a["add_on"] in policy["add_ons"]]
+    return Policy.model_validate(
+        policy
+        | {
+            "plan": plan,
+            "add_ons": add_ons,
+            "deductible_applies_to": plans["deductible_applies_to"],
+        }
+    )
+
+
+def company(conn: sqlite3.Connection) -> dict[str, Any]:
+    """The company's rules, such as the payout approval limit."""
+    return json.loads(records.stored(conn, "company"))
 
 
 def load_run(conn: sqlite3.Connection, run_id: int) -> Run:

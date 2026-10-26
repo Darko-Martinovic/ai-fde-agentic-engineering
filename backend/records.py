@@ -1,11 +1,8 @@
 """Policies, customers and handlers, as recorded."""
 
-import json
-from typing import Any
-
 from fastapi import APIRouter
 
-from backend.api import Db, found
+from backend.api import Db, found, load_policy
 from backend.models import Customer, Handler, Policy
 from backend.store import records
 
@@ -15,18 +12,7 @@ router = APIRouter(prefix="/api")
 @router.get("/policies/{policy_id}", operation_id="get_policy")
 def get_policy(policy_id: str, conn: Db) -> Policy:
     """Get one policy with its plan's limits and its add-ons."""
-    policy: dict[str, Any] = found(records.policy(conn, policy_id), "Policy", policy_id)
-    plans = json.loads(records.stored(conn, "plans"))
-    plan = next(p for p in plans["plans"] if p["plan"] == policy["plan"])
-    add_ons = [a for a in plans["add_ons"] if a["add_on"] in policy["add_ons"]]
-    return Policy.model_validate(
-        policy
-        | {
-            "plan": plan,
-            "add_ons": add_ons,
-            "deductible_applies_to": plans["deductible_applies_to"],
-        }
-    )
+    return load_policy(conn, policy_id)
 
 
 @router.get("/customers/{customer_id}", operation_id="get_customer")

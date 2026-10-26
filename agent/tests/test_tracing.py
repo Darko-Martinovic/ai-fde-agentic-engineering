@@ -51,14 +51,14 @@ def test_a_claim_named_is_a_trace_of_its_own(backend, monkeypatch, traces):
     [root] = roots(spans)
     assert (root.name, root.attributes[INPUT]) == ("work-claim", "CLM-1001")
     assert root.attributes[OUTPUT] == "CLM-1001: approved $420.00, paid"
+    thread_id = backend.get("/api/claims/CLM-1001/steps").json()[0]["thread_id"]
     for span in spans:
         assert span.context.trace_id == root.context.trace_id
-        assert span.attributes[SESSION].startswith("run-1-")
+        assert span.attributes[SESSION] == thread_id
         assert span.attributes["langfuse.trace.name"] == "work-claim"
     [agent] = named(spans, "claim-agent")
     assert agent.attributes[TYPE] == "agent"
     assert parent(spans, agent) == root
-    thread_id = backend.get("/api/claims/CLM-1001/steps").json()[0]["thread_id"]
     metadata = "langfuse.observation.metadata.thread_id"
     assert agent.attributes[metadata] == f'"{thread_id}"'
     generations = [s for s in spans if s.attributes[TYPE] == "generation"]
@@ -67,18 +67,14 @@ def test_a_claim_named_is_a_trace_of_its_own(backend, monkeypatch, traces):
     assert tools == ["get_claim", "decide_claim", "pay_claim"]
 
 
-def test_the_claims_of_one_run_share_its_session(backend, monkeypatch, traces):
+def test_each_claim_has_a_session_of_its_own(backend, monkeypatch, traces):
     approves(monkeypatch)
     cli.work_claims(["CLM-1001", "CLM-1002"], FREE)
-    cli.work_claims(["CLM-1004"], FREE)
     claims = roots(traces())
-    assert [root.attributes[INPUT] for root in claims] == [
-        "CLM-1001",
-        "CLM-1002",
-        "CLM-1004",
-    ]
-    sessions = [root.attributes[SESSION] for root in claims]
-    assert sessions[0] == sessions[1] != sessions[2]
+    assert [root.attributes[INPUT] for root in claims] == ["CLM-1001", "CLM-1002"]
+    for root in claims:
+        claim = backend.get(f"/api/claims/{root.attributes[INPUT]}/steps").json()
+        assert root.attributes[SESSION] == claim[0]["thread_id"]
 
 
 def test_middleware_hooks_are_not_sent(backend, monkeypatch, traces):
@@ -89,29 +85,39 @@ def test_middleware_hooks_are_not_sent(backend, monkeypatch, traces):
     assert {span.name for span in traces() if tracing.sent(span)} == names - HOOKS
 
 
-def test_a_queue_run_is_one_trace_with_its_claim_agents_inside(backend, traces):
+def test_a_queue_runs_claims_are_traces_of_their_own(backend, traces):
     queue_llm = stub(
         tool_call("work_claim", claim_id="CLM-1001"),
-        AIMessage(content="One claim worked."),
+        tool_call("work_claim", claim_id="CLM-1004"),
+        AIMessage(content="Two claims worked."),
     )
     claim_llm = stub(
         decide("approve", 420.0),
         tool_call("pay_claim", amount=420.0),
         AIMessage(content="Approved and paid $420.00."),
+        decide("decline", 0.0),
+        AIMessage(content="Declined."),
     )
-    summary = harness.run_queue(1, FREE, queue_llm, claim_llm)
+    summary = harness.run_queue(2, FREE, queue_llm, claim_llm)
     spans = traces()
-    [root] = roots(spans)
-    assert root.name == "run-queue"
-    assert root.attributes[INPUT] == "Work up to 1 waiting claims in this run."
-    assert root.attributes[OUTPUT] == summary
+    [run] = [root for root in roots(spans) if root.name == "run-queue"]
+    assert run.attributes[INPUT] == "Work up to 2 waiting claims in this run."
+    assert run.attributes[OUTPUT] == summary
+    assert SESSION not in run.attributes
     [queue] = named(spans, "queue-agent")
-    assert parent(spans, queue) == root
-    [handed_on] = named(spans, "work_claim")
-    [claim] = named(spans, "claim-agent")
-    assert claim.attributes[TYPE] == "agent"
-    assert parent(spans, claim) == handed_on
-    assert "CLM-1001: approved $420.00, paid" in handed_on.attributes[OUTPUT]
+    assert parent(spans, queue) == run
+    handed_on = [span.attributes[OUTPUT] for span in named(spans, "work_claim")]
+    assert any("CLM-1001: approved $420.00, paid" in out for out in handed_on)
+    worked = [root for root in roots(spans) if root.name == "work-claim"]
+    assert [root.attributes[INPUT] for root in worked] == ["CLM-1001", "CLM-1004"]
+    for root in worked:
+        assert root.context.trace_id != run.context.trace_id
+        steps = backend.get(f"/api/claims/{root.attributes[INPUT]}/steps").json()
+        assert root.attributes[SESSION] == steps[0]["thread_id"]
+    assert worked[0].attributes[SESSION] != worked[1].attributes[SESSION]
+    assert {parent(spans, claim) for claim in named(spans, "claim-agent")} == set(
+        worked
+    )
 
 
 def test_naming_the_agents_leaves_the_conversation_alone(backend, monkeypatch):

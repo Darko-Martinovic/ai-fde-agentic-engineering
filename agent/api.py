@@ -115,3 +115,7 @@ def decide_claim(claim_id: str, decision: dict[str, Any]) -> dict[str, Any]:
 
 def pay_claim(claim_id: str, amount: float) -> dict[str, Any]:
     return send("POST", f"/api/claims/{claim_id}/payment", {"amount": amount}).json()
+
+
+def calculate_payout(claim_id: str, claim: dict[str, Any]) -> dict[str, Any]:
+    return send("POST", f"/api/claims/{claim_id}/payout", claim).json()

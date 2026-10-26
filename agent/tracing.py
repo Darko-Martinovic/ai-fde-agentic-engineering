@@ -1,13 +1,13 @@
-"""Tracing the agents in Langfuse. A queue run is one trace, with each claim agent
-it hands a claim to inside it, under the tool call that handed the claim on. A
-run of claims named on the command line is a trace for each claim, the run's
-traces sharing a session. Langfuse's address and environment come from the
-settings; it reads its keys from the environment, which the settings fill in
-from .env. Without the keys nothing is sent, and Langfuse warns that it's off."""
+"""Tracing the agents in Langfuse. Each piece of work on a claim is a trace of
+its own, in the session named after the claim's thread, so everything that
+happens on one claim, before and after a pause or a restart, is found together.
+A queue run is one trace too, its tool calls handing claims on. Langfuse's
+address and environment come from the settings; it reads its keys from the
+environment, which the settings fill in from .env. Without the keys nothing is
+sent, and Langfuse warns that it's off."""
 
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
-from uuid import uuid4
+import contextvars
+from collections.abc import Callable
 
 from langchain_core.runnables import RunnableConfig
 from langfuse import Langfuse, propagate_attributes
@@ -39,15 +39,6 @@ def client() -> Langfuse:
     )
 
 
-@contextmanager
-def session(run_id: int) -> Iterator[None]:
-    """Put the traces made inside in one session, the run's. Run ids start again
-    when the records are reseeded, so the session's name adds a few letters of
-    its own."""
-    with propagate_attributes(session_id=f"run-{run_id}-{uuid4().hex[:8]}"):
-        yield
-
-
 def traced(
     name: str,
     request: str,
@@ -64,3 +55,23 @@ def traced(
         report = work({"callbacks": [CallbackHandler()]})
         span.update(output=report)
     return report
+
+
+def claim_trace(
+    name: str,
+    claim_id: str,
+    thread_id: str,
+    work: Callable[[RunnableConfig], str],
+    **metadata: str,
+) -> str:
+    """Do `work` on one claim in a trace named `name`, in the claim's session,
+    named after its thread. It runs in a fresh context, so the trace is one of
+    its own even when a queue run's trace is current."""
+
+    def in_session() -> str:
+        with propagate_attributes(session_id=thread_id):
+            return traced(
+                name, claim_id, work, claim_id=claim_id, thread_id=thread_id, **metadata
+            )
+
+    return contextvars.Context().run(in_session)
