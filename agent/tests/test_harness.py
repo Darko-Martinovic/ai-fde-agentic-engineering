@@ -218,7 +218,7 @@ def test_chat_model_reaches_the_configured_address(monkeypatch):
     assert ollama.num_ctx == 4096
 
 
-def test_chat_model_times_out_and_leaves_retries_to_the_middleware(monkeypatch):
+def test_chat_model_times_out_and_leaves_retries_to_the_agents(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     monkeypatch.setenv("MODEL_TIMEOUT", "42")

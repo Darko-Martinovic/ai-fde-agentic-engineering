@@ -43,7 +43,7 @@ The backend:
 The agent. The brief makes the service a fourth part beside `api.py`, `tools.py` and `harness.py`, and the graph's nodes take the place of the claim agent's middleware:
 
 - `api.py`: gains `calculate_payout`. One function per backend operation, as today.
-- `tools.py`: gains `calculate_payout`; `pay_claim` leaves the claim agent's tools. `decide_claim` returns a `Command` that adds its tool message and puts the backend's status and decision in the graph's state (LangGraph's way for a tool to update state). Gains `ClaimState`.
+- `tools.py`: gains `calculate_payout`; `pay_claim` leaves the claim agent's tools. `decide_claim` returns a `Command` that adds its tool message and puts the backend's status and decision in the graph's state (LangGraph's way for a tool to update state). `ClaimState` lives in `graph.py`, its only user.
 - `graph.py` (new): the claim graph: its nodes, its edges and `claim_graph(llm, model, saver)`. This is what `middleware.py` did for the claim agent.
 - `recording.py` (new): what the agents record on the backend, a reply's steps and a model call's usage. The graph's nodes and the queue agent's `UsageRecorder` both use it, so it is a module of its own rather than a helper borrowed from either.
 - `middleware.py`: keeps `UsageRecorder` and `refusal` for the queue agent, which stays on `create_agent`. `StepRecorder` goes.
@@ -67,7 +67,7 @@ UNDERCOVER_AGENT=http://${AGENT_HOST}:${AGENT_PORT}
 E2E_AGENT_PORT=8003
 E2E_AGENT_URL=http://${AGENT_HOST}:${E2E_AGENT_PORT}
 DATABASE_SCHEMA=undercover
-DATABASE_CONNECTIONS=4
+DATABASE_CONNECTIONS=3
 ```
 
 `DATABASE_URL` stays in `.env` only. The root `conftest.py` removes it from the environment, and the end-to-end servers get it empty, so the tests never connect.
@@ -106,7 +106,7 @@ The nodes:
 | Node | What it does |
 | --- | --- |
 | `agent` | Calls the model, with the claim instructions as the system message and the tools bound, as `create_agent`'s model node does. Records the reply and its tool calls as steps and the call's usage on the run, and adds one to `model_calls`. Raises `TooManyModelCalls` before a 31st call. Provider errors are retried twice by the model's own `with_retry`, in place of `ModelRetryMiddleware`, so only the model call is tried again, never the recording around it |
-| `tools` | `ToolNode(CLAIM_TOOLS)` with `wrap_tool_call`, which gives the backend's refusals (and a tool called the wrong way) back to the model as text, as `ToolErrorMiddleware` does today, and records each tool result, and each section read, as steps. The refusals are handled in the wrapper, not with `handle_tool_errors`: with a wrapper, ToolNode 1.2 gives every error back to the model, so a broken backend would no longer fail the claim |
+| `tools` | `ToolNode(CLAIM_TOOLS)`: `handle_tool_errors` gives the backend's refusals (and a tool called the wrong way) back to the model as text, as `ToolErrorMiddleware` does today, and re-raises anything else, so a broken backend still fails the claim; `wrap_tool_call` records each tool result, and each section read, as steps |
 | `wait_for_sign_off` | Pauses with `interrupt()`; nothing comes before it, since a resumed node runs again from the top. The resume value is the handler's review: a sign-off moves on to `pay`; a rejection adds the handler's note to the messages, clears `decision` and `status`, and the graph goes back to `agent` |
 | `pay` | Pays the decision's payout with `pay_claim` and sets `status` from the reply |
 
@@ -141,7 +141,7 @@ Where the brief differs, we follow the brief:
 
 ### Carrying on
 
-`carry_on(claim_id, graph, run_id)` picks up an in-progress claim on the thread of its latest attempt, without a new attempt:
+`carry_on(claim_id, run_id, model, saver, llm=None)` picks up an in-progress claim on the thread of its latest attempt, without a new attempt:
 
 - Thread waiting at `wait_for_sign_off`: a handler has reviewed the claim, so it resumes with `Command(resume=review)`, the review read from the backend's latest decision (signed off, or rejected with its note). The backend holds the truth; the graph only carries it.
 - Thread with nothing saved, because the agent was stopped before its first checkpoint: it starts the graph from the beginning on the same thread.
@@ -240,7 +240,7 @@ Its lifespan opens the saver; a dependency builds the claim graph on `MODEL_NAME
 
 ### End-to-end tests
 
-- Playwright starts a stand-in for the agent's service, `e2e/agent_stand_in.ts` (Node's own TypeScript), on `E2E_AGENT_PORT` (8003). It answers `health` and `resume_claim` with 202, and lists the claims it was asked to resume at `GET /api/resumed`. The e2e backend gets `UNDERCOVER_AGENT` set to it and `DATABASE_URL` empty, so the tests never reach the real service or Supabase.
+- Playwright starts a stand-in for the agent's service, `e2e/agent-stand-in.ts` (Node's own TypeScript), on `E2E_AGENT_PORT` (8003). It answers `health` and `resume_claim` with 202, and lists the claims it was asked to resume at `GET /api/resumed`. The e2e backend gets `UNDERCOVER_AGENT` set to it and `DATABASE_URL` empty, so the tests never reach the real service or Supabase.
 - The sign-off test signs off a held claim on the dashboard, sees In progress and "Signed off by", checks the stand-in was asked to resume it, then plays the agent by paying through the API and sees Decided and "Paid ... signed off by" without a reload.
 - The rejection test rejects a held claim with a note, sees In progress and "Rejected by ... : <note>", and checks the stand-in was asked to resume it.
 
@@ -250,6 +250,7 @@ Its lifespan opens the saver; a dependency builds the claim graph on `MODEL_NAME
 - One owner for each setting: `DATABASE_URL` and the schema are read by `backend/db.py` and `agent/checkpoints.py`, the backend's and the agent's own connection, since neither imports the other; the schema name and pool size are written once, in `.env.defaults`.
 - All SQL stays in `backend/store/`, now as Core expressions; `db.py` holds the schema.
 - Modules keep to their jobs: rules in `payout.py`, the graph in `graph.py`, saving progress in `checkpoints.py`, recording in `recording.py`, the service only receives the backend's call and hands it to the harness. `harness.py` stays under 300 lines.
+- SQL: all of it is in `backend/store/` and `backend/db.py`, except `agent/checkpoints.py`, which makes the schema for LangGraph's checkpointer tables and turns row level security on for them; standard 17 now says so, and `tests/test_standards.py` allows that one module.
 - The framework's own way: `StateGraph`, `ToolNode` with `wrap_tool_call`, the model's `with_retry`, `Command` from a tool, `interrupt()` and `Command(resume=...)`, `PostgresSaver` on a `ConnectionPool`, `durability="sync"`, FastAPI's `BackgroundTasks`, lifespan and dependency `scope`, SQLAlchemy Core, Langfuse's `CallbackHandler` and `propagate_attributes`.
 - Instructions stay goals. What must always happen in order, paying after the decision and after a sign-off, is done by the graph.
 - No defensive code beyond the brief: the harness keeps its one catch around a claim, and the backend catches only a failure to reach the agent's service, because the sign-off must stand.
@@ -370,22 +371,24 @@ Replace the claim agent's `create_agent` and middleware with the graph, saved by
 
 Run the trial the brief describes, then bring the documents up to date.
 
-- [ ] Live: after a reseed, with `npm run dev` running, Run 5 on the default model works five claims and the run finishes with its summary; at least one waits for sign-off
-- [ ] Live, in the browser with the Playwright MCP server: signing off a held claim as Dana Whitfield shows it Decided and paid, with the handler and the time, within five seconds
-- [ ] Live: Supabase MCP, checked several times during the run and the sign-off, never shows more than 12 `postgres` connections in `pg_stat_activity`
-- [ ] Live: through Langfuse's API, the held claim's session has traces from before and after the sign-off
-- [ ] Live: afterwards the queue shows 20 waiting and none in progress
-- [ ] `docs/SPEC.md`: its section on working the queue describes the pause for a sign-off, the agent picking the claim up after it, carrying on after a restart without a new attempt, and nothing decided or paid twice; its Rules are unchanged
-- [ ] `docs/TECH_STACK.md`: SQLAlchemy Core on Supabase with SQLite in the tests, the claim graph with the Postgres checkpointer and `durability="sync"`, the agent's service at `UNDERCOVER_AGENT`, the tracing sessions
-- [ ] `docs/PROCESS.md`: `npm run dev` starts the backend, the agent's service and the dashboard; `uv run -m backend.seed` reseeds Supabase when `.env` has `DATABASE_URL`; the tests need no network
-- [ ] `docs/CODE_STANDARDS.md` 13: the agent's four parts and its supports; the backend reaches the service only through `backend/agent_service.py`
-- [ ] `docs/STATUS.md` and `CLAUDE.md` describe what's built, how to seed, run and sign off, and the live trial
-- [ ] `npm run check` passes with `.env` in place and with it moved out of the way
+- [x] Live: after a reseed, with `npm run dev` running, Run 5 on the default model works five claims and the run finishes with its summary; at least one waits for sign-off
+- [x] Live, in the browser with the Playwright MCP server: signing off a held claim as Dana Whitfield shows it Decided and paid, with the handler and the time, within five seconds
+- [x] Live: Supabase MCP, checked several times during the run and the sign-off, never shows more than 12 `postgres` connections (it showed 10 throughout) in `pg_stat_activity`
+- [x] Live: through Langfuse's API, the held claim's session has traces from before and after the sign-off
+- [x] Live: afterwards the queue shows 20 waiting and none in progress
+- [x] `docs/SPEC.md`: its section on working the queue describes the pause for a sign-off, the agent picking the claim up after it, carrying on after a restart without a new attempt, and nothing decided or paid twice; its Rules are unchanged
+- [x] `docs/TECH_STACK.md`: SQLAlchemy Core on Supabase with SQLite in the tests, the claim graph with the Postgres checkpointer and `durability="sync"`, the agent's service at `UNDERCOVER_AGENT`, the tracing sessions
+- [x] `docs/PROCESS.md`: `npm run dev` starts the backend, the agent's service and the dashboard; `uv run -m backend.seed` reseeds Supabase when `.env` has `DATABASE_URL`; the tests need no network
+- [x] `docs/CODE_STANDARDS.md` 13: the agent's four parts and its supports; the backend reaches the service only through `backend/agent_service.py`
+- [x] `docs/STATUS.md` and `CLAUDE.md` describe what's built, how to seed, run and sign off, and the live trial
+- [x] `npm run check` passes with `.env` in place and with it moved out of the way
 
 ## Not in this plan
 
 - Saving the queue agent's own progress. A stopped run is finished by the next one and its claims are carried on, but its conversation and to-do list aren't resumed.
 - Clearing old checkpoints.
+- A rejection that comes while the agent is stopped between the backend recording its decision and the graph saving that step: the agent carries on, records the same decision again, which then answers the rejection without the note reaching it. A handler sees the same payout come back and can reject it again.
+- Insights counting a claim after a rejection: a decline after a rejection counts as straight through, and an approval within the limit after a rejection isn't counted among the sign-offs.
 - Telling a run which claims another process is working.
 - Running the agent's service in the cloud.
 - Scoring the agent against `data/evals/`.

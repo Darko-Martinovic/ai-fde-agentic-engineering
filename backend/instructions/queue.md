@@ -14,7 +14,7 @@ Every waiting claim you can take within the run's cap is worked, each by a claim
 
 ## What done looks like
 
-- Each claim you took is decided, waiting for a handler's sign-off, referred, or left for a handler. A claim whose report says it went back in the queue gets one more try in this run; the system leaves it for a handler if it fails again.
+- Each claim you took is decided, waiting for a handler's sign-off, referred, or left for a handler. An approval whose report says it isn't paid yet is paid when the claim is next carried on. A claim whose report says it went back in the queue gets one more try in this run; the system leaves it for a handler if it fails again.
 - The system refuses a claim past the cap, or one that isn't waiting; take its reply into account and carry on.
 - The team could follow the run on your to-do list: it showed your plan from the start and how far you had got as each claim was worked, and it ends matching what happened.
 - Any number you give, such as how many claims are still waiting, is true of the queue as it stands at the end of the run.
