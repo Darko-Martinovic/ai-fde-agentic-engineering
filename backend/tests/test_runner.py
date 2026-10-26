@@ -1,7 +1,8 @@
 import pytest
 
-from backend import db, runner
+from backend import runner
 from backend.tests.claim_starts import start
+from backend.tests.direct_changes import set_status
 
 MODEL = "Claude Haiku 5.5"
 SPEC = "anthropic:claude-haiku-5-5"
@@ -96,10 +97,7 @@ def test_run_queue(client, fake_process):
 
 def test_run_queue_with_nothing_waiting(client):
     client.get("/api/claims")
-    conn = db.connect()
-    with conn:
-        conn.execute("UPDATE claims SET status = 'decided'")
-    conn.close()
+    set_status("decided")
     response = client.post("/api/agent/queue", json=QUEUE)
     assert response.status_code == 409
     assert response.json()["detail"] == "No claims are waiting"
@@ -201,3 +199,18 @@ def test_a_process_that_died_leaves_nothing_in_progress(client, fake_process):
     assert client.get("/api/agent").json()["running"] is False
     assert client.get("/api/claims/CLM-1001").json()["status"] == "waiting"
     assert client.get("/api/runs/latest").json()["status"] == "stopped"
+
+
+def test_the_agent_starts_once_the_queue_is_put_back(client, monkeypatch):
+    """The agent's process finds what the request committed: the claim an earlier
+    run left in progress back in the queue."""
+    start(client, "CLM-1001")
+    seen = []
+
+    def start_and_look(arguments):
+        seen.append(client.get("/api/claims/CLM-1001").json()["status"])
+        return FakeProcess(arguments)
+
+    monkeypatch.setattr(runner, "start_process", start_and_look)
+    client.post("/api/agent/queue", json=QUEUE)
+    assert seen == ["waiting"]

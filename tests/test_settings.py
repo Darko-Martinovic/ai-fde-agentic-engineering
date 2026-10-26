@@ -18,3 +18,12 @@ def test_an_override_can_name_a_default(monkeypatch):
     """As a line in .env naming a key only .env.defaults sets."""
     monkeypatch.setenv("UNDERCOVER_API", "http://${BACKEND_HOST}:9002")
     assert settings.setting("UNDERCOVER_API") == "http://127.0.0.1:9002"
+
+
+def test_an_optional_setting_left_out_or_empty_is_none(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    assert settings.optional_setting("DATABASE_URL") is None
+    monkeypatch.setenv("DATABASE_URL", "")
+    assert settings.optional_setting("DATABASE_URL") is None
+    monkeypatch.setenv("DATABASE_URL", "postgresql://${BACKEND_HOST}/x")
+    assert settings.optional_setting("DATABASE_URL") == "postgresql://127.0.0.1/x"

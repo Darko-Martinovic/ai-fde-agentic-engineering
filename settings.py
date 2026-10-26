@@ -20,3 +20,9 @@ def setting(name: str) -> str:
     """Return one setting, which must be in the environment or an env file, with
     any ${NAME} in it filled in when it's read, as settings.config.ts does."""
     return REFERENCE.sub(lambda found: setting(found[1]), os.environ[name])
+
+
+def optional_setting(name: str) -> str | None:
+    """Return a setting that may be left out, such as DATABASE_URL, or None when
+    it's missing or empty."""
+    return setting(name) if os.environ.get(name) else None

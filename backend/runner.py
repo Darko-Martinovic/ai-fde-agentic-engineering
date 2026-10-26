@@ -1,12 +1,12 @@
 """Starting and stopping the UnderCover Agent, one run at a time."""
 
 import multiprocessing
-import sqlite3
 from multiprocessing.process import BaseProcess
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import Connection
 
 from agent.__main__ import main as work
 from agent.config import current_model, model, models
@@ -44,7 +44,8 @@ class RunQueueIn(RunClaimIn):
 
 
 class Run:
-    """The agent's process, run apart from the backend so Stop ends it at once."""
+    """The agent's process, run apart from the backend so Stop ends it at once.
+    A run with a mode and no process yet is starting."""
 
     process: BaseProcess | None = None
     mode: Literal["claim", "queue"] | None = None
@@ -65,10 +66,10 @@ def start_process(arguments: list[str]) -> BaseProcess:
 
 
 def running() -> bool:
-    return RUN.process is not None and RUN.process.is_alive()
+    return RUN.mode is not None and (RUN.process is None or RUN.process.is_alive())
 
 
-def state(conn: sqlite3.Connection) -> AgentState:
+def state(conn: Connection) -> AgentState:
     if RUN.process is not None and not RUN.process.is_alive():
         # The process ended on its own, or was killed outside Stop: put back
         # any claim it left in progress and stop its run if it never finished
@@ -83,7 +84,7 @@ def state(conn: sqlite3.Connection) -> AgentState:
     )
 
 
-def clear(conn: sqlite3.Connection) -> None:
+def clear(conn: Connection) -> None:
     """Forget the agent's process and put back what it left behind."""
     RUN.process = None
     RUN.mode = None
@@ -91,28 +92,33 @@ def clear(conn: sqlite3.Connection) -> None:
     return_to_queue(conn)
 
 
-def return_to_queue(conn: sqlite3.Connection) -> None:
+def return_to_queue(conn: Connection) -> None:
     """Put claims left in progress back to waiting, clearing unpaid decisions,
     and mark any run still running as stopped."""
-    with conn:
-        claims.return_to_queue(conn)
-        runs.stop_running(conn, now())
+    claims.return_to_queue(conn)
+    runs.stop_running(conn, now())
+
+
+def begin(arguments: list[str]) -> None:
+    RUN.process = start_process(arguments)
 
 
 def launch(
-    conn: sqlite3.Connection,
+    conn: Connection,
+    background: BackgroundTasks,
     mode: Literal["claim", "queue"],
     spec: str,
     arguments: list[str],
 ) -> None:
     """Start a run on a model, first returning any claim an earlier run left in
-    progress."""
+    progress. The agent's process starts once the request's work is committed,
+    so it finds the queue as this request left it."""
     if running():
         raise HTTPException(409, "The agent is already running")
     return_to_queue(conn)
-    RUN.process = start_process([*arguments, "--model", spec])
     RUN.mode = mode
     RUN.model = model(spec).label
+    background.add_task(begin, [*arguments, "--model", spec])
 
 
 @router.get("", operation_id="get_agent")
@@ -132,21 +138,23 @@ def list_models() -> list[ModelChoice]:
 
 
 @router.post("/claims/{claim_id}", operation_id="run_claim")
-def run_claim(claim_id: str, run: RunClaimIn, conn: Db) -> AgentState:
+def run_claim(
+    claim_id: str, run: RunClaimIn, conn: Db, background: BackgroundTasks
+) -> AgentState:
     """Start the agent on one waiting claim, on a model."""
     claim = load_claim(conn, claim_id)
     if claim.status != "waiting":
         raise HTTPException(409, f"Claim {claim_id} is {claim.status}, not waiting")
-    launch(conn, "claim", run.model, [claim_id])
+    launch(conn, background, "claim", run.model, [claim_id])
     return state(conn)
 
 
 @router.post("/queue", operation_id="run_queue")
-def run_queue(run: RunQueueIn, conn: Db) -> AgentState:
+def run_queue(run: RunQueueIn, conn: Db, background: BackgroundTasks) -> AgentState:
     """Start the queue agent on up to `cap` waiting claims, on a model."""
     if claims.count_in(conn, "waiting") == 0:
         raise HTTPException(409, "No claims are waiting")
-    launch(conn, "queue", run.model, ["--cap", str(run.cap)])
+    launch(conn, background, "queue", run.model, ["--cap", str(run.cap)])
     return state(conn)
 
 

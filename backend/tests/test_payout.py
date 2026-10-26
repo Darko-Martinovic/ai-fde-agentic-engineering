@@ -2,6 +2,7 @@ import pytest
 
 from backend.models import Policy
 from backend.payout import Line, PayoutIn, work_out_payout
+from backend.tests.direct_changes import set_approval_limit
 
 MEAL_ALLOWANCE = 35.0
 APPROVAL_LIMIT = 1000.0
@@ -146,8 +147,8 @@ def test_nothing_below_zero(client):
     assert result.payout == 0.0
 
 
-def test_sign_off_follows_the_stored_limit(client, approval_limit):
-    approval_limit(500.0)
+def test_sign_off_follows_the_stored_limit(client):
+    set_approval_limit(500.0)
     lines = [line("Suitcase", 280.0), line("Wool suit", 420.0), line("Shirts", 120.0)]
     result = payout_on(client, "CLM-1002", "baggage", lines, 100.0).json()
     assert result["payout"] == 550.0

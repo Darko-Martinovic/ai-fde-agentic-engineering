@@ -85,3 +85,11 @@ def test_claims_started_count_once(client):
     start(client, "CLM-1002", run_id)
     run = client.get("/api/runs/latest").json()
     assert run["claims_started"] == ["CLM-1001", "CLM-1002"]
+
+
+def test_the_latest_run_is_the_last_started(client):
+    run = {"mode": "queue", "cap": 1, "model": "test"}
+    first = client.post("/api/runs", json=run).json()["run_id"]
+    second = client.post("/api/runs", json=run).json()["run_id"]
+    assert second > first
+    assert client.get("/api/runs/latest").json()["run_id"] == second

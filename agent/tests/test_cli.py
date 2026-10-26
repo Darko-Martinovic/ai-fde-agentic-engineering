@@ -4,7 +4,7 @@ from langchain_core.messages import AIMessage
 import agent.__main__ as cli
 from agent import harness
 from agent.tests.stub import StubModel
-from backend import db
+from backend.tests.direct_changes import set_status
 
 
 def reply_only(monkeypatch):
@@ -73,10 +73,7 @@ def test_the_queue_without_a_cap_takes_every_waiting_claim(backend, monkeypatch)
 def test_nothing_waiting(backend, monkeypatch, capsys):
     started = queue_runs(monkeypatch)
     backend.get("/api/claims")
-    conn = db.connect()
-    with conn:
-        conn.execute("UPDATE claims SET status = 'decided'")
-    conn.close()
+    set_status("decided")
     cli.main([])
     assert started == []
     assert capsys.readouterr().out == "No claims are waiting.\n"
@@ -94,10 +91,7 @@ def test_a_claim_that_is_not_waiting_is_reported_and_the_run_finished(
     backend, monkeypatch, capsys
 ):
     reply_only(monkeypatch)
-    conn = db.connect()
-    with conn:
-        conn.execute("UPDATE claims SET status = 'decided' WHERE claim_id = 'CLM-1001'")
-    conn.close()
+    set_status("decided", "CLM-1001")
     cli.main(["CLM-1001"])
     assert capsys.readouterr().out.startswith("CLM-1001: ")
     assert backend.get("/api/runs/latest").json()["status"] == "finished"
