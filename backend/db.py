@@ -98,6 +98,12 @@ decisions = Table(
     text_column("reasons"),
     text_column("policy_section", nullable=True),
     text_column("decided_at"),
+    # A handler's review of a held payout: signed_off or rejected, by whom, when,
+    # and a rejection's note
+    text_column("review", nullable=True),
+    text_column("reviewed_by", nullable=True),
+    text_column("reviewed_at", nullable=True),
+    text_column("review_note", nullable=True),
     sqlite_autoincrement=True,
 )
 runs = Table(
@@ -145,6 +151,7 @@ payments = Table(
     Column("amount", Float, nullable=False),
     text_column("authorized_by"),
     text_column("paid_at"),
+    text_column("signed_off_at", nullable=True),
 )
 
 

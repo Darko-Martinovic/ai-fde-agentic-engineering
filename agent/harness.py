@@ -10,6 +10,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.types import Command
 
 from agent import api, graph, tracing
 from agent.config import Model
@@ -103,12 +104,20 @@ def report(claim: dict[str, Any]) -> str:
     return f"{claim_id}: approved ${decision['payout']:,.2f}, {BY_STATE[status]}"
 
 
+def undecided(claim: dict[str, Any]) -> bool:
+    """Whether a claim in progress waits for the agent's decision: it has none,
+    or a handler rejected the payout it had."""
+    latest = claim["decisions"][-1] if claim["decisions"] else None
+    in_progress = claim["status"] == "in_progress"
+    return in_progress and (latest is None or latest["review"] == "rejected")
+
+
 def failed(context: ClaimContext, reason: str) -> str:
     """Record that work on a claim failed before it was decided, and report where
     the claim now stands. A failure after the decision changes nothing: the next
     run carries the claim on."""
     claim = api.get_claim(context.claim_id)
-    if claim["status"] != "in_progress" or claim["decisions"]:
+    if not undecided(claim):
         return f"{report(claim)} (then {reason})"
     claim = api.fail_claim(context.claim_id, context.thread_id, reason)
     return f"{report(claim)} ({reason})"
@@ -117,7 +126,7 @@ def failed(context: ClaimContext, reason: str) -> str:
 def run_graph(
     claim_graph: graph.ClaimGraph,
     context: ClaimContext,
-    start: dict[str, Any] | None,
+    start: dict[str, Any] | Command[Any] | None,
     config: RunnableConfig,
 ) -> str:
     """Run the claim graph on the claim's thread, saving each step before the
@@ -139,7 +148,7 @@ def run_graph(
     except Exception as error:  # noqa: BLE001 - one bad claim never stops a run
         return failed(context, f"{type(error).__name__}: {error}")
     worked = api.get_claim(context.claim_id)
-    if worked["status"] == "in_progress" and not worked["decisions"]:
+    if undecided(worked):
         return failed(context, STOPPED)
     return report(worked)
 
@@ -158,9 +167,68 @@ def work_claim(
     )
     claim_graph_on_model = claim_graph(model, saver, llm)
     api.start_claim(claim_id, run_id, context.thread_id)
-    start = {"messages": [HumanMessage(f"Claim {claim_id}")], "model_calls": 0}
     return tracing.claim_trace(
         "work-claim",
+        claim_id,
+        context.thread_id,
+        lambda config: run_graph(
+            claim_graph_on_model, context, first_message(claim_id), config
+        ),
+        run_id=str(run_id),
+        model=model.spec,
+    )
+
+
+def first_message(claim_id: str) -> dict[str, Any]:
+    """Where a claim's thread starts: the message naming the claim."""
+    return {"messages": [HumanMessage(f"Claim {claim_id}")], "model_calls": 0}
+
+
+def where_from(
+    claim_graph: graph.ClaimGraph, claim: dict[str, Any], context: ClaimContext
+) -> dict[str, Any] | Command[Any] | None:
+    """Where a claim's thread carries on from: past a handler's review, with the
+    review the backend holds; from the start if nothing was saved, as when the
+    agent was stopped before its first step, and the claim has no decision; or
+    from its last saved step."""
+    saved = claim_graph.get_state({"configurable": {"thread_id": context.thread_id}})
+    if "wait_for_sign_off" in saved.next:
+        reviewed = claim["decisions"][-1]
+        if reviewed["review"] is None:
+            raise RuntimeError(f"{context.claim_id} waits for a handler's review")
+        return Command(
+            resume={
+                "approved": reviewed["review"] == "signed_off",
+                "note": reviewed["review_note"] or "",
+            }
+        )
+    if saved.created_at is None and claim["decisions"]:
+        # A decision the claim graph never saved, as one made through the API:
+        # there's nothing to carry on, and starting afresh would decide it again
+        raise RuntimeError(f"{context.claim_id} has no saved progress to carry on")
+    if saved.created_at is None:
+        return first_message(context.claim_id)
+    return None
+
+
+def carry_on(
+    claim_id: str,
+    run_id: int,
+    model: Model,
+    saver: BaseCheckpointSaver[Any],
+    llm: BaseChatModel | None = None,
+) -> str:
+    """Carry a claim in progress on from its saved progress, on its latest
+    attempt's thread, without a new attempt, in a trace of its own in the
+    claim's session, and report in a line. Its model calls count on `run_id`."""
+    claim = api.get_claim(claim_id)
+    context = ClaimContext(
+        run_id=run_id, claim_id=claim_id, thread_id=claim["thread_id"]
+    )
+    claim_graph_on_model = claim_graph(model, saver, llm)
+    start = where_from(claim_graph_on_model, claim, context)
+    return tracing.claim_trace(
+        "carry-on",
         claim_id,
         context.thread_id,
         lambda config: run_graph(claim_graph_on_model, context, start, config),

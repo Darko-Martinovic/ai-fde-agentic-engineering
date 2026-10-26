@@ -194,6 +194,10 @@ export function decision(overrides: Partial<Decision> = {}): Decision {
     reasons: "The suitcase was lost by the carrier.",
     policy_section: "Section 5, Baggage and Personal Effects",
     decided_at: "2026-10-19T15:00:00Z",
+    review: null,
+    reviewed_by: null,
+    reviewed_at: null,
+    review_note: null,
     ...overrides,
   };
 }

@@ -10,7 +10,8 @@ from fastapi import Depends, HTTPException
 from sqlalchemy import Connection
 
 from backend import db
-from backend.models import Claim, Policy, Run
+from backend.models import Claim, Policy
+from backend.run_models import Run
 from backend.seed import ready
 from backend.store import claims, records, runs
 

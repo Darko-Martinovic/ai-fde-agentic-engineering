@@ -1,5 +1,9 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
+import { setting } from "../settings.config";
 import { startClaim } from "./claim-starts";
+
+// The stand-in for the agent's service, which playwright.config.ts starts
+const AGENT = setting("E2E_AGENT_URL");
 
 // The agent's decisions are set up through the API, so no model is called.
 async function agentDecides(
@@ -39,15 +43,59 @@ test("a claim opens from the queue", async ({ page }) => {
   await expect(page.getByText("UnderCover Premium")).toBeVisible();
 });
 
-test("a handler signs off a payout over $1,000", async ({ page, request }) => {
-  await agentDecides(request, "CLM-1002", "approve", 1150);
-  await page.goto("/#/claims/CLM-1002");
+/** The claims the stand-in for the agent's service was asked to pick back up. */
+async function resumed(request: APIRequestContext): Promise<string[]> {
+  return (await (await request.get(`${AGENT}/api/resumed`)).json()) as string[];
+}
+
+test("a sign-off reaches the agent, which pays the claim", async ({
+  page,
+  request,
+}) => {
+  await agentDecides(request, "CLM-1020", "approve", 1350);
+  expect(
+    (
+      await request.post("/api/claims/CLM-1020/payment", {
+        data: { amount: 1350 },
+      })
+    ).status(),
+  ).toBe(409);
+  await page.goto("/#/claims/CLM-1020");
   await expect(page.getByText("Awaiting sign-off").first()).toBeVisible();
   await page.getByLabel("Handler").selectOption("HND-01");
-  await page.getByRole("button", { name: "Sign off $1,150.00" }).click();
-  await expect(page.getByText(/authorized by Dana Whitfield/)).toBeVisible();
-  await page.getByRole("link", { name: "Back to the queue" }).click();
-  await expect(page.getByRole("button", { name: "1 Decided" })).toBeVisible();
+  await page.getByRole("button", { name: "Sign off $1,350.00" }).click();
+  await expect(page.getByText(/Signed off by Dana Whitfield/)).toBeVisible();
+  await expect(page.getByText("In progress").first()).toBeVisible();
+  await expect.poll(() => resumed(request)).toContain("CLM-1020");
+  // The test plays the agent's part and pays, as the graph would
+  const paid = await request.post("/api/claims/CLM-1020/payment", {
+    data: { amount: 1350 },
+  });
+  expect(paid.ok()).toBe(true);
+  await expect(
+    page.getByText(/Paid \$1,350\.00, signed off by Dana Whitfield at/),
+  ).toBeVisible();
+  await expect(page.getByText("Decided").first()).toBeVisible();
+});
+
+test("a rejection goes back to the agent with its note", async ({
+  page,
+  request,
+}) => {
+  await agentDecides(request, "CLM-1002", "approve", 1150);
+  await page.goto("/#/claims/CLM-1002");
+  await page.getByLabel("Handler").selectOption("HND-02");
+  await page
+    .getByLabel("Note for the agent")
+    .fill("The wool suit is limited to $300.00.");
+  await page.getByRole("button", { name: "Reject" }).click();
+  await expect(
+    page.getByText(
+      /Rejected by Marcus Oyelaran at .*: The wool suit is limited to \$300\.00\./,
+    ),
+  ).toBeVisible();
+  await expect(page.getByText("In progress").first()).toBeVisible();
+  await expect.poll(() => resumed(request)).toContain("CLM-1002");
 });
 
 test("a handler decides a referral", async ({ page, request }) => {

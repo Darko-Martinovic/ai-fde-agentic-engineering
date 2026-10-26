@@ -25,6 +25,16 @@ export default defineConfig({
         BACKEND_PORT: setting("E2E_API_PORT"),
         BACKEND_RELOAD: "false",
         UNDERCOVER_API: setting("E2E_API_URL"),
+        UNDERCOVER_AGENT: setting("E2E_AGENT_URL"),
+      },
+    },
+    {
+      command: "node e2e/agent-stand-in.ts",
+      url: `${setting("E2E_AGENT_URL")}/api/health`,
+      reuseExistingServer: false,
+      env: {
+        E2E_AGENT_PORT: setting("E2E_AGENT_PORT"),
+        AGENT_HOST: setting("AGENT_HOST"),
       },
     },
     {

@@ -797,7 +797,7 @@
             "description": "`start_claim`: start a waiting claim in the run.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"run_id\": {{runId}},\n  \"thread_id\": \"CLM-1001-postman\"\n}"
+              "raw": "{\n  \"run_id\": {{runId}},\n  \"thread_id\": \"CLM-1001-{{$randomUUID}}\"\n}"
             }
           },
           "event": [
@@ -1156,7 +1156,7 @@
             "description": "`start_claim`: start a waiting claim in the run.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"run_id\": {{runId}},\n  \"thread_id\": \"CLM-1002-postman\"\n}"
+              "raw": "{\n  \"run_id\": {{runId}},\n  \"thread_id\": \"CLM-1002-{{$randomUUID}}\"\n}"
             }
           },
           "event": [
@@ -1257,6 +1257,46 @@
           ]
         },
         {
+          "name": "Reject CLM-1002 without a note",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1002/review",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1002",
+                "review"
+              ]
+            },
+            "description": "`review_payout`: a rejection needs a note that says what's wrong, which goes back to the agent.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"handler_id\": \"HND-01\",\n  \"approved\": false,\n  \"note\": \"\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Sign off CLM-1002 as Dana Whitfield",
           "request": {
             "method": "POST",
@@ -1267,7 +1307,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/claims/CLM-1002/sign-off",
+              "raw": "{{baseUrl}}/api/claims/CLM-1002/review",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1275,13 +1315,56 @@
                 "api",
                 "claims",
                 "CLM-1002",
-                "sign-off"
+                "review"
               ]
             },
-            "description": "`sign_off_claim`: a handler releases the payment.",
+            "description": "`review_payout`: a handler signs off the held payout. The claim goes back in progress for the agent to pay, and the backend asks the agent's service to pick it up.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"handler_id\": \"HND-01\"\n}"
+              "raw": "{\n  \"handler_id\": \"HND-01\",\n  \"approved\": true,\n  \"note\": \"\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const claim = pm.response.json();",
+                  "pm.test(\"back in progress for the agent\", () => pm.expect([\"in_progress\", \"decided\"]).to.include(claim.status));",
+                  "pm.test(\"signed off by Dana Whitfield\", () => { const d = claim.decisions[claim.decisions.length - 1]; pm.expect(d.review).to.eql(\"signed_off\"); pm.expect(d.reviewed_by).to.eql(\"HND-01\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pay CLM-1002 after the sign-off",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1002/payment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1002",
+                "payment"
+              ]
+            },
+            "description": "`pay_claim`: the agent pays the signed-off payout, and the payment records the sign-off. If the agent's service paid it first, the same payment is a repeat and returns the claim.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1150\n}"
             }
           },
           "event": [
@@ -1293,7 +1376,7 @@
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "const claim = pm.response.json();",
                   "pm.test(\"claim is decided\", () => pm.expect(claim.status).to.eql(\"decided\"));",
-                  "pm.test(\"paid on sign-off\", () => pm.expect(claim.payment.authorized_by).to.eql(\"HND-01\"));"
+                  "pm.test(\"authorized by Dana Whitfield, with the sign-off's time\", () => { pm.expect(claim.payment.authorized_by).to.eql(\"HND-01\"); pm.expect(claim.payment.signed_off_at).to.be.a(\"string\"); });"
                 ]
               }
             }
@@ -1324,7 +1407,7 @@
             "description": "`start_claim`: start a waiting claim in the run.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"run_id\": {{runId}},\n  \"thread_id\": \"CLM-1010-postman\"\n}"
+              "raw": "{\n  \"run_id\": {{runId}},\n  \"thread_id\": \"CLM-1010-{{$randomUUID}}\"\n}"
             }
           },
           "event": [
@@ -1539,7 +1622,7 @@
             "description": "`start_claim`: start a waiting claim in the run.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"run_id\": {{runId}},\n  \"thread_id\": \"CLM-1004-postman\"\n}"
+              "raw": "{\n  \"run_id\": {{runId}},\n  \"thread_id\": \"CLM-1004-{{$randomUUID}}\"\n}"
             }
           },
           "event": [
@@ -1579,7 +1662,7 @@
             "description": "`fail_claim`: work on the claim failed; it goes back in the queue.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"thread_id\": \"CLM-1004-postman\",\n  \"reason\": \"The model provider timed out\"\n}"
+              "raw": "{\n  \"thread_id\": \"CLM-1004-{{$randomUUID}}\",\n  \"reason\": \"The model provider timed out\"\n}"
             }
           },
           "event": [
@@ -1928,7 +2011,7 @@
                 "stop"
               ]
             },
-            "description": "`stop_agent`: ends the run and puts the claim being worked back to waiting, keeping its steps.",
+            "description": "`stop_agent`: ends the run, marking it stopped. A claim the agent was working stays in progress with its saved progress, for the next run to carry on.",
             "body": {
               "mode": "raw",
               "raw": "{}"
@@ -1949,7 +2032,7 @@
           ]
         },
         {
-          "name": "CLM-1003 is waiting again",
+          "name": "CLM-1003 after Stop",
           "request": {
             "method": "GET",
             "header": [],
@@ -1964,7 +2047,7 @@
                 "CLM-1003"
               ]
             },
-            "description": "`get_claim`: after Stop, the claim is back in the queue."
+            "description": "`get_claim`: after Stop, the claim is still waiting if the agent hadn't started it, or in progress for the next run to carry on."
           },
           "event": [
             {
@@ -1974,8 +2057,7 @@
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "const claim = pm.response.json();",
-                  "pm.test(\"claim is waiting\", () => pm.expect(claim.status).to.eql(\"waiting\"));",
-                  "pm.test(\"no decision\", () => pm.expect(claim.decisions).to.be.empty);"
+                  "pm.test(\"waiting or in progress, never lost\", () => pm.expect([\"waiting\", \"in_progress\"]).to.include(claim.status));"
                 ]
               }
             }

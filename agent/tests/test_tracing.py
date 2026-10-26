@@ -138,3 +138,18 @@ def test_nothing_is_sent_with_tracing_off(backend, monkeypatch, traces):
     cli.work_claims(["CLM-1001"], FREE)
     assert traces() == ()
     assert backend.get("/api/claims/CLM-1001").json()["status"] == "decided"
+
+
+def test_a_claim_carried_on_is_traced_in_the_same_session(
+    backend, run, memory_saver, traces
+):
+    harness.work_claim(
+        "CLM-1003", run, FREE, memory_saver, stub(decide("approve", 3750.0))
+    )
+    body = {"handler_id": "HND-01", "approved": True, "note": ""}
+    backend.post("/api/claims/CLM-1003/review", json=body)
+    harness.carry_on("CLM-1003", run, FREE, memory_saver, stub())
+    first, then = sorted(roots(traces()), key=lambda root: root.start_time or 0)
+    assert (first.name, then.name) == ("work-claim", "carry-on")
+    thread_id = backend.get("/api/claims/CLM-1003").json()["thread_id"]
+    assert first.attributes[SESSION] == then.attributes[SESSION] == thread_id

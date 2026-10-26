@@ -6,7 +6,7 @@ import json
 from fastapi import APIRouter
 
 from backend.api import Db, load_run, now, require_running
-from backend.models import FinishIn, Run, RunIn, TodosIn, UsageIn
+from backend.run_models import FinishIn, Run, RunIn, TodosIn, UsageIn
 from backend.store import runs
 
 router = APIRouter(prefix="/api/runs")

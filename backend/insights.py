@@ -12,9 +12,9 @@ from pydantic import BaseModel
 from sqlalchemy import Connection, RowMapping
 
 from backend.api import Db
+from backend.claim_rules import approval_limit
 from backend.models import FOR_A_HANDLER, ClaimStatus, DecisionKind
 from backend.store import claims, steps
-from backend.workflow import approval_limit
 
 router = APIRouter(prefix="/api/insights")
 

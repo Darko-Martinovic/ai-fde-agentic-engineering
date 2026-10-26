@@ -16,6 +16,7 @@ from langchain_core.messages import (
     AIMessage,
     AnyMessage,
     BaseMessage,
+    HumanMessage,
     SystemMessage,
     ToolMessage,
 )
@@ -110,11 +111,27 @@ def record_result(
     return result
 
 
-def wait_for_sign_off(state: ClaimState) -> dict[str, Any]:
-    """Wait for a handler's sign-off on the approval. Nothing comes before the
+def wait_for_sign_off(state: ClaimState) -> Command[Any]:
+    """Wait for a handler's review of the held payout, which the graph is resumed
+    with: a sign-off goes on to the payment, and a rejection takes the handler's
+    note back to the agent, which decides again. Nothing comes before the
     interrupt, as a resumed node runs again from the top."""
-    interrupt({"decision": state.get("decision"), "status": state.get("status")})
-    return {}
+    review = interrupt(
+        {"decision": state.get("decision"), "status": state.get("status")}
+    )
+    if review["approved"]:
+        return Command(goto="pay")
+    note = HumanMessage(f"A handler rejected the payout: {review['note']}")
+    # The agent works the claim again with a fresh allowance of model calls
+    return Command(
+        goto="agent",
+        update={
+            "messages": [note],
+            "decision": None,
+            "status": None,
+            "model_calls": 0,
+        },
+    )
 
 
 def pay(state: ClaimState, runtime: Runtime[ClaimContext]) -> dict[str, Any]:
@@ -162,13 +179,14 @@ def claim_graph(
         "tools",
         ToolNode(CLAIM_TOOLS, handle_tool_errors=refusal, wrap_tool_call=record_result),
     )
-    builder.add_node("wait_for_sign_off", wait_for_sign_off)
+    builder.add_node(
+        "wait_for_sign_off", wait_for_sign_off, destinations=("pay", "agent")
+    )
     builder.add_node("pay", pay)
     builder.add_edge(START, "agent")
     builder.add_conditional_edges("agent", after_agent, ["tools", END])
     builder.add_conditional_edges(
         "tools", after_tools, ["agent", "wait_for_sign_off", "pay", END]
     )
-    builder.add_edge("wait_for_sign_off", "pay")
     builder.add_edge("pay", END)
     return builder.compile(checkpointer=saver)

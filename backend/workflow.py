@@ -1,72 +1,31 @@
-"""How a claim moves through the queue, and the rule that holds large payments."""
+"""How the agent moves a claim through the queue: starting it, its steps, its
+decision and its payment, and a failure."""
 
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import Connection
 
-from backend.api import Db, company, found, load_claim, now, require_running
+from backend.api import Db, found, load_claim, now, require_running
+from backend.claim_rules import (
+    add_decision,
+    add_payment,
+    held,
+    require_status,
+    status_after,
+)
 from backend.models import (
-    FOR_A_HANDLER,
     Claim,
     DecisionIn,
     FailureIn,
-    HandlerDecisionIn,
     PaymentIn,
-    SignOffIn,
     StartIn,
     Step,
     StepIn,
 )
-from backend.store import claims, records, runs, steps
+from backend.store import claims, runs, steps
 
 router = APIRouter(prefix="/api/claims/{claim_id}")
 
-STATUS_AFTER = {"decline": "decided", "refer": "referred"}
 # A claim that fails this many times is left for a handler
 MAX_FAILURES = 2
-
-
-def approval_limit(conn: Connection) -> float:
-    """Return the payout above which a handler must sign off."""
-    return company(conn)["payout_approval_limit"]
-
-
-def check_handler(conn: Connection, handler_id: str) -> None:
-    found(records.handler(conn, handler_id), "Handler", handler_id)
-
-
-def require_status(claim: Claim, *statuses: str) -> None:
-    if claim.status not in statuses:
-        wanted = " or ".join(statuses)
-        raise HTTPException(
-            409, f"Claim {claim.claim_id} is {claim.status}, not {wanted}"
-        )
-
-
-def add_decision(
-    conn: Connection,
-    claim_id: str,
-    decided_by: str,
-    decision: DecisionIn | HandlerDecisionIn,
-    policy_section: str | None,
-) -> None:
-    claims.add_decision(
-        conn,
-        claim_id,
-        {
-            "decided_by": decided_by,
-            "decision": decision.decision,
-            "payout": round(decision.payout, 2),
-            "reasons": decision.reasons,
-            "policy_section": policy_section,
-            "decided_at": now(),
-        },
-    )
-
-
-def add_payment(
-    conn: Connection, claim_id: str, amount: float, authorized_by: str
-) -> None:
-    claims.add_payment(conn, claim_id, round(amount, 2), authorized_by, now())
 
 
 @router.post("/start", operation_id="start_claim")
@@ -89,13 +48,15 @@ def start_claim(claim_id: str, start: StartIn, conn: Db) -> Claim:
 def fail_claim(claim_id: str, failure: FailureIn, conn: Db) -> Claim:
     """Record that work on a claim failed before it was decided: the claim goes
     back in the queue, or is left for a handler when it has failed twice. A claim
-    with a decision is never failed: the agent carries it on."""
+    with a decision is never failed: the agent carries it on. One a handler
+    rejected the payout on is left for a handler, with its decisions."""
     claim = load_claim(conn, claim_id)
     require_status(claim, "in_progress")
-    if claim.decisions:
+    latest = claim.decisions[-1] if claim.decisions else None
+    if latest and latest.review != "rejected":
         raise HTTPException(409, f"Claim {claim_id} has a decision")
     failures = steps.count_of(conn, claim_id, "failure") + 1
-    status = "left_for_handler" if failures >= MAX_FAILURES else "waiting"
+    status = "left_for_handler" if failures >= MAX_FAILURES or latest else "waiting"
     step = {"thread_id": failure.thread_id, "kind": "failure", "text": failure.reason}
     steps.add(conn, claim_id, step | {"recorded_at": now()})
     claims.set_status(conn, claim_id, status)
@@ -120,7 +81,8 @@ def list_steps(claim_id: str, conn: Db) -> list[Step]:
 
 def repeated_decision(claim: Claim, decision: DecisionIn) -> Claim:
     """The agent's decision the claim already has, as when the agent carries on
-    after a restart, is done: return the claim. Any other decision is refused."""
+    after a restart, is done: return the claim. Any other decision is refused,
+    unless a handler rejected the payout, when the agent decides again."""
     recorded = claim.decisions[-1]
     if (recorded.decided_by, recorded.decision, recorded.payout) != (
         "agent",
@@ -136,14 +98,10 @@ def decide_claim(claim_id: str, decision: DecisionIn, conn: Db) -> Claim:
     """Approve, decline or refer a claim in progress, with the payout and reasons."""
     seen = found(claims.revision(conn, claim_id), "Claim", claim_id)
     claim = load_claim(conn, claim_id)
-    if claim.decisions:
+    if claim.decisions and claim.decisions[-1].review != "rejected":
         return repeated_decision(claim, decision)
     require_status(claim, "in_progress")
-    if decision.decision == "approve":
-        over_limit = decision.payout > approval_limit(conn)
-        status = "awaiting_sign_off" if over_limit else "in_progress"
-    else:
-        status = STATUS_AFTER[decision.decision]
+    status = status_after(conn, claim, decision)
     if not claims.move(conn, claim_id, seen, status):
         # Another request decided the claim first, as when the agent asks twice
         # at once: this one is a repeat of it, or refused
@@ -154,25 +112,26 @@ def decide_claim(claim_id: str, decision: DecisionIn, conn: Db) -> Claim:
 
 @router.post("/payment", operation_id="pay_claim")
 def pay_claim(claim_id: str, payment: PaymentIn, conn: Db) -> Claim:
-    """Pay an approved claim its payout, if no handler's sign-off is needed. A
-    payment already made, as after a restart, is done."""
+    """Pay an approved claim its payout, once a handler has signed it off if it
+    needs that. A payment already made, as after a restart, is done."""
     seen = found(claims.revision(conn, claim_id), "Claim", claim_id)
     claim = load_claim(conn, claim_id)
     approval = claim.decisions[-1] if claim.decisions else None
-    limit = approval_limit(conn)
     if claim.payment:
         return repeated_payment(claim, payment)
     if approval is None or approval.decision != "approve":
         raise HTTPException(409, f"Claim {claim_id} is not approved")
-    if approval.payout > limit:
-        raise HTTPException(
-            409, f"A payout over ${limit:,.2f} waits for a handler's sign-off"
-        )
+    reason = held(conn, claim, approval)
+    if reason:
+        raise HTTPException(409, reason)
     if round(payment.amount, 2) != approval.payout:
         raise HTTPException(409, f"The approved payout is ${approval.payout:,.2f}")
     if not claims.move(conn, claim_id, seen, "decided"):
         return repeated_payment(load_claim(conn, claim_id), payment)
-    add_payment(conn, claim_id, approval.payout, "agent")
+    signed_off = approval.reviewed_at.isoformat() if approval.reviewed_at else None
+    add_payment(
+        conn, claim_id, approval.payout, approval.reviewed_by or "agent", signed_off
+    )
     return load_claim(conn, claim_id)
 
 
@@ -182,28 +141,3 @@ def repeated_payment(claim: Claim, payment: PaymentIn) -> Claim:
     if claim.payment is None or claim.payment.amount != round(payment.amount, 2):
         raise HTTPException(409, f"Claim {claim.claim_id} is already paid")
     return claim
-
-
-@router.post("/sign-off", operation_id="sign_off_claim")
-def sign_off_claim(claim_id: str, sign_off: SignOffIn, conn: Db) -> Claim:
-    """Sign off a large approved payout as a handler, which pays it."""
-    claim = load_claim(conn, claim_id)
-    check_handler(conn, sign_off.handler_id)
-    require_status(claim, "awaiting_sign_off")
-    add_payment(conn, claim_id, claim.decisions[-1].payout, sign_off.handler_id)
-    claims.set_status(conn, claim_id, "decided")
-    return load_claim(conn, claim_id)
-
-
-@router.post("/handler-decision", operation_id="decide_as_handler")
-def decide_as_handler(claim_id: str, resolution: HandlerDecisionIn, conn: Db) -> Claim:
-    """Approve or decline, as a handler, a claim the agent referred or that was
-    left for a handler, paying an approval."""
-    claim = load_claim(conn, claim_id)
-    check_handler(conn, resolution.handler_id)
-    require_status(claim, *FOR_A_HANDLER)
-    add_decision(conn, claim_id, resolution.handler_id, resolution, None)
-    if resolution.decision == "approve":
-        add_payment(conn, claim_id, resolution.payout, resolution.handler_id)
-    claims.set_status(conn, claim_id, "decided")
-    return load_claim(conn, claim_id)

@@ -54,7 +54,7 @@ def test_the_saver_keeps_a_small_pool_in_undercovers_schema(monkeypatch):
     )
     with real_saver() as saver:
         assert isinstance(saver, Saver)
-    assert (made["min_size"], made["max_size"]) == (1, 4)
+    assert (made["min_size"], made["max_size"]) == (1, 3)
     assert made["kwargs"] == {
         "autocommit": True,
         "prepare_threshold": 0,

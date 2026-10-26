@@ -17,7 +17,7 @@ def test_with_database_url_the_records_are_on_postgres(monkeypatch):
     engine = db.engine()
     assert engine.url.drivername == "postgresql+psycopg"
     assert isinstance(engine.pool, QueuePool)
-    assert engine.pool.size() == 4
+    assert engine.pool.size() == 3
     assert engine.pool._max_overflow == 0  # noqa: SLF001 - no public way to read it
 
 

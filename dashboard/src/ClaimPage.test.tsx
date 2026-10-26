@@ -60,6 +60,7 @@ it("shows a decision, its section and the payment", async () => {
           amount: 420,
           authorized_by: "agent",
           paid_at: "2026-10-19T15:01:00Z",
+          signed_off_at: null,
         },
       }),
     }),
@@ -162,23 +163,18 @@ it("runs the agent on a waiting claim", async () => {
   });
 });
 
-it("returns a claim left in progress to the queue", async () => {
-  const fetchMock = mockFetch(
+it("leaves a claim a stopped run left in progress for the next run", async () => {
+  mockFetch(
     claimRoutes({
       "GET /api/claims/CLM-1001": claim({ status: "in_progress" }),
-      "POST /api/agent/stop": IDLE,
     }),
   );
   render(<ClaimPage claimId="CLM-1001" />);
   expect(
     await screen.findByText("Waiting for the agent's first step."),
   ).toBeDefined();
-  fireEvent.click(
-    await screen.findByRole("button", { name: "Return to the queue" }),
-  );
-  await waitFor(() => {
-    expect(calledWith(fetchMock, "POST /api/agent/stop")).toBe(true);
-  });
+  expect(screen.queryByRole("button", { name: "Run the agent" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
 });
 
 it("shows when the claim can't load", async () => {

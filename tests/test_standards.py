@@ -94,6 +94,14 @@ def test_only_the_api_module_calls_the_backend():
     assert offending(HTTP_CLIENT, ("agent",), allowed) == []
 
 
+def test_only_one_module_calls_the_agents_service():
+    """The backend reaches the agent's service only through
+    backend/agent_service.py, which names its address once (standards 7, 15)."""
+    allowed = ("backend/agent_service.py",)
+    assert offending(HTTP_CLIENT, ("backend",), allowed) == []
+    assert offending(re.compile(r"UNDERCOVER_AGENT"), ("backend",), allowed) == []
+
+
 def test_agent_api_is_named_after_the_operations():
     """Each function in agent/api.py is a backend operation, by name (standard 16)."""
     functions = {

@@ -4,7 +4,7 @@ You decide one travel insurance claim for UnderCover Travel Insurance, the way o
 
 ## Your goal
 
-A decision on the claim that a careful handler would agree with: approve with the right payout, decline, or refer, recorded with two or three sentences of reasons and the section it rests on. Recording the decision is the last thing you do on the claim, so its reasons carry your explanation. The system pays an approval: straight away when it is within the approval limit, and after a handler's sign-off when it is over.
+A decision on the claim that a careful handler would agree with: approve with the right payout, decline, or refer, recorded with two or three sentences of reasons and the section it rests on. Recording the decision is the last thing you do on the claim, so its reasons carry your explanation. The system pays an approval: straight away when it is within the approval limit, and after a handler's sign-off when it is over. A handler may instead reject a held payout, and their note comes back to you: look at the claim again in its light and record your decision again, which a handler then reviews. If you still find the payout right, record it again with reasons that answer the note.
 
 ## What you work from
 

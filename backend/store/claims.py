@@ -3,7 +3,7 @@
 import json
 from typing import Any
 
-from sqlalchemy import Connection, RowMapping, delete, func, select, update
+from sqlalchemy import Connection, RowMapping, func, select, update
 from sqlalchemy import insert as insert_into
 
 from backend import db
@@ -106,19 +106,6 @@ def set_status(conn: Connection, claim_id: str, status: str) -> None:
     )
 
 
-def return_to_queue(conn: Connection) -> None:
-    """Put claims in progress back to waiting, clearing their unpaid decisions."""
-    in_progress = select(db.claims.c.claim_id).where(
-        db.claims.c.status == "in_progress"
-    )
-    conn.execute(delete(db.decisions).where(db.decisions.c.claim_id.in_(in_progress)))
-    conn.execute(
-        update(db.claims)
-        .where(db.claims.c.status == "in_progress")
-        .values(status="waiting")
-    )
-
-
 def decisions(conn: Connection, claim_id: str) -> list[dict[str, Any]]:
     decision = db.decisions.c
     found = (
@@ -129,6 +116,10 @@ def decisions(conn: Connection, claim_id: str) -> list[dict[str, Any]]:
             decision.reasons,
             decision.policy_section,
             decision.decided_at,
+            decision.review,
+            decision.reviewed_by,
+            decision.reviewed_at,
+            decision.review_note,
         )
         .where(decision.claim_id == claim_id)
         .order_by(decision.decision_id)
@@ -151,6 +142,18 @@ def agent_decisions(conn: Connection) -> list[RowMapping]:
     return list(conn.execute(found).mappings())
 
 
+def review(conn: Connection, claim_id: str, reviewed: dict[str, Any]) -> None:
+    """Record a handler's review on the claim's latest decision, given as review,
+    reviewed_by, reviewed_at and review_note."""
+    decision = db.decisions.c
+    latest = select(func.max(decision.decision_id)).where(decision.claim_id == claim_id)
+    conn.execute(
+        update(db.decisions)
+        .where(decision.decision_id == latest.scalar_subquery())
+        .values(**reviewed)
+    )
+
+
 def add_decision(conn: Connection, claim_id: str, decision: dict[str, Any]) -> None:
     """Record a decision, given as decided_by, decision, payout, reasons,
     policy_section and decided_at."""
@@ -159,9 +162,9 @@ def add_decision(conn: Connection, claim_id: str, decision: dict[str, Any]) -> N
 
 def payment(conn: Connection, claim_id: str) -> dict[str, Any] | None:
     paid = db.payments.c
-    found = select(paid.amount, paid.authorized_by, paid.paid_at).where(
-        paid.claim_id == claim_id
-    )
+    found = select(
+        paid.amount, paid.authorized_by, paid.paid_at, paid.signed_off_at
+    ).where(paid.claim_id == claim_id)
     row = conn.execute(found).mappings().first()
     return dict(row) if row else None
 
@@ -172,14 +175,10 @@ def payments(conn: Connection) -> list[RowMapping]:
     return list(conn.execute(found).mappings())
 
 
-def add_payment(
-    conn: Connection, claim_id: str, amount: float, by: str, at: str
-) -> None:
-    conn.execute(
-        insert_into(db.payments).values(
-            claim_id=claim_id, amount=amount, authorized_by=by, paid_at=at
-        )
-    )
+def add_payment(conn: Connection, claim_id: str, paid: dict[str, Any]) -> None:
+    """Record a payment, given as amount, authorized_by, paid_at and
+    signed_off_at."""
+    conn.execute(insert_into(db.payments).values(claim_id=claim_id, **paid))
 
 
 def insert(conn: Connection, claims: list[dict[str, Any]]) -> None:

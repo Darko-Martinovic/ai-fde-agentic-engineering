@@ -15,15 +15,15 @@ import { SectionsPanel } from "./Sections";
 import { StepsPanel } from "./Steps";
 import { paths } from "./paths";
 
-type AgentAction = "run" | "stop" | "return" | null;
+type AgentAction = "run" | "stop" | null;
 
-/** What the agent can do on this claim now: run on it, stop working on it, or
- *  put it back in the queue after a run that left it in progress. */
+/** What the agent can do on this claim now: run on it, or stop working on it. A
+ *  claim a stopped run left in progress keeps its saved progress for the next
+ *  run to carry on. */
 function agentAction(claim: Claim, agent: AgentState | null): AgentAction {
   const running = agent?.running ?? false;
   if (claim.status === "waiting") return "run";
   if (running && agent?.claim_id === claim.claim_id) return "stop";
-  if (!running && claim.status === "in_progress") return "return";
   return null;
 }
 
@@ -66,18 +66,6 @@ function AgentControls({
           }}
         >
           Stop
-        </button>
-      )}
-      {action === "return" && (
-        <button
-          type="button"
-          className="button button--secondary"
-          disabled={busy}
-          onClick={() => {
-            run(api.stopAgent);
-          }}
-        >
-          Return to the queue
         </button>
       )}
       {error && <span className="form-error">{error}</span>}

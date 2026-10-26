@@ -13,6 +13,7 @@ export type ClaimStatus =
 export const FOR_A_HANDLER: ClaimStatus[] = ["referred", "left_for_handler"];
 
 export type DecisionKind = "approve" | "decline" | "refer";
+export type Review = "signed_off" | "rejected";
 
 export interface ClaimSummary {
   claim_id: string;
@@ -45,12 +46,17 @@ export interface Decision {
   reasons: string;
   policy_section: string | null;
   decided_at: string;
+  review: Review | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
 }
 
 export interface Payment {
   amount: number;
   authorized_by: string;
   paid_at: string;
+  signed_off_at: string | null;
 }
 
 export interface Claim {
