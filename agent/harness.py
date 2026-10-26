@@ -13,6 +13,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.types import Command
 
 from agent import api, graph, tracing
+from agent.claims import claims_in
 from agent.config import Model
 from agent.tools import ClaimContext
 from settings import setting
@@ -27,6 +28,7 @@ BY_STATE = {
 }
 BY_DECISION = {"decline": "declined", "refer": "referred to a handler"}
 STOPPED = "The agent stopped before finishing the claim: it replied with no decision"
+STOPPED_RUN = "The run stopped before it finished."
 
 # Our providers, and the LangChain integration that serves each one
 INTEGRATIONS = {"openrouter": "openai", "anthropic": "anthropic", "ollama": "ollama"}
@@ -220,13 +222,18 @@ def carry_on(
 ) -> str:
     """Carry a claim in progress on from its saved progress, on its latest
     attempt's thread, without a new attempt, in a trace of its own in the
-    claim's session, and report in a line. Its model calls count on `run_id`."""
-    claim = api.get_claim(claim_id)
-    context = ClaimContext(
-        run_id=run_id, claim_id=claim_id, thread_id=claim["thread_id"]
-    )
-    claim_graph_on_model = claim_graph(model, saver, llm)
-    start = where_from(claim_graph_on_model, claim, context)
+    claim's session, and report in a line. Its model calls count on `run_id`. A
+    claim that can't be picked up, as one whose decision the graph never saved,
+    reports why and stays in progress, so it never stops a run."""
+    try:
+        claim = api.get_claim(claim_id)
+        context = ClaimContext(
+            run_id=run_id, claim_id=claim_id, thread_id=claim["thread_id"]
+        )
+        claim_graph_on_model = claim_graph(model, saver, llm)
+        start = where_from(claim_graph_on_model, claim, context)
+    except Exception as error:  # noqa: BLE001 - one claim never stops a run
+        return f"{claim_id}: not picked up ({type(error).__name__}: {error})"
     return tracing.claim_trace(
         "carry-on",
         claim_id,
@@ -235,3 +242,30 @@ def carry_on(
         run_id=str(run_id),
         model=model.spec,
     )
+
+
+def finish_stopped_run() -> None:
+    """Finish the latest run if it is still running, because its process was
+    stopped before it could: a crash, Ctrl-C or a restart."""
+    latest = api.get_latest_run()
+    if latest and latest["status"] == "running":
+        api.finish_run(latest["run_id"], STOPPED_RUN)
+
+
+def carry_on_stopped(
+    run_id: int,
+    model: Model,
+    saver: BaseCheckpointSaver[Any],
+    llm: BaseChatModel | None = None,
+) -> dict[str, str]:
+    """Carry on every claim left in progress, as by a run that was stopped or a
+    sign-off while the agent was away, printing each one's report as it comes.
+    Return the reports, by claim. These claims aren't new attempts, so they don't
+    count toward a run's cap."""
+    reports = {}
+    for claim in claims_in("in_progress"):
+        reports[claim["claim_id"]] = carry_on(
+            claim["claim_id"], run_id, model, saver, llm
+        )
+        print(reports[claim["claim_id"]], flush=True)
+    return reports

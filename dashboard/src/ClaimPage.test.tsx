@@ -163,18 +163,25 @@ it("runs the agent on a waiting claim", async () => {
   });
 });
 
-it("leaves a claim a stopped run left in progress for the next run", async () => {
-  mockFetch(
+it("carries on with a claim a stopped run left in progress", async () => {
+  const fetchMock = mockFetch(
     claimRoutes({
       "GET /api/claims/CLM-1001": claim({ status: "in_progress" }),
+      "POST /api/agent/claims/CLM-1001": IDLE,
     }),
   );
   render(<ClaimPage claimId="CLM-1001" />);
   expect(
     await screen.findByText("Waiting for the agent's first step."),
   ).toBeDefined();
-  expect(screen.queryByRole("button", { name: "Run the agent" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+  const carryOn = await screen.findByRole("button", { name: "Carry on" });
+  await waitFor(() => {
+    expect(carryOn).toHaveProperty("disabled", false);
+  });
+  fireEvent.click(carryOn);
+  await waitFor(() => {
+    expect(calledWith(fetchMock, "POST /api/agent/claims/CLM-1001")).toBe(true);
+  });
 });
 
 it("shows when the claim can't load", async () => {

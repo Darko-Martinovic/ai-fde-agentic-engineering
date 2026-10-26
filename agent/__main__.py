@@ -1,16 +1,18 @@
 """Run the UnderCover Agent. `uv run -m agent` works the waiting claims with the
 queue agent, `--cap 5` stopping it at five; `uv run -m agent CLM-1001` works
 one claim; and `--model provider:model` picks a model from models.toml. Each
-claim graph saves its progress with the Postgres checkpointer."""
+claim graph saves its progress with the Postgres checkpointer, and every run
+first finishes a run that was stopped and carries on any claim left in
+progress."""
 
 import argparse
 import sys
 
 from agent import api, checkpoints
+from agent.claims import claims_in, waiting_claims
 from agent.config import Model, current_model, model
-from agent.harness import work_claim
+from agent.harness import carry_on_stopped, finish_stopped_run, work_claim
 from agent.queue_agent import run_queue
-from agent.tools import waiting_claims
 
 
 def positive(text: str) -> int:
@@ -36,11 +38,15 @@ def parse(arguments: list[str]) -> argparse.Namespace:
 
 
 def work_claims(claim_ids: list[str], chosen: Model) -> None:
-    """Work the claims named, in one run, finished with each claim's report."""
+    """Work the claims named, in one run, after carrying on any claim left in
+    progress, finished with each claim's report."""
     with checkpoints.saver() as saver:
         run_id = api.start_run("claim", len(claim_ids), chosen.spec)["run_id"]
-        reports = []
+        carried = carry_on_stopped(run_id, chosen, saver)
+        reports = list(carried.values())
         for claim_id in claim_ids:
+            if claim_id in carried:
+                continue
             try:
                 reports.append(work_claim(claim_id, run_id, chosen, saver))
             except api.Refused as refused:
@@ -49,15 +55,30 @@ def work_claims(claim_ids: list[str], chosen: Model) -> None:
         api.finish_run(run_id, "\n".join(reports))
 
 
+def carry_on_alone(chosen: Model) -> None:
+    """With nothing waiting, carry on any claim left in progress, in a run of its
+    own."""
+    left = claims_in("in_progress")
+    if not left:
+        return
+    with checkpoints.saver() as saver:
+        run_id = api.start_run("claim", len(left), chosen.spec)["run_id"]
+        reports = carry_on_stopped(run_id, chosen, saver)
+        api.finish_run(run_id, "\n".join(reports.values()))
+
+
 def main(arguments: list[str]) -> None:
-    """Work the claims named, or the queue with the queue agent."""
+    """Work the claims named, or the queue with the queue agent, once a stopped
+    run is finished."""
     options = parse(arguments)
     chosen = model(options.model) if options.model else current_model()
+    finish_stopped_run()
     if options.claims:
         work_claims(options.claims, chosen)
         return
     waiting = len(waiting_claims())
     if waiting == 0:
+        carry_on_alone(chosen)
         print("No claims are waiting.")
         return
     cap = waiting if options.cap is None else options.cap
