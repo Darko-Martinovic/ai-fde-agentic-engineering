@@ -186,8 +186,11 @@ class TableRecords:
         )
 
     def finished(self, claim_id):
+        """Mark this process's latest attempt on the claim finished, so an attempt that failed before a retry stays unfinished."""
         self.connection.execute(
-            "UPDATE swarm_attempts SET finished_at = now() WHERE thread_id = %s AND claim_id = %s AND pid = %s AND finished_at IS NULL",
+            """UPDATE swarm_attempts SET finished_at = now() WHERE ctid = (
+                SELECT ctid FROM swarm_attempts WHERE thread_id = %s AND claim_id = %s AND pid = %s AND finished_at IS NULL
+                ORDER BY started_at DESC LIMIT 1)""",
             (self.thread_id, claim_id, os.getpid()),
         )
 
