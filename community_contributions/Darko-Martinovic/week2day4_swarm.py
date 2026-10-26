@@ -11,6 +11,7 @@ holds all but N of them at a semaphore, so LangGraph's thread pool always has a 
 a finished claim.
 """
 
+import functools
 import json
 import operator
 import os
@@ -25,6 +26,7 @@ import pandas as pd
 import psycopg
 from dotenv import load_dotenv
 from langchain.agents import create_agent
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.postgres import PostgresSaver
@@ -190,12 +192,17 @@ class TableRecords:
         )
 
     def record(self, claim_id, decision, payout, rationale):
-        """Record a decision once; False when one is already recorded."""
+        """Record a decision once; False, and the refusal noted, when one is already recorded."""
         row = self.connection.execute(
-            """INSERT INTO swarm_decisions (thread_id, claim_id, decision, payout, rationale)
-            VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING RETURNING claim_id""",
-            (self.thread_id, claim_id, decision, payout, rationale),
+            """INSERT INTO swarm_decisions (thread_id, claim_id, decision, payout, rationale, pid)
+            VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING RETURNING claim_id""",
+            (self.thread_id, claim_id, decision, payout, rationale, os.getpid()),
         ).fetchone()
+        if row is None:
+            self.connection.execute(
+                "INSERT INTO swarm_refusals (thread_id, claim_id, pid) VALUES (%s, %s, %s)",
+                (self.thread_id, claim_id, os.getpid()),
+            )
         return row is not None
 
     def decision(self, claim_id):
@@ -228,6 +235,9 @@ def connect():
         recorded_at TIMESTAMPTZ DEFAULT now(), PRIMARY KEY (thread_id, claim_id))""")
     connection.execute("""CREATE TABLE IF NOT EXISTS swarm_attempts (
         thread_id TEXT, claim_id TEXT, pid INTEGER, started_at TIMESTAMPTZ DEFAULT now(), finished_at TIMESTAMPTZ)""")
+    connection.execute("ALTER TABLE swarm_decisions ADD COLUMN IF NOT EXISTS pid INTEGER")
+    connection.execute("""CREATE TABLE IF NOT EXISTS swarm_refusals (
+        thread_id TEXT, claim_id TEXT, pid INTEGER, refused_at TIMESTAMPTZ DEFAULT now())""")
     return connection
 
 
@@ -304,22 +314,25 @@ def calculate_payout(policy_id: str, benefit: Benefit, lines: list[Line], paid_b
     return work_out_payout(policies[policy_id], benefit, lines, paid_by_others)
 
 
-luna = ChatOpenAI(
-    model="openai/gpt-6-luna",
-    base_url=OPENROUTER_BASE_URL,
-    api_key=os.getenv("OPENROUTER_API_KEY"),
-    reasoning_effort="low",
-    timeout=120,
-    max_retries=5,
-)
-payout_agent = create_agent(model=luna, tools=[record_decision, calculate_payout], system_prompt=f"{INSTRUCTIONS}\n{policy_wording}\n")
+@functools.cache
+def payout_agent():
+    """The lab's claim agent, built on first use, so the stand-in needs no OpenRouter key."""
+    luna = ChatOpenAI(
+        model="openai/gpt-6-luna",
+        base_url=OPENROUTER_BASE_URL,
+        api_key=os.getenv("OPENROUTER_API_KEY"),
+        reasoning_effort="low",
+        timeout=120,
+        max_retries=5,
+    )
+    return create_agent(model=luna, tools=[record_decision, calculate_payout], system_prompt=f"{INSTRUCTIONS}\n{policy_wording}\n")
 
 
 def work_claim(claim_id):
     """Run the claim agent on one claim and return its result."""
     records.store.started(claim_id)
     started = datetime.now()
-    result = payout_agent.invoke({"messages": [{"role": "user", "content": make_user_prompt(claims[claim_id])}]})
+    result = payout_agent().invoke({"messages": [{"role": "user", "content": make_user_prompt(claims[claim_id])}]})
     answer = records.store.decision(claim_id) or {"decision": "refer", "payout": 0.0, "rationale": "Nothing recorded"}
     cost = sum(message.response_metadata["token_usage"]["cost"] for message in result["messages"] if message.type == "ai")
     records.store.finished(claim_id)
@@ -327,6 +340,21 @@ def work_claim(claim_id):
 
 
 WORKERS = {"stand-in": stand_in, "agent": work_claim}
+
+
+class ModelCalls(BaseCallbackHandler):
+    """Counts the model calls made in this process, and what they cost."""
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.calls = 0
+        self.cost = 0.0
+
+    def on_llm_end(self, response, **kwargs):
+        usage = response.generations[0][0].message.response_metadata.get("token_usage", {})
+        with self.lock:
+            self.calls += 1
+            self.cost += usage.get("cost", 0.0)
 
 
 def gated(worker, agents):
