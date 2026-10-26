@@ -35,6 +35,48 @@ class RunContext(RunScope):
     work: Callable[[str], str]
 
 
+Benefit = Literal[
+    "trip_cancellation",
+    "trip_interruption",
+    "trip_delay",
+    "baggage_delay",
+    "baggage",
+    "passport",
+    "emergency_medical",
+]
+
+
+class Line(BaseModel):
+    """One covered item or expense on a claim."""
+
+    description: str = Field(description="What the item or expense is")
+    amount: float = Field(
+        description="The total claimed for the line in US dollars, before any"
+        " limits. For several items, the total for all of them"
+    )
+    quantity: int = Field(
+        default=1,
+        ge=1,
+        description="How many separate items the line holds, such as 3 for three"
+        " shirts. A pair or a set is one item",
+    )
+    kind: Literal[
+        "item", "electronics", "cash", "expense", "hotel", "meals_without_receipts"
+    ] = Field(
+        description="item: a belonging, or a pair or set that counts as one item."
+        " electronics: only a phone, tablet, laptop, camera or its lens, e-reader"
+        " or smartwatch; any other device is an item. cash: cash that was lost or"
+        " stolen. expense: any other cost with a receipt, such as a medical bill, a"
+        " meal, a taxi, a fee or a prepaid trip cost. hotel: a hotel during a trip"
+        " delay. meals_without_receipts: meals during a trip delay with no receipts."
+    )
+    nights: int = Field(ge=0, description="For a hotel, the nights; otherwise 0")
+    hours: float = Field(
+        ge=0,
+        description="For meals without receipts, the delay in hours; otherwise 0",
+    )
+
+
 class Todo(BaseModel):
     content: str = Field(description="What to do, such as 'Work CLM-1001'")
     status: Literal["pending", "in_progress", "completed", "left_for_handler"]
@@ -73,6 +115,28 @@ def read_section(document: Literal["wording", "manual"], number: int) -> dict[st
 
 
 @tool
+def calculate_payout(
+    benefit: Benefit,
+    lines: list[Line],
+    paid_by_others: float,
+    runtime: ToolRuntime[ClaimContext],
+) -> dict[str, Any]:
+    """Work out the payout on the claim if you approve it, with UnderCover's payout
+    rules: the covered lines, with any excluded ones left out, the benefit they're
+    paid under, and anything a carrier, hotel or other party has paid or refunded
+    for the same loss (0 if nothing). Returns the calculation step by step, the
+    payout and whether it needs a handler's sign-off."""
+    return api.calculate_payout(
+        runtime.context.claim_id,
+        {
+            "benefit": benefit,
+            "lines": [line.model_dump() for line in lines],
+            "paid_by_others": paid_by_others,
+        },
+    )
+
+
+@tool
 def decide_claim(
     decision: Literal["approve", "decline", "refer"],
     payout: float,
@@ -105,6 +169,7 @@ CLAIM_TOOLS = [
     get_customer,
     search_documents,
     read_section,
+    calculate_payout,
     decide_claim,
     pay_claim,
 ]

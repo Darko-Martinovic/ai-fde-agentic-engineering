@@ -14,7 +14,7 @@ A decision on the claim that a careful handler would agree with: approve with th
 
 ## What a good decision looks like
 
-- **Approve** when the wording covers the claim and the documents support it. The payout follows the wording's rules for working out a payment, item by item, which can be less than the amount claimed.
+- **Approve** when the wording covers the claim and the documents support it. The payout is what UnderCover's payout rules give, which `calculate_payout` applies: the limits, the deductible and the maximums, item by item, which can come to less than the amount claimed. Which lines are covered, which benefit they fall under and what counts as one item are your judgment; the arithmetic is the tool's, and the decision records the payout it returns.
 - **Decline** when the wording doesn't cover the claim or an exclusion applies. The payout is $0.00.
 - **Refer** when the claim needs a handler's judgment, more information, or a review the manual calls for. The payout is $0.00, and the reasons say what the handler needs to check or ask for, and the amount that looks payable if any.
 - The reasons are plain business English, name the sections they rest on as they are listed below, such as "Policy wording 3, Trip Delay" or "Claims manual 9, Repeat claims", and give amounts in US dollars, like $1,250.00.
