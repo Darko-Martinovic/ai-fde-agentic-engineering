@@ -9,7 +9,7 @@ from sqlalchemy import Connection, RowMapping
 
 from backend.api import found, queue_line
 from backend.models import ClaimSummary
-from backend.run_models import Held, Run, RunClaim, Summary
+from backend.run_models import EVALUATION, Held, Run, RunClaim, Summary
 from backend.store import claims, runs, usage
 
 # The states in which a claim waits for the next dispatch
@@ -17,8 +17,12 @@ UNFINISHED = ("in_progress", "waiting")
 
 
 def run_claims(conn: Connection, run_id: int) -> list[RunClaim]:
-    """A run's claims, in its order, each with its work in the run."""
-    lines = {line.claim_id: line for line in map(queue_line, claims.queue(conn))}
+    """A run's claims, in its order, each with its work in the run: the queue's
+    claims for a dispatch, its copies for an evaluation."""
+    row = found(runs.run(conn, run_id), "Run", str(run_id))
+    evaluation_id = run_id if row["kind"] == EVALUATION else None
+    rows = claims.queue(conn, evaluation_id)
+    lines = {line.claim_id: line for line in map(queue_line, rows)}
     costs = usage.claim_costs(conn, run_id)
     times = usage.claim_times(conn, run_id)
     return [

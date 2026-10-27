@@ -64,11 +64,17 @@ class Line(BaseModel):
     )
 
 
+# What a claim records of the evaluation a copy is in, which the agent works
+# without: an evaluation's claim reads as any other
+EVALUATIONS = ("evaluation_id", "copy_of")
+
+
 @tool
 def get_claim(runtime: ToolRuntime[ClaimContext]) -> dict[str, Any]:
     """Get the claim you are working on in full: the story, the items claimed and
     the documents."""
-    return api.get_claim(runtime.context.claim_id)
+    claim = api.get_claim(runtime.context.claim_id)
+    return {key: value for key, value in claim.items() if key not in EVALUATIONS}
 
 
 @tool

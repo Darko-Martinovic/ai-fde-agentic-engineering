@@ -93,6 +93,14 @@ def create_dispatch(agents: int, model: str, reasoning_effort: str) -> dict[str,
     return send("POST", "/api/runs/dispatches", body).json()
 
 
+def create_evaluation(
+    evaluation_set: str, tiny: bool, agents: int, model: str, reasoning_effort: str
+) -> dict[str, Any]:
+    body = {"evaluation_set": evaluation_set, "tiny": tiny, "agents": agents}
+    body |= {"model": model, "reasoning_effort": reasoning_effort}
+    return send("POST", "/api/runs/evaluations", body).json()
+
+
 def record_run_claims(run_id: int, claim_ids: list[str]) -> None:
     send("PUT", f"/api/runs/{run_id}/claims", {"claim_ids": claim_ids})
 

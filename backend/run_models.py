@@ -11,7 +11,11 @@ from backend.models import ClaimSummary
 from settings import setting
 
 RunStatus = Literal["running", "finished", "stopped"]
-RunKind = Literal["dispatch"]
+RunKind = Literal["dispatch", "evaluation"]
+DISPATCH, EVALUATION = "dispatch", "evaluation"
+# The labelled sets an evaluation works copies of: the queue's own claims, or
+# the held-out ones
+EvaluationSet = Literal["evaluation", "held_out"]
 # The most claim agents a run may have working at once
 MAX_AGENTS = int(setting("MAX_AGENTS"))
 
@@ -31,6 +35,17 @@ class DispatchStart(BaseModel):
     def model_is_allowed(cls, spec: str) -> str:
         """Only a model in models.toml runs."""
         return model(spec).spec
+
+
+class EvaluationIn(DispatchIn):
+    evaluation_set: EvaluationSet
+    # Only the set's five tiny claims, for a quick evaluation
+    tiny: bool
+
+
+class EvaluationStart(DispatchStart):
+    evaluation_set: EvaluationSet
+    tiny: bool
 
 
 class Started(BaseModel):
@@ -85,12 +100,17 @@ class RunClaim(ClaimSummary):
     model_cost: float
 
 
-class Run(BaseModel):
+class RunFacts(BaseModel):
+    """What every run shows, apart from its claims."""
+
     run_id: int
     kind: RunKind
     agents: int
     model: str
     reasoning_effort: str
+    # For an evaluation: its set, and whether it's the five tiny claims
+    evaluation_set: EvaluationSet | None
+    tiny: bool | None
     status: RunStatus
     started_at: datetime
     finished_at: datetime | None
@@ -98,7 +118,41 @@ class Run(BaseModel):
     seconds: float | None
     summary: Summary | None
     usage: Usage
+
+
+class Run(RunFacts):
     claims: list[RunClaim]
+
+
+class Measures(BaseModel):
+    decision_accuracy: float
+    accuracy: float
+    cost_of_mistakes: float
+    straight_through: float
+    model_cost_per_claim: float
+    seconds_per_claim: float
+    # From its start to its finish, once it has finished
+    run_seconds: float | None
+
+
+class EvaluationClaim(RunClaim):
+    """An evaluation's copy, its agent's decision beside the handler's on the
+    claim it copies: whether it's right, and what a mistake costs."""
+
+    copy_of: str
+    reasons: str | None
+    handler_decision: str
+    handler_payout: float
+    right: bool
+    mistake_cost: float
+
+
+class Evaluation(RunFacts):
+    """An evaluation with its measures and its copies, each beside the
+    handler's decision."""
+
+    measures: Measures
+    claims: list[EvaluationClaim]
 
 
 class Stopped(BaseModel):

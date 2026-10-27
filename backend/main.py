@@ -6,6 +6,7 @@ from backend import (
     agent_models,
     claims,
     documents,
+    evaluations,
     insights,
     records,
     reviews,
@@ -23,6 +24,7 @@ for module in (
     usage,
     reviews,
     runs,
+    evaluations,
     agent_models,
     insights,
 ):

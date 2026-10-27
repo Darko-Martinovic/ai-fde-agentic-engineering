@@ -16,7 +16,7 @@ from langgraph.types import Command
 
 from agent import api, graph, recording, tracing
 from agent.config import Model
-from agent.reports import IN_PROGRESS, report
+from agent.reports import AWAITING_SIGN_OFF, IN_PROGRESS, report
 from agent.tools import ClaimContext
 from settings import setting
 
@@ -257,7 +257,20 @@ def work_in_run(
 ) -> str:
     """Work one claim in a run, or on its own (`run_id` None), with a saver of
     its own, and report in a line: carry it on if it's in progress, or start it
-    if it's waiting. The one way a dispatch reaches the claim agent."""
-    if api.get_claim(claim_id)["status"] == IN_PROGRESS:
-        return carry_on(claim_id, run_id, model, new_saver(), llm)
-    return work_claim(claim_id, run_id, model, new_saver(), llm)
+    if it's waiting, and for an evaluation's copy held for sign-off clear its
+    saved progress. The one way a dispatch reaches the claim agent."""
+    saver = new_saver()
+    claim = api.get_claim(claim_id)
+    work = carry_on if claim["status"] == IN_PROGRESS else work_claim
+    report = work(claim_id, run_id, model, saver, llm)
+    if claim["evaluation_id"] is not None:
+        forget_held(claim_id, saver)
+    return report
+
+
+def forget_held(claim_id: str, saver: BaseCheckpointSaver[Any]) -> None:
+    """Clear the saved progress of an evaluation's copy held for sign-off:
+    nobody signs a copy off, so its approval counts as finished."""
+    claim = api.get_claim(claim_id)
+    if claim["status"] == AWAITING_SIGN_OFF:
+        saver.delete_thread(claim["thread_id"])

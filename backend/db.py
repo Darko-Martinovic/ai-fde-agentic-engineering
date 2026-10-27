@@ -8,6 +8,7 @@ from functools import cache
 
 from sqlalchemy import (
     DDL,
+    Boolean,
     Column,
     Connection,
     Engine,
@@ -56,6 +57,27 @@ claims = Table(
     # Counts the changes to the claim's decision and payment, so two at once
     # can't both be recorded
     Column("revision", Integer, nullable=False, default=0),
+    # An evaluation's copy of a claim: the evaluation, and the claim it copies.
+    # Copies stay out of the queue.
+    Column("evaluation_id", Integer, nullable=True),
+    text_column("copy_of", nullable=True),
+)
+# The answer key, which seeding loads: the held-out claims, out of the queue, and
+# the handlers' decisions on both labelled sets. No claim operation reads these.
+held_out_claims = Table(
+    "held_out_claims",
+    metadata,
+    text_column("claim_id", primary_key=True),
+    text_column("data"),
+)
+handler_decisions = Table(
+    "handler_decisions",
+    metadata,
+    text_column("evaluation_set", primary_key=True),
+    text_column("claim_id", primary_key=True),
+    text_column("decision"),
+    Column("payout", Float, nullable=False),
+    Column("tiny", Boolean, nullable=False),
 )
 policies = Table(
     "policies",
@@ -108,8 +130,10 @@ decisions = Table(
     text_column("review_note", nullable=True),
     sqlite_autoincrement=True,
 )
-# A dispatch: N claim agents at once on the claims of the queue, on a model.
-# Its summary, built from the records when it finishes, is kept as JSON.
+# A dispatch or an evaluation: N claim agents at once on the claims of the
+# queue, or on copies of a labelled set's claims (all of them, or its tiny
+# ones), on a model. Its summary, built from the records when it finishes, is
+# kept as JSON.
 runs = Table(
     "runs",
     metadata,
@@ -118,6 +142,8 @@ runs = Table(
     Column("agents", Integer, nullable=False),
     text_column("model"),
     text_column("reasoning_effort"),
+    text_column("evaluation_set", nullable=True),
+    Column("tiny", Boolean, nullable=True),
     text_column("status"),
     text_column("started_at"),
     text_column("finished_at", nullable=True),

@@ -87,13 +87,15 @@ class Records:
 
     @classmethod
     def load(cls, conn: Connection) -> "Records":
+        """The queue's records, leaving out evaluations' copies."""
+        queue = {
+            row["claim_id"]: json.loads(row["data"]) | {"status": row["status"]}
+            for row in claims.every_claim(conn)
+        }
         return cls(
-            claims={
-                row["claim_id"]: json.loads(row["data"]) | {"status": row["status"]}
-                for row in claims.every_claim(conn)
-            },
-            decisions={row["claim_id"]: row for row in claims.agent_decisions(conn)},
-            payments={row["claim_id"]: row for row in claims.payments(conn)},
+            claims=queue,
+            decisions=in_queue(queue, claims.agent_decisions(conn)),
+            payments=in_queue(queue, claims.payments(conn)),
             limit=approval_limit(conn),
         )
 
@@ -108,11 +110,17 @@ class Records:
         return [d for d in self.decisions.values() if d["decision"] == "approve"]
 
 
-def latest_runs(conn: Connection) -> dict[str, list[RowMapping]]:
-    """Return the steps of each claim's latest run, in order."""
+def in_queue(queue: dict[str, Any], rows: list[RowMapping]) -> dict[str, RowMapping]:
+    """The rows of the queue's claims, by claim, the latest last."""
+    return {row["claim_id"]: row for row in rows if row["claim_id"] in queue}
+
+
+def latest_runs(conn: Connection, queue: dict[str, Any]) -> dict[str, list[RowMapping]]:
+    """Return the steps of each of the queue's claims' latest run, in order."""
     runs: dict[str, dict[str, list[RowMapping]]] = defaultdict(dict)
     for step in steps.every_step(conn):
-        runs[step["claim_id"]].setdefault(step["thread_id"], []).append(step)
+        if step["claim_id"] in queue:
+            runs[step["claim_id"]].setdefault(step["thread_id"], []).append(step)
     return {claim_id: list(threads.values())[-1] for claim_id, threads in runs.items()}
 
 
@@ -219,7 +227,7 @@ def totals(records: Records, work: list[ClaimWork]) -> Totals:
 def get_insights(conn: Db) -> Insights:
     """Sum up the agent's work on the queue: outcomes, time, tools and money."""
     records = Records.load(conn)
-    runs = latest_runs(conn)
+    runs = latest_runs(conn, records.claims)
     work = [claim_work(records, claim_id, run) for claim_id, run in runs.items()]
     return Insights(
         totals=totals(records, work),

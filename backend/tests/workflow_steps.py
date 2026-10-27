@@ -49,8 +49,8 @@ def referred(client, claim_id):
     return decide(client, claim_id, "refer", 0)
 
 
-def fail(client, claim_id, reason="The model provider timed out"):
+def fail(client, claim_id, reason="The model provider timed out", thread_id=None):
     return client.post(
         f"/api/claims/{claim_id}/failure",
-        json={"thread_id": f"{claim_id}-test", "reason": reason},
+        json={"thread_id": thread_id or f"{claim_id}-test", "reason": reason},
     )

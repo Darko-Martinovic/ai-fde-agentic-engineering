@@ -1,8 +1,9 @@
-"""The backend's calls to the agent's service, at UNDERCOVER_AGENT: starting and
-stopping a dispatch, and asking it to pick a claim back up after a handler's
-review. A start or a stop passes the service's refusal on, and says so when the
-service can't be reached; a review stands whether or not the service can be
-reached, and the next dispatch carries the claim on."""
+"""The backend's calls to the agent's service, at UNDERCOVER_AGENT: starting a
+dispatch or an evaluation, stopping it, and asking the service to pick a claim
+back up after a handler's review. A start or a stop passes the service's
+refusal on, and says so when the service can't be reached; a review stands
+whether or not the service can be reached, and the next dispatch carries the
+claim on."""
 
 import logging
 from typing import Any
@@ -42,6 +43,14 @@ def ask(path: str, body: dict[str, Any]) -> dict[str, Any]:
 def start_dispatch(agents: int, model: str) -> dict[str, Any]:
     """Ask the agent's service to start a dispatch of the queue."""
     return ask("/api/dispatches", {"agents": agents, "model": model})
+
+
+def start_evaluation(
+    evaluation_set: str, tiny: bool, agents: int, model: str
+) -> dict[str, Any]:
+    """Ask the agent's service to start an evaluation of a labelled set."""
+    body = {"evaluation_set": evaluation_set, "tiny": tiny, "agents": agents}
+    return ask("/api/evaluations", body | {"model": model})
 
 
 def stop_run() -> dict[str, Any]:

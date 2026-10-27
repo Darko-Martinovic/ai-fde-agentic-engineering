@@ -2015,6 +2015,269 @@
       ]
     },
     {
+      "name": "Evaluations",
+      "item": [
+        {
+          "name": "Create an evaluation of the held-out tiny claims",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/runs/evaluations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "runs",
+                "evaluations"
+              ]
+            },
+            "description": "`create_evaluation`: an evaluation, as the agent's service records one, with its copies of the held-out set's five tiny claims.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"evaluation_set\": \"held_out\",\n  \"tiny\": true,\n  \"agents\": 5,\n  \"model\": \"openrouter:openai/gpt-6-luna\",\n  \"reasoning_effort\": \"low\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const run = pm.response.json();",
+                  "pm.test(\"five waiting copies\", () => {",
+                  "  pm.expect(run.claims.length).to.eql(5);",
+                  "  pm.expect(run.claims.every((c) => c.status === \"waiting\" && c.claim_id.endsWith(`-E${run.run_id}`))).to.eql(true);",
+                  "});",
+                  "pm.collectionVariables.set(\"evaluationId\", run.run_id);",
+                  "pm.collectionVariables.set(\"copyId\", run.claims[0].claim_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The copy is out of the queue",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims"
+              ]
+            },
+            "description": "`list_claims`: the queue holds its 25 claims and no copy."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"no copy\", () => pm.expect(pm.response.json().some((c) => c.claim_id === pm.collectionVariables.get(\"copyId\"))).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Review a copy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/{{copyId}}/review",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "{{copyId}}",
+                "review"
+              ]
+            },
+            "description": "`review_payout`: refused on an evaluation's copy, which nobody signs off or rejects.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"handler_id\": \"HND-01\",\n  \"approved\": true,\n  \"note\": \"\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"a copy\", () => pm.expect(pm.response.json().detail).to.include(\"is a copy in an evaluation\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Finish the evaluation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/runs/{{evaluationId}}/finish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "runs",
+                "{{evaluationId}}",
+                "finish"
+              ]
+            },
+            "description": "`finish_run`: finish the evaluation.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stopped\": false\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get the evaluation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/evaluations/{{evaluationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "evaluations",
+                "{{evaluationId}}"
+              ]
+            },
+            "description": "`get_evaluation`: the evaluation with its measures, each copy beside the handler's decision."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const evaluation = pm.response.json();",
+                  "pm.test(\"nothing decided, so every copy is a referral\", () => pm.expect(evaluation.measures.straight_through).to.eql(0));",
+                  "pm.test(\"five copies beside the handlers\", () => pm.expect(evaluation.claims.map((c) => c.handler_decision).length).to.eql(5));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List evaluations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/evaluations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "evaluations"
+              ]
+            },
+            "description": "`list_evaluations`: every evaluation, newest first, with its measures."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the newest first\", () => pm.expect(pm.response.json()[0].run_id).to.eql(pm.collectionVariables.get(\"evaluationId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start an evaluation of an unknown set",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/evaluations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "evaluations"
+              ]
+            },
+            "description": "`start_evaluation`: 422 for a set that isn't one, before the agent's service is asked. A real start calls the model, so the collection doesn't send one.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"evaluation_set\": \"harder\",\n  \"tiny\": true,\n  \"agents\": 5,\n  \"model\": \"openrouter:openai/gpt-6-luna\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Insights",
       "description": "Run after the Workflow folder, on fresh data: sums up what the workflow did.",
       "item": [
@@ -2099,6 +2362,14 @@
   "variable": [
     {
       "key": "runId",
+      "value": ""
+    },
+    {
+      "key": "evaluationId",
+      "value": ""
+    },
+    {
+      "key": "copyId",
       "value": ""
     }
   ]

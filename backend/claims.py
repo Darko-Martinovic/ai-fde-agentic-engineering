@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/claims")
 @router.get("", operation_id="list_claims")
 def list_claims(conn: Db) -> list[ClaimSummary]:
     """List the claims queue with the state, latest decision and payment of each."""
-    return [queue_line(row) for row in claims.queue(conn)]
+    return [queue_line(row) for row in claims.queue(conn, None)]
 
 
 @router.get("/{claim_id}", operation_id="get_claim")
