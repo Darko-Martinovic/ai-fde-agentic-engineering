@@ -10,7 +10,7 @@ const SOURCE = "dashboard/src/";
 const CONFIGS = [
   "dashboard/vite.config.ts",
   "playwright.config.ts",
-  "settings.config.ts",
+  "settings/settings.config.ts",
 ];
 
 function product(): string[] {

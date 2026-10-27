@@ -35,9 +35,9 @@ HTTP_CLIENT = re.compile(r"^\s*(import|from) httpx")
 
 def sources(parts: tuple[str, ...] = PARTS) -> Iterator[Path]:
     """Every Python module of the product's parts, leaving out tests, and the
-    shared settings.py."""
+    shared settings."""
     if parts == PARTS:
-        yield ROOT / "settings.py"
+        yield ROOT / "settings" / "__init__.py"
     for part in parts:
         for path in sorted((ROOT / part).rglob("*.py")):
             if "tests" not in path.parts:

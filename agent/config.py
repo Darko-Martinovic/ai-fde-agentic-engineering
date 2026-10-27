@@ -1,5 +1,5 @@
 """The models the agent may run on, from models.toml. Its other settings are the
-shared ones in settings.py."""
+shared ones in settings/."""
 
 import tomllib
 from dataclasses import dataclass
@@ -43,7 +43,7 @@ class Model:
 @cache
 def models() -> dict[str, Model]:
     """Return the models allowed, by their spec."""
-    with (ROOT / "models.toml").open("rb") as file:
+    with (ROOT / "settings" / "models.toml").open("rb") as file:
         return {m["spec"]: Model(**m) for m in tomllib.load(file)["models"]}
 
 

@@ -1,7 +1,8 @@
 """UnderCover's settings, for every Python part: the environment, filled in from
-.env and then .env.defaults at the repo's root. The environment wins over .env,
-which wins over .env.defaults, and a value can name another, as ${NAME}. Tests
-name .env.defaults alone in UNDERCOVER_ENV_FILES, so they never read .env."""
+.env at the repo's root and then settings/.env.defaults. The environment wins over
+.env, which wins over .env.defaults, and a value can name another, as ${NAME}.
+UNDERCOVER_ENV_FILES names the files from the repo's root; tests name
+settings/.env.defaults alone, so they never read .env."""
 
 import os
 import re
@@ -9,10 +10,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 REFERENCE = re.compile(r"\$\{(\w+)\}")
+ALL_FILES = ".env,settings/.env.defaults"
 
-for env_file in os.environ.get("UNDERCOVER_ENV_FILES", ".env,.env.defaults").split(","):
+for env_file in os.environ.get("UNDERCOVER_ENV_FILES", ALL_FILES).split(","):
     load_dotenv(ROOT / env_file, interpolate=False)
 
 

@@ -1,5 +1,9 @@
 import { defineConfig } from "@playwright/test";
-import { DEFAULTS_ONLY, loadSettings, setting } from "./settings.config";
+import {
+  DEFAULTS_ONLY,
+  loadSettings,
+  setting,
+} from "./settings/settings.config";
 
 // The end-to-end tests run on their own ports and their own SQLite database, seeded
 // fresh each run, from .env.defaults alone, so they never touch the data or

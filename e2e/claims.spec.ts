@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
-import { setting } from "../settings.config";
+import { setting } from "../settings/settings.config";
 import { startClaim } from "./claim-starts";
 
 // The stand-in for the agent's service, which playwright.config.ts starts

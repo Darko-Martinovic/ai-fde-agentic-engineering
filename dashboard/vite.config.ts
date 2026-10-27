@@ -1,6 +1,10 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
-import { DEFAULTS_ONLY, loadSettings, setting } from "../settings.config";
+import {
+  DEFAULTS_ONLY,
+  loadSettings,
+  setting,
+} from "../settings/settings.config";
 
 export default defineConfig(({ mode }) => {
   // Tests read the committed defaults alone, never a developer's .env.

@@ -1,4 +1,4 @@
-"""The backend's settings, beyond the shared ones in settings.py."""
+"""The backend's settings, beyond the shared ones in settings/."""
 
 from pathlib import Path
 

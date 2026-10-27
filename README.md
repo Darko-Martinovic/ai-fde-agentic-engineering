@@ -44,8 +44,8 @@ This README describes what I added on top of Ed's builds. Each day's build here 
 | | Ed's build | Mine |
 |---|---|---|
 | Capped runs | `uv run -m agent --cap 5` | The same, and Run 5 and Run all in the dashboard, with the number of claims in a field |
-| Model | DeepSeek V4.1 Flash on OpenRouter, or `MODEL_NAME` | Any model in `models.toml`, on OpenRouter, Anthropic or a local Ollama, picked in the dashboard or with `--model`. The running model is shown, never written in code |
-| Settings | Defaults in code, such as the backend's URL | `.env.defaults` (committed), `.env` and `models.toml` with prices. No host, port, URL, model id or price in code, and tests that fail if one appears |
+| Model | DeepSeek V4.1 Flash on OpenRouter, or `MODEL_NAME` | Any model in `settings/models.toml`, on OpenRouter, Anthropic or a local Ollama, picked in the dashboard or with `--model`. The running model is shown, never written in code |
+| Settings | Defaults in code, such as the backend's URL | `settings/.env.defaults` (committed), `.env` and `settings/models.toml` with prices. No host, port, URL, model id or price in code, and tests that fail if one appears |
 | Watching a run | The latest run's to-do list and summary | A live run panel: model, claims done of the cap, time taken and left, model calls, tokens and cost, the to-do list, and the claim being worked with its steps arriving |
 | Usage | Not recorded | Each model call's tokens, cost and time, on the run |
 | Accuracy | Not scored | The model comparison, below |
@@ -117,7 +117,7 @@ Install [uv](https://docs.astral.sh/uv/) and Node, then from the repo root:
 ```
 uv sync
 npm install
-cp .env.example .env     # add a model key, DATABASE_URL and, for traces, the Langfuse keys
+cp settings/.env.example .env     # add a model key, DATABASE_URL and, for traces, the Langfuse keys
 uv run -m backend.seed   # load data/ into Supabase
 npm run dev              # backend on 8000, the agent's service on 8002, dashboard on http://localhost:5173
 ```
@@ -126,7 +126,7 @@ npm run dev              # backend on 8000, the agent's service on 8002, dashboa
 
 | Task | Command |
 |---|---|
-| The queue agent on five claims, on a model from `models.toml` | `uv run -m agent --cap 5 --model anthropic:claude-haiku-5-5` |
+| The queue agent on five claims, on a model from `settings/models.toml` | `uv run -m agent --cap 5 --model anthropic:claude-haiku-5-5` |
 | One claim | `uv run -m agent CLM-1001` |
 | Reset the data | `uv run -m backend.seed` |
 | Every check | `npm run check` |
