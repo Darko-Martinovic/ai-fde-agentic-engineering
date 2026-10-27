@@ -59,7 +59,7 @@ def test_the_pool_is_small_waits_for_a_connection_and_sets_up_once(monkeypatch):
     with real_pool() as connections:
         assert isinstance(connections, Pool)
         first, second = real_saver(connections), real_saver(connections)
-    assert (made["min_size"], made["max_size"], made["timeout"]) == (1, 4, 120)
+    assert (made["min_size"], made["max_size"], made["timeout"]) == (1, 4, 25)
     assert made["kwargs"] == {
         "autocommit": True,
         "prepare_threshold": 0,

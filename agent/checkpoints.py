@@ -15,8 +15,6 @@ from psycopg_pool import ConnectionPool
 
 from settings import optional_setting, setting
 
-# How long a claim agent waits for one of the pool's connections
-POOL_WAIT_SECONDS = 120
 NO_DATABASE = (
     "The agent saves its progress on Postgres, so a handler's sign-off can pick a"
     " claim back up: set DATABASE_URL in .env"
@@ -74,7 +72,7 @@ def pool() -> Iterator[Pool]:
         max_size=int(setting("DATABASE_CONNECTIONS")),
         kwargs=connection_options(schema),
         check=ConnectionPool.check_connection,
-        timeout=POOL_WAIT_SECONDS,
+        timeout=int(setting("DATABASE_WAIT_SECONDS")),
     ) as connections:
         with connections.connection() as conn:
             create_schema(conn, schema)

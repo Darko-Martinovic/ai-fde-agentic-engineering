@@ -156,7 +156,7 @@ Add GPT-6 Luna to `settings/models.toml` (reasoning `low`, $0.10 and $0.50 a mil
 - [x] Stub model test: a stub reply with `token_usage.cost` records that cost; a stub with no cost records the cost from the model's prices
 - [x] Stub model test: `CLM-1001` worked with no run records one model call per reply and one spell of work, with no run
 - [x] Stub model test: a claim whose first attempt fails after one model call, worked again in the same run, has both attempts' model calls and spells under the run
-- [x] Stub model test: `CLM-1002` approved for 1,350.00 pauses; the clock moves on an hour; it is signed off and carried on. It has two spells, together under a second, the second with no run. The same for a rejection, whose carry-on makes its own model calls with no run
+- [x] Stub model test: `CLM-1002` approved for 1,350.00 pauses; the clock moves on an hour; it is signed off and carried on. It has two spells, together far under the hour (under a second on an idle machine), the second with no run. The same for a rejection, whose carry-on makes its own model calls with no run
 - [x] Stub model test: in a queue run of two claims, every model call and spell carries the run's id, and each claim's trace has the run's tag; `CLM-1001` alone has none
 - [x] Postman: the two new operations, against the dev backend
 - [x] `npm run check` passes
@@ -177,7 +177,7 @@ Add `dispatcher.py`, `work_in_run`, `TRANSIENT`, the pool with a saver per claim
 - [x] Stub model test: when `start_claim` is refused, because another process started the claim, the dispatch reports it and works the rest
 - [x] Stub model test: a dispatch stopped with `KeyboardInterrupt` partway leaves its claims in progress, and the next carries them on as the same attempts, and pays a claim signed off while the service was away
 - [x] Stub model test: a dispatch started while the service resumes a claim leaves it out; Stop during a dispatch starts no more claims, lets the working ones finish, and the run shows stopped with the rest unfinished
-- [x] pytest: the pool opens at most `DATABASE_CONNECTIONS` with `timeout=120`, and each claim run's saver is its own; the backend's engine waits up to two minutes for a connection too (`pool_timeout=120`), since 25 claim agents send it requests at once
+- [x] pytest: the pool opens at most `DATABASE_CONNECTIONS` with `timeout` from `DATABASE_WAIT_SECONDS` (120 when built, 25 after the live runs, under the agent's 30 second wait for the backend), and each claim run's saver is its own; the backend's engine waits up to two minutes for a connection too (`pool_timeout=120`), since 25 claim agents send it requests at once
 - [x] pytest, backend: `create_dispatch` (N of 0 or 26 is 422), `record_run_claims` in order, `get_latest_dispatch` with each claim's state, decision, payout, start, seconds and cost, `finish_run` with the summary on a hand-made set of claims (paid, declined, referred, held, left for a handler, in progress, signed off but unpaid, rejected and waiting for the agent, never started), a second finish 409, `stop_runs`
 - [x] pytest, service: `start_dispatch` with N=2 runs with `max_concurrency` 2; a second start is 409 with "A dispatch or an evaluation is already running"; the lifespan marks a running run stopped; a dispatcher that fails marks the run stopped and frees the lock
 - [x] Command line: `uv run -m agent` asks for a claim id; `uv run -m agent CLM-1001` works one claim with no run
@@ -229,15 +229,15 @@ Add the Scoreboard page with its form and list, an evaluation's page, the header
 
 After one reseed, with `npm run dev` running and GPT-6 Luna, the runs the brief describes, then the documents.
 
-- [ ] Live: a dispatch at N=3 from the queue page; once three claims are decided, every process on port 8002 killed (`Get-NetTCPConnection -LocalPort 8002` then `Stop-Process -Force` on this Windows machine), which stops `npm run dev`; `npm run dev` again; the N=3 dispatch shows Stopped
-- [ ] Live: a dispatch at N=25 carries on the claims left in progress as the same attempts with one decision each, and works the rest with 25 at once, which their start times show; the run takes well under the sum of its claims' times
-- [ ] Live: claims worked from the start take about as long at N=25 as at N=3, from `work_times`; if not, report where the time goes from `model_calls` (each call's seconds) and the gaps between steps, keeping to 4 connections a process. Ed's run found the steps outside the model about 2.6 times slower at N=25, most likely waiting for a connection
-- [ ] Live: a held claim signed off on its page shows paid within five seconds; one rejected comes back for a review
-- [ ] Live: no claim fails for want of a connection, and `pg_stat_activity` never shows more than 12 `postgres` connections during the N=25 dispatch
-- [ ] Live: an evaluation of the evaluation set at N=25 and one of the held-out `tiny` claims at N=5 appear on the Scoreboard with every measure, and the queue's counts are the same before and after
-- [ ] Live: Langfuse's API finds the N=25 dispatch's claims together by its tag
-- [ ] `docs/SPEC.md` (working the queue, what the team sees; Rules unchanged), `docs/TECH_STACK.md`, `docs/PROCESS.md` (these runs replace the five-claim cap), `docs/CODE_STANDARDS.md` (10 and 13), `docs/STATUS.md`, `CLAUDE.md` and the README describe the product as it now is
-- [ ] `npm run check` passes with `.env` in place and moved out of the way
+- [x] Live: a dispatch at N=3 from the queue page; once three claims are decided, every process on port 8002 killed (`Get-NetTCPConnection -LocalPort 8002` then `Stop-Process -Force` on this Windows machine), which stops `npm run dev`; `npm run dev` again; the N=3 dispatch shows Stopped
+- [x] Live: a dispatch at N=25 carries on the claims left in progress as the same attempts with one decision each, and works the rest with 25 at once, which their start times show; the run takes well under the sum of its claims' times
+- [x] Live: claims worked from the start take about as long at N=25 as at N=3, from `work_times`; if not, report where the time goes from `model_calls` (each call's seconds) and the gaps between steps, keeping to 4 connections a process. Ed's run found the steps outside the model about 2.6 times slower at N=25, most likely waiting for a connection
+- [x] Live: a held claim signed off on its page shows paid within five seconds; one rejected comes back for a review (paid 3.9 s after the sign-off; the page, polling every two seconds, showed it at 5.9 s)
+- [x] Live: no claim fails for want of a connection, and `pg_stat_activity` never shows more than 12 `postgres` connections during the N=25 dispatch (the first N=25 try stalled the backend's threads, fixed with `BACKEND_THREADS`; see `docs/STATUS.md`)
+- [x] Live: an evaluation of the evaluation set at N=25 and one of the held-out `tiny` claims at N=5 appear on the Scoreboard with every measure, and the queue's counts are the same before and after
+- [x] Live: Langfuse's API finds the N=25 dispatch's claims together by its tag
+- [x] `docs/SPEC.md` (working the queue, what the team sees; Rules unchanged), `docs/TECH_STACK.md`, `docs/PROCESS.md` (these runs replace the five-claim cap), `docs/CODE_STANDARDS.md` (10 and 13), `docs/STATUS.md`, `CLAUDE.md` and the README describe the product as it now is
+- [x] `npm run check` passes with `.env` in place and moved out of the way
 
 ## Not in this plan
 

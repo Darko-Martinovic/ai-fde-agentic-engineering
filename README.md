@@ -19,6 +19,7 @@ This README describes what I added on top of Ed's builds. Each day's build here 
 | [`week2day1-end`](https://github.com/Darko-Martinovic/ai-fde-agentic-engineering/tree/week2day1-end) | Langfuse tracing, the Week 2 Day 1 lab and challenge | |
 | [`week2day2-end`](https://github.com/Darko-Martinovic/ai-fde-agentic-engineering/tree/week2day2-end) | The Week 2 Day 2 lab and challenge | |
 | [`week2day3-end`](https://github.com/Darko-Martinovic/ai-fde-agentic-engineering/tree/week2day3-end) | Durable state from `docs/DURABLE.md`, with a handler's rejection | Ed's `week2day3-end` |
+| [`week2day4-end`](https://github.com/Darko-Martinovic/ai-fde-agentic-engineering/tree/week2day4-end) | The swarm from `docs/SWARM.md`: a dispatcher with many claim agents at once, evaluations and the Scoreboard | Ed's `week2day4-end` |
 | `main` | The latest build, where work goes in through PRs | |
 
 ## Week 1: the AI Engineer
@@ -33,7 +34,7 @@ This README describes what I added on top of Ed's builds. Each day's build here 
 | Referrals | A referral is final | A `referred` state and a form where a handler approves or declines the claim |
 | Queue | Counts by state and a line per claim | Tiles per state that filter the table, money totals, search, a type filter and sortable columns |
 | After a run | Each decision printed, then a count | Insights, built just after the pilot: claims straight through, time per claim, a timeline of the latest run, tool calls and refusals, decisions by claim type, the sections cited and the money claimed, paid and held, from one read-only endpoint ([docs/PLAN_INSIGHTS.md](docs/PLAN_INSIGHTS.md)) |
-| API | 13 operations | 19 at the pilot (31 now), with a Postman collection that runs through the workflow and starts and stops the agent |
+| API | 13 operations | 19 at the pilot (35 now), with a Postman collection that runs through the workflow and starts and stops the agent |
 
 ![Insights after a run of the queue](assets/insights.png)
 
@@ -104,6 +105,33 @@ dashboard ──/api──> backend (FastAPI) ──SQLAlchemy Core──> Supab
 
 In the live trial on Claude Haiku 5.5, Run 5 worked five claims in 1 min 5 s for $0.02; signing off CLM-1008 on the dashboard showed it paid four seconds later, with no model call, and its Langfuse session holds the work before the pause and the payment after it. A queue run killed partway carried on from its last step the next time. The plan, with what isn't covered, is [docs/PLAN_DURABLE.md](docs/PLAN_DURABLE.md).
 
+### Day 4: a swarm of claim agents and a scoreboard
+
+![The latest dispatch on the queue page: 22 claims at 25 at once in 77 seconds](docs/screenshots/swarm-live-dispatch.png)
+
+The brief replaces the queue agent with a dispatcher that has no model: a LangGraph graph in the lab's style that works every claim left in progress and every waiting one with up to N claim agents at once, each on its own thread, with its pause for a sign-off and its recovery after a restart. A rate limit or a timeout waits and carries the claim on; any other failure gets one more try. Every model call's cost and every spell of work are recorded with their run, and a Scoreboard scores evaluations on copies of the labelled claims with the lab's measures.
+
+```
+dashboard ──/api──> backend ──> Supabase: claims, model calls, work times, runs, the answer key
+                       │  start_dispatch / start_evaluation / stop_run / resume_claim
+                       v
+                   agent's service ── dispatcher (LangGraph, no model, max_concurrency = N)
+                                          │ a Send per claim
+                                          v
+                                   harness.work_in_run ── claim graph, its own thread and PostgresSaver
+```
+
+| | Ed's build | Mine |
+|---|---|---|
+| Stop | None on the dashboard | A graceful Stop: no more claims start, those working finish, and the dispatch shows Stopped |
+| Model | `MODEL_NAME` only | A model picker on the dispatch and evaluation forms, `MODEL_NAME` chosen, recorded on each run |
+| Cost | OpenRouter's `usage.cost` | The same, or else the prices in `settings/models.toml`, so Anthropic and Ollama runs have a cost too |
+| A held payout | Sign-off only, refused on a copy | Sign-off or rejection; both refused on a copy, and a handler can't decide a copy left for them |
+| The model comparison | None | `bench/` rebuilt on evaluations: the backend is the only scorer, and only seeding reads `data/evals/` |
+| Limits and tests | 25 written in three places | `MAX_AGENTS` once in `settings/.env.defaults`; a test that a claim graph saves under its own thread and never as the dispatcher's subgraph; Postman for every operation |
+
+The live trial on GPT-6 Luna: a dispatch at N=3 killed partway with every process on port 8002, then one at N=25 that carried on the three claims left in progress as the same attempts and worked the other 19, all 22 starting within 3.6 seconds and finishing in 77 seconds against 1,221 seconds of claim work, for $0.02. Its first try stalled the backend: requests waiting for the 4 database connections took every thread, so the backend now keeps 200. The evaluation set at N=25 scored 84% on decisions and accuracy, and the held-out set's five tiny claims 100%. Every run of the day cost $0.09. The plan is [docs/PLAN_SWARM.md](docs/PLAN_SWARM.md), and the runs are in [docs/STATUS.md](docs/STATUS.md).
+
 ## How it's built
 
 - **Standards checked by tests.** Ed's code standards 1 to 14 plus eight more in [docs/CODE_STANDARDS.md](docs/CODE_STANDARDS.md), enforced by `tests/test_standards.py`, `dashboard/src/standards.test.ts`, ESLint and ruff, or by review: one owner for each service's address, one name for each operation, all SQL in `backend/store/`, functions under 40 lines and modules under 300, complexity limits, and no configuration in code.
@@ -126,8 +154,8 @@ npm run dev              # backend on 8000, the agent's service on 8002, dashboa
 
 | Task | Command |
 |---|---|
-| The queue agent on five claims, on a model from `settings/models.toml` | `uv run -m agent --cap 5 --model anthropic:claude-haiku-5-5` |
-| One claim | `uv run -m agent CLM-1001` |
+| A dispatch of the queue, or an evaluation | The queue page's Start a dispatch, or the Scoreboard's Start an evaluation, with `npm run dev` running |
+| One claim, on a model from `settings/models.toml` | `uv run -m agent CLM-1001 --model anthropic:claude-haiku-5-5` |
 | Reset the data | `uv run -m backend.seed` |
 | Every check | `npm run check` |
 | End-to-end tests | `npm run e2e` |

@@ -19,7 +19,7 @@ def test_with_database_url_the_records_are_on_postgres(monkeypatch):
     assert isinstance(engine.pool, QueuePool)
     assert engine.pool.size() == 4
     assert engine.pool._max_overflow == 0  # noqa: SLF001 - no public way to read it
-    assert engine.pool.timeout() == 120
+    assert engine.pool.timeout() == 25
 
 
 def test_postgres_connections_use_undercovers_schema(monkeypatch):

@@ -21,6 +21,8 @@ from agent import api, harness
 from agent.reports import IN_PROGRESS, WAITING
 
 STATUS = "status"
+# How the report reads for a claim left as it stands
+LEFT = "left for the next dispatch"
 EVALUATION = "evaluation"
 
 log = logging.getLogger(__name__)
@@ -101,7 +103,7 @@ def work_claim(state: ClaimToWork, runtime: Runtime[DispatchContext]) -> dict[st
     no claim stops the dispatch."""
     context, claim_id = runtime.context, state["claim_id"]
     if context.stop.is_set() or claim_id in context.resuming:
-        return reported(f"{claim_id}: left for the next dispatch")
+        return reported(f"{claim_id}: {LEFT}")
     try:
         report = context.work(claim_id, context.run["run_id"])
         if api.get_claim(claim_id)[STATUS] == WAITING and not context.stop.is_set():
@@ -129,8 +131,8 @@ def attempt(runtime: Runtime[DispatchContext]) -> int:
 
 def left(claim_id: str, error: Exception) -> str:
     """Report a claim whose work went wrong, as it stands, logging the error."""
-    log.warning("%s was left for the next dispatch", claim_id, exc_info=error)
-    return f"{claim_id}: left for the next dispatch ({type(error).__name__}: {error})"
+    log.warning("%s: %s", claim_id, LEFT, exc_info=error)
+    return f"{claim_id}: {LEFT} ({type(error).__name__}: {error})"
 
 
 def finish_run(state: Dispatch, runtime: Runtime[DispatchContext]) -> dict[str, Any]:
