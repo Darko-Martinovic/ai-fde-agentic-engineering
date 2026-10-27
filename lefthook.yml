@@ -5,7 +5,7 @@ pre-commit:
   parallel: true
   jobs:
     - name: python
-      glob: ["{backend,agent,tests,bench}/**/*.py", "*.py", "*.toml", ".env.defaults", "postman/**", "dashboard/src/api.ts"]
+      glob: ["{backend,agent,tests,bench,settings}/**/*.py", "*.py", "*.toml", "settings/*.toml", "settings/.env.defaults", "postman/**", "dashboard/src/api.ts"]
       group:
         piped: true
         jobs:
@@ -14,7 +14,7 @@ pre-commit:
           - run: npm run check:python
 
     - name: typescript
-      glob: ["{dashboard,e2e}/**", "*.config.*", ".env.defaults"]
+      glob: ["{dashboard,e2e}/**", "*.config.*", "settings/*.ts", "settings/.env.defaults"]
       group:
         piped: true
         jobs:

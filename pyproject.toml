@@ -53,7 +53,8 @@ server = [
 ]
 
 [tool.ruff]
-include = ["backend/**/*.py", "agent/**/*.py", "bench/**/*.py", "tests/**/*.py", "conftest.py", "settings.py"]
+cache-dir = ".cache/ruff"
+include = ["backend/**/*.py", "agent/**/*.py", "bench/**/*.py", "tests/**/*.py", "conftest.py", "settings/**/*.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "SIM", "UP", "PL", "S", "PT", "FAST", "C90", "PLR1702"]
@@ -69,6 +70,7 @@ max-complexity = 8
 
 [tool.pytest.ini_options]
 testpaths = ["backend", "agent", "bench", "tests"]
+cache_dir = ".cache/pytest"
 pythonpath = ["."]
 addopts = "--import-mode=importlib --cov --cov-report=term-missing"
 
@@ -80,7 +82,7 @@ omit = ["*/tests/*"]
 fail_under = 80
 
 [tool.pyright]
-include = ["backend", "agent", "bench", "settings.py"]
+include = ["backend", "agent", "bench", "settings"]
 venvPath = "."
 venv = ".venv"
 pythonVersion = "3.12"
