@@ -8,8 +8,7 @@ from langchain_core.utils.function_calling import convert_to_openai_tool
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 
-import agent.__main__ as cli
-from agent import harness, queue_agent
+from agent import harness
 from agent.config import model
 from agent.tests.stub import FREE, REASONS, StubModel, decide, stub, tool_call
 from agent.tools import CLAIM_TOOLS
@@ -31,7 +30,7 @@ def test_work_claim_approves_and_the_graph_pays(backend, run, memory_saver):
     steps = backend.get("/api/claims/CLM-1001/steps").json()
     assert [s["kind"] for s in steps] == ["tool_call", "tool_result"] * 4
     assert not any(s["text"].startswith("pay_claim") for s in steps)
-    assert backend.get("/api/runs/latest").json()["usage"]["model_calls"] == 4
+    assert backend.get("/api/dispatches/latest").json()["usage"]["model_calls"] == 4
     assert steps[0]["text"] == "get_claim {}"
     assert '"story"' in steps[1]["text"]
     assert len({s["thread_id"] for s in steps}) == 1
@@ -145,7 +144,7 @@ def test_usage_is_recorded_on_the_run(backend, run, memory_saver):
     harness.work_claim(
         "CLM-1001", run, priced, memory_saver, stub(reply, AIMessage(content="."))
     )
-    usage = backend.get("/api/runs/latest").json()["usage"]
+    usage = backend.get("/api/dispatches/latest").json()["usage"]
     assert usage["model_calls"] == 2
     assert usage["input_tokens"] == 20000
     assert usage["cost"] == pytest.approx(priced.cost(20000, 1000))
@@ -333,7 +332,7 @@ def test_both_attempts_of_a_claim_count_on_its_run(backend, run, memory_saver):
     assert len({c["thread_id"] for c in calls}) == 2
     assert [c["run_id"] for c in calls] == [run, run]
     assert [s["run_id"] for s in spells] == [run, run]
-    assert backend.get("/api/runs/latest").json()["usage"]["model_calls"] == 2
+    assert backend.get("/api/dispatches/latest").json()["usage"]["model_calls"] == 2
 
 
 @pytest.fixture
@@ -381,29 +380,6 @@ def test_a_carry_on_after_a_rejection_makes_its_calls_with_no_run(
     before, after = work_times("CLM-1002")
     assert (before["run_id"], after["run_id"]) == (run, None)
     assert before["seconds"] + after["seconds"] < 1
-
-
-def test_a_queue_runs_claims_record_its_run(backend, memory_saver):
-    queue_llm = stub(
-        tool_call("work_claim", claim_id="CLM-1001"),
-        tool_call("work_claim", claim_id="CLM-1004"),
-        AIMessage(content="Two claims worked."),
-    )
-    claim_llm = stub(decide("approve", 420.0), decide("decline", 0.0))
-    queue_agent.run_queue(2, FREE, memory_saver, queue_llm, claim_llm)
-    run_id = backend.get("/api/runs/latest").json()["run_id"]
-    for claim_id in ("CLM-1001", "CLM-1004"):
-        assert [c["run_id"] for c in model_calls(claim_id)] == [run_id]
-        assert [s["run_id"] for s in work_times(claim_id)] == [run_id]
-
-
-def test_the_command_line_counts_a_claim_on_its_run(backend, monkeypatch):
-    monkeypatch.setattr(
-        harness, "chat_model", lambda chosen: stub(decide("approve", 420.0))
-    )
-    cli.work_claims(["CLM-1001"], FREE)
-    run_id = backend.get("/api/runs/latest").json()["run_id"]
-    assert [c["run_id"] for c in model_calls("CLM-1001")] == [run_id]
 
 
 def test_a_spell_that_ends_in_an_error_is_still_recorded(backend, run, memory_saver):

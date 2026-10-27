@@ -21,13 +21,39 @@ def add_work_time(conn: Connection, claim_id: str, spell: dict[str, Any]) -> Non
 
 
 def run_model_calls(conn: Connection, run_id: int) -> RowMapping:
-    """A run's model calls added up: how many, their tokens, cost and seconds."""
+    """A run's model calls added up: how many, their tokens and their cost."""
     call = db.model_calls.c
     found = select(
         func.count().label("model_calls"),
         func.coalesce(func.sum(call.input_tokens), 0).label("input_tokens"),
         func.coalesce(func.sum(call.output_tokens), 0).label("output_tokens"),
         func.coalesce(func.sum(call.cost), 0).label("cost"),
-        func.coalesce(func.sum(call.seconds), 0).label("seconds"),
     ).where(call.run_id == run_id)
     return conn.execute(found).mappings().one()
+
+
+def claim_costs(conn: Connection, run_id: int) -> dict[str, float]:
+    """What each claim's model calls cost in a run, by claim."""
+    call = db.model_calls.c
+    found = (
+        select(call.claim_id, func.sum(call.cost))
+        .where(call.run_id == run_id)
+        .group_by(call.claim_id)
+    )
+    return {claim_id: cost for claim_id, cost in conn.execute(found).all()}
+
+
+def claim_times(conn: Connection, run_id: int) -> dict[str, RowMapping]:
+    """When each claim's first spell of work in a run started, and how many
+    seconds its spells took in all, by claim."""
+    spell = db.work_times.c
+    found = (
+        select(
+            spell.claim_id,
+            func.min(spell.started_at).label("started_at"),
+            func.sum(spell.seconds).label("seconds"),
+        )
+        .where(spell.run_id == run_id)
+        .group_by(spell.claim_id)
+    )
+    return {row["claim_id"]: row for row in conn.execute(found).mappings()}

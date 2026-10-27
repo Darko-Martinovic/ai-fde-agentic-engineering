@@ -1,11 +1,11 @@
-import type { AgentState, Insights, ModelChoice, Run } from "./api";
+import type { Insights, ModelChoice, Run, RunClaim } from "./api";
 
-/* Test fixtures for the agent: its models, state, runs and insights. */
+/* Test fixtures for the agent: its models, dispatches and insights. */
 
 export const MODELS: ModelChoice[] = [
   {
-    spec: "openrouter:deepseek/deepseek-v4.1-flash",
-    label: "DeepSeek V4.1 Flash",
+    spec: "openrouter:openai/gpt-6-luna",
+    label: "GPT-6 Luna",
     default: true,
   },
   {
@@ -15,40 +15,61 @@ export const MODELS: ModelChoice[] = [
   },
 ];
 
-/** A queue run on Claude Haiku 5.5, five claims capped, two started: CLM-1001
- *  done and CLM-1002 being worked. */
-export function run(overrides: Partial<Run> = {}): Run {
+/** A claim in a dispatch: CLM-1001, decided and paid $420.00, by default. */
+export function runClaim(overrides: Partial<RunClaim> = {}): RunClaim {
   return {
-    run_id: 1,
-    mode: "queue",
-    cap: 5,
-    model: "anthropic:claude-haiku-5-5",
-    status: "running",
-    started_at: "2026-10-21T10:00:00Z",
-    finished_at: null,
-    summary: null,
-    todos: [
-      { content: "Work CLM-1001", status: "completed" },
-      { content: "Work CLM-1002", status: "in_progress" },
-    ],
-    claims_started: ["CLM-1001", "CLM-1002"],
-    usage: {
-      model_calls: 16,
-      input_tokens: 72240,
-      output_tokens: 4316,
-      cost: 0.0094,
-      seconds: 39,
-    },
+    claim_id: "CLM-1001",
+    claim_type: "trip_delay",
+    customer_name: "Priya Shah",
+    amount_claimed: 420,
+    submitted_on: "2026-09-02",
+    status: "decided",
+    decision: "approve",
+    payout: 420,
+    paid: 420,
+    started_at: "2026-10-27T10:00:01Z",
+    seconds: 12.4,
+    model_cost: 0.0011,
     ...overrides,
   };
 }
 
-export const IDLE: AgentState = {
-  model: null,
-  running: false,
-  mode: null,
-  claim_id: null,
-};
+/** A dispatch on GPT-6 Luna with three claim agents, running: CLM-1001 done
+ *  and CLM-1002 being worked. */
+export function run(overrides: Partial<Run> = {}): Run {
+  return {
+    run_id: 7,
+    kind: "dispatch",
+    agents: 3,
+    model: "openrouter:openai/gpt-6-luna",
+    reasoning_effort: "low",
+    status: "running",
+    started_at: "2026-10-27T10:00:00Z",
+    finished_at: null,
+    seconds: null,
+    summary: null,
+    usage: {
+      model_calls: 9,
+      input_tokens: 41230,
+      output_tokens: 2210,
+      cost: 0.0204,
+    },
+    claims: [
+      runClaim(),
+      runClaim({
+        claim_id: "CLM-1002",
+        customer_name: "Tom Becker",
+        status: "in_progress",
+        decision: null,
+        payout: null,
+        paid: null,
+        seconds: 6,
+        model_cost: 0.0004,
+      }),
+    ],
+    ...overrides,
+  };
+}
 
 export const NO_INSIGHTS: Insights = {
   totals: {

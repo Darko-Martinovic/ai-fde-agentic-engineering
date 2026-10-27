@@ -27,7 +27,7 @@ def test_a_model_call_is_recorded_with_its_run(client):
     assert {key: row[key] for key in CALL} == CALL
     assert (row["claim_id"], row["run_id"]) == ("CLM-1004", run_id)
     assert row["recorded_at"]
-    assert client.get("/api/runs/latest").json()["usage"]["cost"] == 0.0042
+    assert client.get("/api/dispatches/latest").json()["usage"]["cost"] == 0.0042
 
 
 def test_a_model_call_outside_a_run_has_none(client):

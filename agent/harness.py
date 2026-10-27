@@ -7,6 +7,7 @@ from typing import Any
 from uuid import uuid4
 
 from langchain.chat_models import init_chat_model
+from langchain_core.exceptions import ModelRateLimitError, ModelTimeoutError
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
@@ -14,14 +15,16 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.types import Command
 
 from agent import api, graph, recording, tracing
-from agent.claims import claims_in
 from agent.config import Model
-from agent.reports import report
+from agent.reports import IN_PROGRESS, report
 from agent.tools import ClaimContext
 from settings import setting
 
 STOPPED = "The agent stopped before finishing the claim: it replied with no decision"
-STOPPED_RUN = "The run stopped before it finished."
+# The model errors that pass with time. Work on a claim that hits one stops
+# without settling the claim, which stays in progress, its progress saved, for
+# the dispatcher to carry on after a wait.
+TRANSIENT = (ModelRateLimitError, ModelTimeoutError)
 
 # Our providers, and the LangChain integration that serves each one
 INTEGRATIONS = {"openrouter": "openai", "anthropic": "anthropic", "ollama": "ollama"}
@@ -32,8 +35,7 @@ def timeout() -> float:
 
 
 # How to reach each provider, from the settings. A call that takes too long
-# fails, and only the agents retry it (the claim graph's model and the queue
-# agent's middleware), not the provider's client.
+# fails, and only the claim graph's model retries it, not the provider's client.
 CONNECTIONS: dict[str, Callable[[], dict[str, Any]]] = {
     "openrouter": lambda: {
         "base_url": setting("OPENROUTER_BASE_URL"),
@@ -75,7 +77,7 @@ def contents() -> str:
 
 def instructions() -> str:
     """The claim agent's instructions and the documents' contents, from the API."""
-    return f"{api.get_instructions('claim')}\n\n{contents()}"
+    return f"{api.get_instructions()}\n\n{contents()}"
 
 
 def claim_graph(
@@ -90,7 +92,7 @@ def undecided(claim: dict[str, Any]) -> bool:
     """Whether a claim in progress waits for the agent's decision: it has none,
     or a handler rejected the payout it had."""
     latest = claim["decisions"][-1] if claim["decisions"] else None
-    in_progress = claim["status"] == "in_progress"
+    in_progress = claim["status"] == IN_PROGRESS
     return in_progress and (latest is None or latest["review"] == "rejected")
 
 
@@ -141,9 +143,12 @@ def run_graph(
     config: RunnableConfig,
 ) -> str:
     """Work the claim for a spell and report in a line: the decision and payout,
-    or what went wrong, failing a claim left undecided."""
+    or what went wrong, failing a claim left undecided. A transient error is
+    raised again, leaving the claim in progress."""
     try:
         work_one_spell(claim_graph, context, start, config)
+    except TRANSIENT:
+        raise
     except Exception as error:  # noqa: BLE001 - one bad claim never stops a run
         return failed(context, f"{type(error).__name__}: {error}")
     worked = api.get_claim(context.claim_id)
@@ -243,28 +248,16 @@ def carry_on(
     )
 
 
-def finish_stopped_run() -> None:
-    """Finish the latest run if it is still running, because its process was
-    stopped before it could: a crash, Ctrl-C or a restart."""
-    latest = api.get_latest_run()
-    if latest and latest["status"] == "running":
-        api.finish_run(latest["run_id"], STOPPED_RUN)
-
-
-def carry_on_stopped(
-    run_id: int,
+def work_in_run(
+    claim_id: str,
+    run_id: int | None,
     model: Model,
-    saver: BaseCheckpointSaver[Any],
+    new_saver: Callable[[], BaseCheckpointSaver[Any]],
     llm: BaseChatModel | None = None,
-) -> dict[str, str]:
-    """Carry on every claim left in progress, as by a run that was stopped or a
-    sign-off while the agent was away, printing each one's report as it comes.
-    Return the reports, by claim. These claims aren't new attempts, so they don't
-    count toward a run's cap."""
-    reports = {}
-    for claim in claims_in("in_progress"):
-        reports[claim["claim_id"]] = carry_on(
-            claim["claim_id"], run_id, model, saver, llm
-        )
-        print(reports[claim["claim_id"]], flush=True)
-    return reports
+) -> str:
+    """Work one claim in a run, or on its own (`run_id` None), with a saver of
+    its own, and report in a line: carry it on if it's in progress, or start it
+    if it's waiting. The one way a dispatch reaches the claim agent."""
+    if api.get_claim(claim_id)["status"] == IN_PROGRESS:
+        return carry_on(claim_id, run_id, model, new_saver(), llm)
+    return work_claim(claim_id, run_id, model, new_saver(), llm)

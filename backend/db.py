@@ -28,6 +28,8 @@ from backend.config import database_path
 from settings import optional_setting, setting
 
 metadata = MetaData()
+# How long a request waits for one of the pool's connections
+POOL_WAIT_SECONDS = 120
 
 
 def text_column(
@@ -106,19 +108,29 @@ decisions = Table(
     text_column("review_note", nullable=True),
     sqlite_autoincrement=True,
 )
+# A dispatch: N claim agents at once on the claims of the queue, on a model.
+# Its summary, built from the records when it finishes, is kept as JSON.
 runs = Table(
     "runs",
     metadata,
     counter("run_id"),
-    text_column("mode"),
-    Column("cap", Integer, nullable=False),
+    text_column("kind"),
+    Column("agents", Integer, nullable=False),
     text_column("model"),
+    text_column("reasoning_effort"),
     text_column("status"),
     text_column("started_at"),
     text_column("finished_at", nullable=True),
     text_column("summary", nullable=True),
-    text_column("todos"),
     sqlite_autoincrement=True,
+)
+# The claims a run works, in the order it takes them
+run_claims = Table(
+    "run_claims",
+    metadata,
+    Column("run_id", Integer, primary_key=True),
+    Column("position", Integer, primary_key=True),
+    text_column("claim_id"),
 )
 attempts = Table(
     "attempts",
@@ -128,20 +140,6 @@ attempts = Table(
     text_column("claim_id"),
     text_column("thread_id"),
     text_column("started_at"),
-    sqlite_autoincrement=True,
-)
-usage = Table(
-    "usage",
-    metadata,
-    counter("usage_id"),
-    Column("run_id", Integer, nullable=False),
-    text_column("claim_id", nullable=True),
-    text_column("model"),
-    Column("input_tokens", Integer, nullable=False),
-    Column("output_tokens", Integer, nullable=False),
-    Column("cost", Float, nullable=False),
-    Column("seconds", Float, nullable=False),
-    text_column("recorded_at"),
     sqlite_autoincrement=True,
 )
 # Each model call a claim agent makes, and each spell of its work on a claim,
@@ -237,6 +235,8 @@ def engine_for(url: str) -> Engine:
         connect_args={"options": f"-c search_path={schema()}"},
         pool_size=int(setting("DATABASE_CONNECTIONS")),
         max_overflow=0,
+        # Many claim agents at once share the pool: wait for a connection
+        pool_timeout=POOL_WAIT_SECONDS,
         pool_pre_ping=True,
     )
 
@@ -249,10 +249,17 @@ def create_tables(conn: Connection) -> None:
     metadata.create_all(conn)
 
 
+# Tables earlier builds made, which seeding drops so none is left behind: the
+# queue agent's model calls, which claims' model calls replaced
+RETIRED = ("usage",)
+
+
 def drop_tables(conn: Connection) -> None:
-    """Drop the backend's tables, leaving any others, such as the agent's
-    checkpoints, alone."""
+    """Drop the backend's tables, and those it no longer has, leaving any others,
+    such as the agent's checkpoints, alone."""
     metadata.drop_all(conn)
+    for name in RETIRED:
+        Table(name, MetaData()).drop(conn, checkfirst=True)
 
 
 def where(engine: Engine) -> str:

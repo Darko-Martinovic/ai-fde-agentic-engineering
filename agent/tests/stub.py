@@ -1,5 +1,8 @@
+from collections.abc import Iterator
+
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
 
 from agent.config import model
 
@@ -46,4 +49,30 @@ def decide(decision, payout):
         payout=payout,
         reasons=REASONS,
         policy_section="Section 3, Trip Delay",
+    )
+
+
+class ByClaim(StubModel):
+    """A stub model for claim agents working side by side: each claim's replies
+    come from its own script, chosen by the claim its thread starts with."""
+
+    scripts: dict[str, Iterator[AIMessage]]
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        first = next(m for m in messages if isinstance(m, HumanMessage))
+        claim_id = str(first.content).removeprefix("Claim ")
+        return ChatResult(generations=[ChatGeneration(message=self.reply(claim_id))])
+
+    def reply(self, claim_id):
+        return next(self.scripts[claim_id])
+
+
+def by_claim(**scripts):
+    """A stub model that works each claim named, as CLM_1001=[replies], from its
+    own replies."""
+    return ByClaim(
+        messages=iter([]),
+        scripts={
+            claim.replace("_", "-"): iter(replies) for claim, replies in scripts.items()
+        },
     )

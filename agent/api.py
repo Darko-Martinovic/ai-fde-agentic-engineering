@@ -8,10 +8,18 @@ import httpx
 
 from settings import setting
 
+# Connections refused before the backend is up, as when npm run dev starts it
+# beside the agent's service, are tried again this many times
+CONNECT_RETRIES = 5
+
 
 def client() -> httpx.Client:
     """Return a client for the backend at UNDERCOVER_API."""
-    return httpx.Client(base_url=setting("UNDERCOVER_API"), timeout=30)
+    return httpx.Client(
+        base_url=setting("UNDERCOVER_API"),
+        timeout=30,
+        transport=httpx.HTTPTransport(retries=CONNECT_RETRIES),
+    )
 
 
 class Refused(Exception):
@@ -54,8 +62,8 @@ def get_customer(customer_id: str) -> dict[str, Any]:
     return send("GET", f"/api/customers/{customer_id}").json()
 
 
-def get_instructions(agent: str) -> str:
-    return send("GET", f"/api/instructions/{agent}").text
+def get_instructions() -> str:
+    return send("GET", "/api/instructions").text
 
 
 def list_sections() -> list[dict[str, Any]]:
@@ -80,25 +88,21 @@ def fail_claim(claim_id: str, thread_id: str, reason: str) -> dict[str, Any]:
     return send("POST", f"/api/claims/{claim_id}/failure", body).json()
 
 
-def start_run(mode: str, cap: int, model: str) -> dict[str, Any]:
-    body = {"mode": mode, "cap": cap, "model": model}
-    return send("POST", "/api/runs", body).json()
+def create_dispatch(agents: int, model: str, reasoning_effort: str) -> dict[str, Any]:
+    body = {"agents": agents, "model": model, "reasoning_effort": reasoning_effort}
+    return send("POST", "/api/runs/dispatches", body).json()
 
 
-def get_latest_run() -> dict[str, Any] | None:
-    return send("GET", "/api/runs/latest").json()
+def record_run_claims(run_id: int, claim_ids: list[str]) -> None:
+    send("PUT", f"/api/runs/{run_id}/claims", {"claim_ids": claim_ids})
 
 
-def write_todos(run_id: int, todos: list[dict[str, str]]) -> None:
-    send("PUT", f"/api/runs/{run_id}/todos", {"todos": todos})
+def finish_run(run_id: int, stopped: bool) -> dict[str, Any]:
+    return send("POST", f"/api/runs/{run_id}/finish", {"stopped": stopped}).json()
 
 
-def finish_run(run_id: int, summary: str) -> dict[str, Any]:
-    return send("POST", f"/api/runs/{run_id}/finish", {"summary": summary}).json()
-
-
-def record_usage(run_id: int, usage: dict[str, Any]) -> None:
-    send("POST", f"/api/runs/{run_id}/usage", usage)
+def stop_runs() -> list[int]:
+    return send("POST", "/api/runs/stop").json()["run_ids"]
 
 
 def record_model_call(claim_id: str, call: dict[str, Any]) -> None:

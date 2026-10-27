@@ -7,7 +7,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
 
-from agent import api, config
+from agent import api, config, dispatcher
 from agent.tests.stub import FREE
 from backend import agent_service
 from backend.main import app
@@ -25,10 +25,19 @@ def backend(tmp_path, monkeypatch):
     return TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def no_waits(monkeypatch):
+    """The dispatcher's RetryPolicy, with its three tries, but no waits between
+    them, so no test sleeps through the backoff."""
+    monkeypatch.setattr(
+        dispatcher, "RETRY", dispatcher.RETRY._replace(initial_interval=0, jitter=False)
+    )
+
+
 @pytest.fixture
 def run(backend):
-    """A run to work claims in, on a free model."""
-    return api.start_run("queue", 25, FREE.spec)["run_id"]
+    """A dispatch to work claims in, on a free model."""
+    return api.create_dispatch(3, FREE.spec, FREE.reasoning_effort)["run_id"]
 
 
 @pytest.fixture

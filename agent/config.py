@@ -14,6 +14,8 @@ PER_MILLION = 1_000_000
 # many seconds, for every agent
 MODEL_RETRIES = 2
 RETRY_DELAY = 1.0
+# The reasoning effort a run records for a model run without one
+NO_REASONING = "none"
 
 
 @dataclass(frozen=True)
@@ -33,6 +35,11 @@ class Model:
     @property
     def name(self) -> str:
         return self.spec.split(":", 1)[1]
+
+    @property
+    def reasoning_effort(self) -> str:
+        """The reasoning effort the model runs with, which a run records."""
+        return self.options.get("reasoning_effort", NO_REASONING)
 
     def cost(self, input_tokens: int, output_tokens: int) -> float:
         """What a model call cost in US dollars, at the prices in models.toml."""

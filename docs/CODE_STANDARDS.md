@@ -7,7 +7,7 @@
 3. Be concise: a short README and no emojis.
 4. IMPORTANT: avoid overly defensive code. Handle exceptions only when necessary.
 5. Use uv: ALWAYS `uv run`, NEVER `python3`.
-6. TypeScript: strict mode, never `any`.
+10. Use the framework's own way before writing your own: FastAPI dependencies and models, LangChain's `context_schema` with `ToolRuntime` for what a tool needs to know, LangGraph's `Send`, `max_concurrency`, `RetryPolicy` and `Runtime` context for the dispatcher, `init_chat_model` for models, React hooks and shared components. Check the documentation for the installed version. Where we write our own instead, the plan says why.
 
 ## Structure
 
@@ -20,7 +20,7 @@
 
 ## The agent
 
-13. The agent has four parts, kept apart, and their supports. `api.py` is the backend's API. `tools.py` holds every tool and the contexts the tools read. `harness.py` builds and runs the claim agents: their models, their graphs and their work on a claim, and `queue_agent.py` the queue agent. `service.py` is the agent's service, which the backend calls after a handler's review. `graph.py` is the claim agent's graph, whose nodes record what middleware recorded for `create_agent`; `middleware.py` holds what happens around the queue agent's model and tool calls, `recording.py` what both record on the backend, `reports.py` the line each piece of work on a claim reports, `checkpoints.py` where the claim graph saves its progress, `claims.py` the claims by state, `tracing.py` traces them in Langfuse, and `config.py` reads the models allowed. Rules about claims and payments are enforced by the backend, whatever the agent does.
+13. The agent has five parts, kept apart, and their supports. `api.py` is the backend's API. `tools.py` holds every tool and the context the tools read. `harness.py` builds and runs the claim agents: their models, their graphs and their work on a claim. `dispatcher.py` works a dispatch with many claim agents at once, and reaches the claim agent only through the harness's one function, `work_in_run`. `service.py` is the agent's service, which the backend calls to start and stop a dispatch and after a handler's review. `graph.py` is the claim agent's graph, whose nodes record each step and model call; `recording.py` holds what they record on the backend, `reports.py` the line each piece of work on a claim reports, `checkpoints.py` where the claim graph saves its progress, `tracing.py` traces the claims in Langfuse, and `config.py` reads the models allowed. Rules about claims and payments are enforced by the backend, whatever the agent does.
 14. Instructions give an agent its goal, what it has to work from and what done looks like. They don't script its steps: it plans those itself. Anything that must always happen, or happen in a fixed order, is done by the code.
 
 ## Checked by tests
@@ -29,7 +29,7 @@ Except where marked, these hold because a test fails when they don't: `tests/tes
 
 15. One owner for each service's address. In the agent, `httpx` and `/api/` paths of the backend appear only in `agent/api.py` (the agent's service declares its own routes under its `/api` router); in the backend, `httpx` and `UNDERCOVER_AGENT` only in `backend/agent_service.py`; in the dashboard, `fetch` and `/api/` paths only in `api.ts`.
 16. One name for each operation: each function in `agent/api.py` is named after a backend `operation_id`, each key of `api` in `dashboard/src/api.ts` is the same name in camelCase, and each Postman request's description starts with its operation, every operation having at least one request.
-17. `backend/main.py` only puts the app together. Routes live in one router per resource (claims, records, documents, workflow, reviews, runner, insights and runs). All SQL lives in `backend/store/`, one module per group of tables, each function named for what it returns or does; routes and other modules call those functions, never the database. `backend/db.py` holds the schema. The one other place is `agent/checkpoints.py`, which opens the claim graph's checkpointer: LangGraph makes its own tables, and the module makes the schema for them and turns row level security on for them.
+17. `backend/main.py` only puts the app together. Routes live in one router per resource (claims, records, documents, workflow, usage, reviews, runs, agent models and insights). All SQL lives in `backend/store/`, one module per group of tables, each function named for what it returns or does; routes and other modules call those functions, never the database. `backend/db.py` holds the schema. The one other place is `agent/checkpoints.py`, which opens the claim graph's checkpointer: LangGraph makes its own tables, and the module makes the schema for them and turns row level security on for them.
 18. Size: a module stays under 300 lines and a function under 40, or 120 for a React component. Past that, split it. ESLint enforces `max-lines` 300, `max-lines-per-function` 120 and `complexity` 10; ruff enforces mccabe 8; tests check each Python module's and function's length.
 19. Page links are built in one place, `dashboard/src/paths.ts`, which also reads them back.
 20. Tests mirror modules: a test file per module it tests, shared helpers in `conftest.py` or `dashboard/src/testing.ts`. (Checked by review.)

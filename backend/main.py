@@ -3,12 +3,12 @@
 from fastapi import FastAPI
 
 from backend import (
+    agent_models,
     claims,
     documents,
     insights,
     records,
     reviews,
-    runner,
     runs,
     usage,
     workflow,
@@ -23,7 +23,7 @@ for module in (
     usage,
     reviews,
     runs,
-    runner,
+    agent_models,
     insights,
 ):
     app.include_router(module.router)

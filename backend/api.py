@@ -1,5 +1,5 @@
-"""What the backend's routes share: the database for a request, the time, and
-loading a claim or a run."""
+"""What the backend's routes share: the database for a request, the time, a
+claim's line in the queue, and loading a claim."""
 
 import json
 from collections.abc import Iterator
@@ -7,13 +7,12 @@ from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException
-from sqlalchemy import Connection
+from sqlalchemy import Connection, RowMapping
 
 from backend import db
-from backend.models import Claim, Policy
-from backend.run_models import Run
+from backend.models import Claim, ClaimSummary, Policy
 from backend.seed import ready
-from backend.store import claims, records, runs, usage
+from backend.store import claims, records, runs
 
 
 def database() -> Iterator[Connection]:
@@ -39,6 +38,20 @@ def found[T](record: T | None, label: str, key: str) -> T:
     if record is None:
         raise HTTPException(404, f"{label} {key} not found")
     return record
+
+
+def queue_line(row: RowMapping) -> ClaimSummary:
+    """A claim's line in the queue, from its row in `claims.queue`."""
+    return ClaimSummary.model_validate(
+        json.loads(row["data"])
+        | {
+            "status": row["status"],
+            "customer_name": json.loads(row["customer"])["name"],
+            "decision": row["decision"],
+            "payout": row["payout"],
+            "paid": row["paid"],
+        }
+    )
 
 
 def load_claim(conn: Connection, claim_id: str) -> Claim:
@@ -79,27 +92,3 @@ def load_policy(conn: Connection, policy_id: str) -> Policy:
 def company(conn: Connection) -> dict[str, Any]:
     """The company's rules, such as the payout approval limit."""
     return json.loads(records.stored(conn, "company"))
-
-
-def load_run(conn: Connection, run_id: int) -> Run:
-    """Load one run with its to-do list, the claims it started and its usage:
-    the queue agent's model calls and its claim agents'."""
-    row = found(runs.run(conn, run_id), "Run", str(run_id))
-    queue_agent = runs.usage(conn, run_id)
-    claim_agents = usage.run_model_calls(conn, run_id)
-    return Run.model_validate(
-        dict(row)
-        | {
-            "todos": json.loads(row["todos"]),
-            "claims_started": sorted(runs.claims_started(conn, run_id)),
-            "usage": {key: queue_agent[key] + claim_agents[key] for key in queue_agent},
-        }
-    )
-
-
-def require_running(conn: Connection, run_id: int) -> Run:
-    """Load a run that is still running, or refuse."""
-    run = load_run(conn, run_id)
-    if run.status != "running":
-        raise HTTPException(409, f"Run {run_id} is {run.status}, not running")
-    return run
