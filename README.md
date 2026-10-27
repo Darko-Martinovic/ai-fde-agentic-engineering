@@ -23,7 +23,8 @@ This README describes what I added on top of Ed's builds. Each day's build here 
 
 ## Week 1: the AI Engineer
 
-### Day 3: the pilot
+<details>
+<summary><b>Day 3: the pilot</b>: Run and Stop on the dashboard, referrals a handler finishes, and Insights</summary>
 
 ![The queue after a run of the agent](assets/queue-after-run.png)
 
@@ -37,7 +38,10 @@ This README describes what I added on top of Ed's builds. Each day's build here 
 
 ![Insights after a run of the queue](assets/insights.png)
 
-### Day 5: the harness
+</details>
+
+<details>
+<summary><b>Day 5: the harness</b>: any model from <code>settings/models.toml</code>, a live run panel, and the model comparison</summary>
 
 ![The run panel after five claims on Claude Haiku 5.5](docs/screenshots/harness-run-finished.png)
 
@@ -64,9 +68,12 @@ The plan is [docs/PLAN_HARNESS.md](docs/PLAN_HARNESS.md).
 
 The whole comparison cost $2.06. The full report, with every claim each model got wrong, is [bench/results.md](bench/results.md).
 
+</details>
+
 ## Week 2: the AI Architect
 
-### Labs and challenges
+<details>
+<summary><b>Labs and challenges</b>: a notebook for each day, and what each found</summary>
 
 Each challenge is a notebook in [community_contributions/Darko-Martinovic](community_contributions/Darko-Martinovic), kept with its outputs: Days 1 and 2 ran on Claude Haiku 5.5, Days 3 to 5 on GPT-6 Luna.
 
@@ -78,7 +85,10 @@ Each challenge is a notebook in [community_contributions/Darko-Martinovic](commu
 | 4 | The swarm's dispatcher with a `score_run` node, then checkpointed in Supabase, killed partway and picked up | With `max_concurrency=5` it saved no result before the kill, so every claim it had started was worked again; the claim agents still cost only a few model calls, picking up from their own saved steps |
 | 5 | The short policy wording as a lever for the improver, with a control that swaps in the short wording alone | The improver kept the full wording, rightly: the short one dropped the grade from 1.24 to 0.81 (no section numbers to cite) and saved nothing, since the full prompt was already 98% cached |
 
-### Day 3: durable state
+</details>
+
+<details>
+<summary><b>Day 3: durable state</b>: Supabase, the claim agent as a LangGraph graph, and a handler's rejection</summary>
 
 ![A payout signed off on the dashboard and paid by the agent's service](docs/screenshots/durable-signed-off-paid.png)
 
@@ -103,6 +113,8 @@ dashboard ──/api──> backend (FastAPI) ──SQLAlchemy Core──> Supab
 | Tests | 20 unit test files | 45, and Playwright tests where a review reaches a stand-in for the agent's service |
 
 In the live trial on Claude Haiku 5.5, Run 5 worked five claims in 1 min 5 s for $0.02; signing off CLM-1008 on the dashboard showed it paid four seconds later, with no model call, and its Langfuse session holds the work before the pause and the payment after it. A queue run killed partway carried on from its last step the next time. The plan, with what isn't covered, is [docs/PLAN_DURABLE.md](docs/PLAN_DURABLE.md).
+
+</details>
 
 ## How it's built
 
@@ -137,6 +149,9 @@ A local model needs [Ollama](https://ollama.com) with the model pulled, such as 
 
 ## Shared with the course
 
+<details>
+<summary><b>10 pull requests to Ed's repo</b>: write-ups of three builds and seven challenges</summary>
+
 My contributions to Ed's repo, in `community_contributions/Darko-Martinovic/`:
 
 | PR | Day | What |
@@ -151,3 +166,5 @@ My contributions to Ed's repo, in `community_contributions/Darko-Martinovic/`:
 | [#56](https://github.com/ed-donner/undercover/pull/56) | Week 2 Day 3 | Durable state, with a handler who can sign off or reject (`DURABLE.md`) |
 | [#57](https://github.com/ed-donner/undercover/pull/57) | Week 2 Day 4 | Challenge: `score_run`, and a restart partway through a dispatch |
 | [#63](https://github.com/ed-donner/undercover/pull/63) | Week 2 Day 5 | Challenge: the short policy wording as a lever |
+
+</details>
