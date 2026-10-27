@@ -130,7 +130,7 @@ dashboard ──/api──> backend ──> Supabase: claims, model calls, work 
 | The model comparison | None | `bench/` rebuilt on evaluations: the backend is the only scorer, and only seeding reads `data/evals/` |
 | Limits and tests | 25 written in three places | `MAX_AGENTS` once in `settings/.env.defaults`; a test that a claim graph saves under its own thread and never as the dispatcher's subgraph; Postman for every operation |
 
-The live trial on GPT-6 Luna: a dispatch at N=3 killed partway with every process on port 8002, then one at N=25 that carried on the three claims left in progress as the same attempts and worked the other 19, all 22 starting within 3.6 seconds and finishing in 77 seconds against 1,221 seconds of claim work, for $0.02. Its first try stalled the backend: requests waiting for the 4 database connections took every thread, so the backend now keeps 200. The evaluation set at N=25 scored 84% on decisions and accuracy, and the held-out set's five tiny claims 100%. Every run of the day cost $0.09. The plan is [docs/PLAN_SWARM.md](docs/PLAN_SWARM.md), and the runs are in [docs/STATUS.md](docs/STATUS.md).
+The live trial on GPT-6 Luna: a dispatch at N=3 killed partway with every process on port 8002, then one at N=25 that carried on the three claims left in progress as the same attempts and worked the other 19, all 22 starting within 3.6 seconds and finishing in 77 seconds against 1,221 seconds of claim work, for $0.02. Its first try stalled the backend: requests waiting for the 4 database connections took every thread, so the backend now keeps 200. The evaluation set at N=25 scored 84% on decisions and accuracy, and the held-out set's five tiny claims 100%. Every run of the day cost about $0.11. The plan is [docs/PLAN_SWARM.md](docs/PLAN_SWARM.md), and the runs are in [docs/STATUS.md](docs/STATUS.md).
 
 ## How it's built
 
@@ -178,4 +178,5 @@ My contributions to Ed's repo, in `community_contributions/Darko-Martinovic/`:
 | [#52](https://github.com/ed-donner/undercover/pull/52) | Week 2 Day 3 | Challenge: a handler can reject a payout |
 | [#56](https://github.com/ed-donner/undercover/pull/56) | Week 2 Day 3 | Durable state, with a handler who can sign off or reject (`DURABLE.md`) |
 | [#57](https://github.com/ed-donner/undercover/pull/57) | Week 2 Day 4 | Challenge: `score_run`, and a restart partway through a dispatch |
+| [#67](https://github.com/ed-donner/undercover/pull/67) | Week 2 Day 4 | The swarm, with a graceful Stop and a model choice (`SWARM.md`) |
 | [#63](https://github.com/ed-donner/undercover/pull/63) | Week 2 Day 5 | Challenge: the short policy wording as a lever |
