@@ -1,15 +1,41 @@
-"""The agent's runs. The agent's service records each dispatch under /api/runs:
-its start, its claims in order, and its finish, when the backend builds its
-summary from its records. The dashboard reads the latest under /api/dispatches."""
+"""The agent's runs. The dashboard starts a dispatch and stops a run through the
+backend, which asks the agent's service and writes nothing itself. The service
+records each dispatch under /api/runs: its start, its claims in order, and its
+finish, when the backend builds its summary from its records. The dashboard
+reads the latest under /api/dispatches."""
 
 from fastapi import APIRouter, HTTPException
 
+from backend import agent_service
 from backend.api import Db, now
-from backend.run_models import DispatchIn, FinishIn, Run, RunClaimsIn, Stopped
+from backend.run_models import (
+    DispatchIn,
+    DispatchStart,
+    FinishIn,
+    Run,
+    RunClaimsIn,
+    Started,
+    Stopped,
+    Stopping,
+)
 from backend.run_views import load_run, require_running, run_claims, summary
 from backend.store import claims, runs
 
 router = APIRouter(prefix="/api")
+
+
+@router.post("/dispatches", operation_id="start_dispatch", status_code=202)
+def start_dispatch(dispatch: DispatchStart) -> Started:
+    """Ask the agent's service to start a dispatch with N claim agents at once."""
+    return Started.model_validate(
+        agent_service.start_dispatch(dispatch.agents, dispatch.model)
+    )
+
+
+@router.post("/runs/stop-request", operation_id="stop_run", status_code=202)
+def stop_run() -> Stopping:
+    """Ask the agent's service to stop the run it's working, starting no more claims."""
+    return Stopping.model_validate(agent_service.stop_run())
 
 
 @router.post("/runs/dispatches", operation_id="create_dispatch")
@@ -40,7 +66,7 @@ def finish_run(run_id: int, finish: FinishIn, conn: Db) -> Run:
     return load_run(conn, run_id)
 
 
-@router.post("/runs/stop", operation_id="stop_runs")
+@router.post("/runs/stop-all", operation_id="stop_runs")
 def stop_runs(conn: Db) -> Stopped:
     """Mark every run still running as stopped, as when the agent's service starts."""
     return Stopped(run_ids=runs.stop_running(conn, now()))

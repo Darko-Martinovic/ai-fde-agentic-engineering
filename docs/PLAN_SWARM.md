@@ -190,13 +190,13 @@ Add `dispatcher.py`, `work_in_run`, `TRANSIENT`, the pool with a saver per claim
 
 Add `start_dispatch` and `stop_run` to the backend and `agent_service.py`, the form on the queue page and starts in the e2e stand-in.
 
-- [ ] pytest, backend: `start_dispatch` with N=7 and a model asks the service once with them and writes nothing; the service's 409 comes back with its detail; an unreachable service gives 503 "The agent's service isn't running"; N of 0 or 26 is 422 and the service isn't asked. `stop_run` passes on the service's answer
-- [ ] `grep -rn "UNDERCOVER_AGENT" backend --include=*.py` finds it only in `agent_service.py`
-- [ ] vitest: the form offers 1 to 25 with 3 chosen and the models with `MODEL_NAME` chosen; Start posts the choices; a 409 and a 503 show in an alert; Stop shows while a dispatch runs
-- [ ] e2e: choosing 7 and pressing "Start a dispatch" reaches the stand-in with `{"agents": 7, ...}`; Stop reaches it too
-- [ ] Browser, with the service stopped: Start shows "The agent's service isn't running" and no dispatch appears
-- [ ] Browser: a dispatch of five claims played out with curl, screenshots in light and dark mode, no console errors; reseed afterwards
-- [ ] `npm run check` passes
+- [x] pytest, backend: `start_dispatch` with N=7 and a model asks the service once with them and writes nothing; the service's 409 comes back with its detail; an unreachable service gives 503 "The agent's service isn't running"; N of 0 or 26 is 422 and the service isn't asked. `stop_run` passes on the service's answer
+- [x] `grep -rn "UNDERCOVER_AGENT" backend --include=*.py` finds it only in `agent_service.py`
+- [x] vitest: the form offers 1 to 25 with 3 chosen and the models with `MODEL_NAME` chosen; Start posts the choices; a 409 and a 503 show in an alert; Stop shows while a dispatch runs
+- [x] e2e: choosing 7 and pressing "Start a dispatch" reaches the stand-in with `{"agents": 7, ...}`; Stop reaches it too
+- [x] Browser, with the service stopped: Start shows "The agent's service isn't running" and no dispatch appears
+- [x] Browser: a dispatch of five claims played out with curl, screenshots in light and dark mode, no console errors; reseed afterwards
+- [x] `npm run check` passes
 
 ## Phase 4: Evaluations
 

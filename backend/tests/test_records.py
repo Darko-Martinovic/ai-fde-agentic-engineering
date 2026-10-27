@@ -102,6 +102,8 @@ def test_operations_are_documented(client):
         "review_payout",
         "decide_as_handler",
         "fail_claim",
+        "start_dispatch",
+        "stop_run",
         "create_dispatch",
         "record_run_claims",
         "finish_run",

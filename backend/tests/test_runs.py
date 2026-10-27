@@ -140,9 +140,9 @@ def test_stopping_runs_stops_every_running_one_and_leaves_finished_ones(client):
     client.post(f"/api/runs/{finished}/finish", json={"stopped": False})
     first = create(client).json()["run_id"]
     second = create(client).json()["run_id"]
-    assert client.post("/api/runs/stop").json() == {"run_ids": [first, second]}
+    assert client.post("/api/runs/stop-all").json() == {"run_ids": [first, second]}
     assert client.get("/api/dispatches/latest").json()["status"] == "stopped"
-    assert client.post("/api/runs/stop").json() == {"run_ids": []}
+    assert client.post("/api/runs/stop-all").json() == {"run_ids": []}
 
 
 def test_an_unknown_run(client):

@@ -102,7 +102,7 @@ def finish_run(run_id: int, stopped: bool) -> dict[str, Any]:
 
 
 def stop_runs() -> list[int]:
-    return send("POST", "/api/runs/stop").json()["run_ids"]
+    return send("POST", "/api/runs/stop-all").json()["run_ids"]
 
 
 def record_model_call(claim_id: str, call: dict[str, Any]) -> None:
