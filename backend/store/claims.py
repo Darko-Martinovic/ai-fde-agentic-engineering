@@ -3,14 +3,15 @@
 import json
 from typing import Any
 
-from sqlalchemy import Connection, RowMapping, func, select, update
+from sqlalchemy import ColumnElement, Connection, RowMapping, func, select, update
 from sqlalchemy import insert as insert_into
 
 from backend import db
 
 
-def queue(conn: Connection) -> list[RowMapping]:
-    """Every claim with its customer, its latest decision and its payment."""
+def queue(conn: Connection, evaluation_id: int | None) -> list[RowMapping]:
+    """Every claim of the queue (`evaluation_id` None), or every copy in an
+    evaluation, with its customer, its latest decision and its payment."""
     decision = db.decisions.c
     latest = (
         select(decision.claim_id, decision.decision, decision.payout)
@@ -33,21 +34,33 @@ def queue(conn: Connection) -> list[RowMapping]:
         .join(db.customers, db.customers.c.customer_id == db.claims.c.customer_id)
         .outerjoin(latest, latest.c.claim_id == db.claims.c.claim_id)
         .outerjoin(db.payments, db.payments.c.claim_id == db.claims.c.claim_id)
+        .where(in_evaluation(evaluation_id))
         .order_by(db.claims.c.claim_id)
     )
     return list(conn.execute(found).mappings())
 
 
+def in_evaluation(evaluation_id: int | None) -> ColumnElement[bool]:
+    """The claims of the queue, for None, or the copies in an evaluation."""
+    column = db.claims.c.evaluation_id
+    return column.is_(None) if evaluation_id is None else column == evaluation_id
+
+
 def claim(conn: Connection, claim_id: str) -> RowMapping | None:
-    """A claim's record and state, or None if there's no such claim."""
-    found = select(db.claims.c.data, db.claims.c.status).where(
-        db.claims.c.claim_id == claim_id
+    """A claim's record and state, and the evaluation a copy is in and the
+    claim it copies, or None if there's no such claim."""
+    claim = db.claims.c
+    found = select(claim.data, claim.status, claim.evaluation_id, claim.copy_of).where(
+        claim.claim_id == claim_id
     )
     return conn.execute(found).mappings().first()
 
 
 def every_claim(conn: Connection) -> list[RowMapping]:
-    found = select(db.claims.c.claim_id, db.claims.c.status, db.claims.c.data)
+    """Every claim of the queue, leaving out evaluations' copies."""
+    found = select(db.claims.c.claim_id, db.claims.c.status, db.claims.c.data).where(
+        in_evaluation(None)
+    )
     return list(conn.execute(found).mappings())
 
 

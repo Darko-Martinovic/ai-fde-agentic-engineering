@@ -7,8 +7,9 @@ reads the latest under /api/dispatches."""
 from fastapi import APIRouter, HTTPException
 
 from backend import agent_service
-from backend.api import Db, now
+from backend.api import Db, found, now
 from backend.run_models import (
+    DISPATCH,
     DispatchIn,
     DispatchStart,
     FinishIn,
@@ -41,17 +42,19 @@ def stop_run() -> Stopping:
 @router.post("/runs/dispatches", operation_id="create_dispatch")
 def create_dispatch(dispatch: DispatchIn, conn: Db) -> Run:
     """Record a new dispatch, running, with N claim agents at once on a model."""
-    started = dispatch.model_dump() | {"kind": "dispatch", "started_at": now()}
+    started = dispatch.model_dump() | {"kind": DISPATCH, "started_at": now()}
     return load_run(conn, runs.add(conn, started))
 
 
 @router.put("/runs/{run_id}/claims", operation_id="record_run_claims")
 def record_run_claims(run_id: int, listed: RunClaimsIn, conn: Db) -> Run:
     """Record the claims a running dispatch works, in the order it takes them."""
-    require_running(conn, run_id)
+    if require_running(conn, run_id).kind != DISPATCH:
+        raise HTTPException(409, f"Run {run_id} is not a dispatch")
     for claim_id in listed.claim_ids:
-        if claims.claim(conn, claim_id) is None:
-            raise HTTPException(404, f"Claim {claim_id} not found")
+        claim = found(claims.claim(conn, claim_id), "Claim", claim_id)
+        if claim["evaluation_id"] is not None:
+            raise HTTPException(409, f"Claim {claim_id} is a copy in an evaluation")
     runs.set_claims(conn, run_id, listed.claim_ids)
     return load_run(conn, run_id)
 
@@ -75,5 +78,5 @@ def stop_runs(conn: Db) -> Stopped:
 @router.get("/dispatches/latest", operation_id="get_latest_dispatch")
 def get_latest_dispatch(conn: Db) -> Run | None:
     """Get the newest dispatch with its claims, cost and time, or nothing yet."""
-    run_id = runs.latest(conn, "dispatch")
+    run_id = runs.latest(conn, DISPATCH)
     return load_run(conn, run_id) if run_id else None

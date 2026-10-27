@@ -25,6 +25,16 @@ def latest(conn: Connection, kind: str) -> int | None:
     return conn.execute(found).scalar_one()
 
 
+def of_kind(conn: Connection, kind: str) -> list[int]:
+    """Every run of a kind, newest first."""
+    found = (
+        select(db.runs.c.run_id)
+        .where(db.runs.c.kind == kind)
+        .order_by(db.runs.c.run_id.desc())
+    )
+    return list(conn.execute(found).scalars())
+
+
 def set_claims(conn: Connection, run_id: int, claim_ids: list[str]) -> None:
     """Record the claims a run works, in order, in place of any before."""
     conn.execute(db.run_claims.delete().where(db.run_claims.c.run_id == run_id))

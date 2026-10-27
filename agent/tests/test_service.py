@@ -291,3 +291,86 @@ def test_a_claim_already_being_picked_up_is_refused(
         service.RESUMING.discard("CLM-1003")
     assert again.status_code == 409
     assert again.json()["detail"] == "Claim CLM-1003 is being picked up already"
+
+
+TINY = ["CLM-1007", "CLM-1015", "CLM-1017", "CLM-1020", "CLM-1021"]
+
+
+def copies_decide(monkeypatch, scripts):
+    """Claim agents working copies, each from the script of the claim it copies."""
+    llm = ByClaim(
+        messages=iter([]),
+        scripts={
+            f"{claim_id}-E1": iter(replies) for claim_id, replies in scripts.items()
+        },
+    )
+    monkeypatch.setattr(harness, "chat_model", lambda chosen: llm)
+
+
+def test_an_evaluation_works_copies_and_leaves_the_queue_alone(
+    backend, agent_service, monkeypatch, memory_saver
+):
+    client, _ = agent_service
+    queue = backend.get("/api/claims").json()
+    copies_decide(
+        monkeypatch,
+        {
+            "CLM-1007": [decide("approve", 50.0)],
+            "CLM-1015": [decide("approve", 300.0)],
+            "CLM-1017": [decide("decline", 0)],
+            "CLM-1020": [decide("approve", 1240.0)],
+            "CLM-1021": [AIMessage(content="Hmm."), AIMessage(content="Hmm.")],
+        },
+    )
+    body = {"evaluation_set": "evaluation", "tiny": True, "agents": 5}
+    started = client.post("/api/evaluations", json=body | {"model": FREE.spec})
+    assert started.status_code == 202
+    assert backend.get("/api/claims").json() == queue
+    [listed] = backend.get("/api/evaluations").json()
+    evaluation = backend.get(f"/api/evaluations/{listed['run_id']}").json()
+    assert evaluation["status"] == "finished"
+    assert [c["copy_of"] for c in evaluation["claims"]] == sorted(
+        TINY, key=lambda c: next(q["submitted_on"] for q in queue if q["claim_id"] == c)
+    )
+    held = backend.get("/api/claims/CLM-1020-E1").json()
+    assert held["status"] == "awaiting_sign_off"
+    saved = {"configurable": {"thread_id": held["thread_id"]}}
+    assert memory_saver.get_tuple(saved) is None
+    assert evaluation["measures"]["decision_accuracy"] == pytest.approx(0.4)
+    assert evaluation["measures"]["accuracy"] == pytest.approx(0.2)
+    assert evaluation["measures"]["cost_of_mistakes"] == pytest.approx(2850)
+    assert evaluation["measures"]["straight_through"] == pytest.approx(0.8)
+    assert evaluation["measures"]["model_cost_per_claim"] == 0
+    assert evaluation["measures"]["seconds_per_claim"] < 1
+    assert evaluation["measures"]["run_seconds"] < 30
+    left = backend.get("/api/claims/CLM-1021-E1").json()
+    assert left["status"] == "left_for_handler"
+
+
+def test_a_dispatch_after_an_evaluation_leaves_its_copies_alone(
+    backend, agent_service, monkeypatch
+):
+    client, _ = agent_service
+    copies_decide(monkeypatch, {})
+    run = api.create_evaluation("held_out", True, 5, FREE.spec, "none")
+    api.start_claim("CLM-1104-E1", run["run_id"], "CLM-1104-E1-left")
+    api.finish_run(run["run_id"], True)
+    declines(monkeypatch, "CLM-1005")
+    client.post("/api/dispatches", json={"agents": 3, "model": FREE.spec})
+    dispatch = backend.get("/api/dispatches/latest").json()
+    assert [c["claim_id"] for c in dispatch["claims"]] == ["CLM-1005"]
+    assert backend.get("/api/claims/CLM-1104-E1").json()["status"] == "in_progress"
+
+
+def test_one_run_at_a_time_whichever_kind(agent_service):
+    client, _ = agent_service
+    evaluation = {
+        "evaluation_set": "held_out",
+        "tiny": True,
+        "agents": 5,
+        "model": FREE.spec,
+    }
+    with service.RUNNING:
+        assert client.post("/api/evaluations", json=evaluation).status_code == 409
+        dispatch = {"agents": 3, "model": FREE.spec}
+        assert client.post("/api/dispatches", json=dispatch).status_code == 409

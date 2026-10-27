@@ -9,7 +9,7 @@ import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from functools import partial
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import uvicorn
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
@@ -17,7 +17,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from pydantic import BaseModel, Field, field_validator
 
 from agent import api, checkpoints, dispatcher, harness
-from agent.config import current_model, model
+from agent.config import Model, current_model, model
 from agent.reports import IN_PROGRESS
 from settings import setting
 
@@ -85,6 +85,11 @@ class DispatchIn(BaseModel):
         return model(spec).spec
 
 
+class EvaluationIn(DispatchIn):
+    evaluation_set: Literal["evaluation", "held_out"]
+    tiny: bool
+
+
 class Started(BaseModel):
     agents: int
     model: str
@@ -106,24 +111,52 @@ def start_dispatch(
     new_saver: Annotated[Savers, Depends(savers)],
 ) -> Started:
     """Start a dispatch of the queue with up to N claim agents at once."""
-    if not RUNNING.acquire(blocking=False):
-        raise HTTPException(409, ALREADY_RUNNING)
-    STOP.clear()
-    in_background(dispatch_queue, dispatch, new_saver)
+    begin(dispatch, new_saver)
     return Started(agents=dispatch.agents, model=dispatch.model)
 
 
-def dispatch_queue(dispatch: DispatchIn, new_saver: Savers) -> None:
-    """Create the dispatch through the backend and work it; the dispatcher prints
+@router.post("/evaluations", operation_id="start_evaluation", status_code=202)
+def start_evaluation(
+    evaluation: EvaluationIn,
+    new_saver: Annotated[Savers, Depends(savers)],
+) -> Started:
+    """Start an evaluation of a labelled set with up to N claim agents at once."""
+    begin(evaluation, new_saver)
+    return Started(agents=evaluation.agents, model=evaluation.model)
+
+
+def begin(start: DispatchIn, new_saver: Savers) -> None:
+    """Start a run in the background, or refuse while one runs."""
+    if not RUNNING.acquire(blocking=False):
+        raise HTTPException(409, ALREADY_RUNNING)
+    STOP.clear()
+    in_background(work_a_run, start, new_saver)
+
+
+def create(start: DispatchIn, chosen: Model) -> dict[str, Any]:
+    """Record the run through the backend: an evaluation, with its copies, or a
+    dispatch."""
+    if isinstance(start, EvaluationIn):
+        return api.create_evaluation(
+            start.evaluation_set,
+            start.tiny,
+            start.agents,
+            chosen.spec,
+            chosen.reasoning_effort,
+        )
+    return api.create_dispatch(start.agents, chosen.spec, chosen.reasoning_effort)
+
+
+def work_a_run(start: DispatchIn, new_saver: Savers) -> None:
+    """Create the run through the backend and work it; the dispatcher prints
     each claim's report as it comes. A dispatcher that fails marks the run
     stopped; either way the next start is free to go."""
     try:
-        chosen = model(dispatch.model)
-        run = api.create_dispatch(dispatch.agents, chosen.spec, chosen.reasoning_effort)
+        chosen = model(start.model)
         work = partial(harness.work_in_run, model=chosen, new_saver=new_saver)
-        dispatcher.work_run(run, work, RESUMING, STOP)
+        dispatcher.work_run(create(start, chosen), work, RESUMING, STOP)
     except Exception:
-        log.exception("The dispatch stopped")
+        log.exception("The run stopped")
         api.stop_runs()
     finally:
         RUNNING.release()

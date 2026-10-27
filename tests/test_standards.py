@@ -81,9 +81,10 @@ def test_no_model_in_code():
 
 
 def test_nothing_reaches_the_answer_key():
-    """The agent and the backend never see data/evals/; only the comparison's
-    scoring reads it."""
-    assert offending(ANSWER_KEY, PRODUCT) == []
+    """Only seeding reads data/evals/, into tables no claim operation reads, and
+    the agent never sees it; the comparison's scoring reads it too, until it
+    scores through evaluations."""
+    assert offending(ANSWER_KEY, PRODUCT, ("backend/seed.py",)) == []
     assert offending(ANSWER_KEY, ("bench",), ("bench/score.py",)) == []
 
 
@@ -188,3 +189,18 @@ def test_functions_stay_short():
 def test_modules_stay_short(path):
     """A module over 300 lines does more than one job (standard 18)."""
     assert len(path.read_text(encoding="utf-8").splitlines()) <= MAX_LINES
+
+
+def test_the_agent_cannot_read_the_scoreboard_or_start_runs():
+    """The handlers' decisions reach the scoreboard only, and runs are started
+    from the dashboard, never by the agent."""
+    kept_out = {
+        "list_evaluations",
+        "get_evaluation",
+        "start_dispatch",
+        "start_evaluation",
+    }
+    assert kept_out <= operation_ids()
+    assert not kept_out & set(dir(api))
+    reads = re.compile(r"[\"']/api/(evaluations|dispatches)")
+    assert offending(reads, ("agent",), ("agent/service.py",)) == []

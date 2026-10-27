@@ -21,6 +21,7 @@ from agent import api, harness
 from agent.reports import IN_PROGRESS, WAITING
 
 STATUS = "status"
+EVALUATION = "evaluation"
 
 log = logging.getLogger(__name__)
 
@@ -65,8 +66,12 @@ def queue_order(claim: dict[str, Any]) -> tuple[bool, str, str]:
 
 
 def list_claims(state: Dispatch, runtime: Runtime[DispatchContext]) -> dict[str, Any]:
-    """The claims the dispatch works, recorded with it: those in progress, then
-    the waiting ones, less any the agent's service is carrying on."""
+    """The claims the run works: an evaluation's copies, which the backend made
+    with it, or for a dispatch the queue's claims in progress, then the waiting
+    ones, less any the agent's service is carrying on, recorded with it."""
+    run = runtime.context.run
+    if run["kind"] == EVALUATION:
+        return {"claims": [claim["claim_id"] for claim in run["claims"]]}
     listed = sorted(
         (
             claim
@@ -77,7 +82,7 @@ def list_claims(state: Dispatch, runtime: Runtime[DispatchContext]) -> dict[str,
         key=queue_order,
     )
     claim_ids = [claim["claim_id"] for claim in listed]
-    api.record_run_claims(runtime.context.run["run_id"], claim_ids)
+    api.record_run_claims(run["run_id"], claim_ids)
     return {"claims": claim_ids}
 
 

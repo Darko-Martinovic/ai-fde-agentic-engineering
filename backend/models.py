@@ -179,6 +179,9 @@ class Claim(BaseModel):
     run_id: int | None
     thread_id: str | None
     attempts: int
+    # For an evaluation's copy: the evaluation, and the claim it copies
+    evaluation_id: int | None
+    copy_of: str | None
 
 
 class Plan(BaseModel):

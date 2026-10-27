@@ -6,11 +6,12 @@ from typing import Any
 # Where a claim stands, as the backend records it, for the states the agent
 # works from
 IN_PROGRESS, WAITING = "in_progress", "waiting"
+AWAITING_SIGN_OFF = "awaiting_sign_off"
 # How a claim's report reads, by the claim's state and by the agent's decision
 BY_STATE = {
     "decided": "paid",
     IN_PROGRESS: "not paid yet",
-    "awaiting_sign_off": "waiting for a handler's sign-off",
+    AWAITING_SIGN_OFF: "waiting for a handler's sign-off",
     WAITING: "failed, back in the queue",
     "left_for_handler": "failed twice, left for a handler",
 }

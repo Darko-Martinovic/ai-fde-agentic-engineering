@@ -11,6 +11,7 @@ from backend.claim_rules import (
     add_decision,
     add_payment,
     check_handler,
+    refuse_copy,
     rejections,
     require_status,
 )
@@ -27,6 +28,7 @@ def review_payout(
     """Sign off a held payout as a handler, or reject it with a note, for the agent."""
     seen = found(claims.revision(conn, claim_id), "Claim", claim_id)
     claim = load_claim(conn, claim_id)
+    refuse_copy(claim)
     check_handler(conn, review.handler_id)
     require_status(claim, "awaiting_sign_off")
     referred = not review.approved and rejections(claim) + 1 >= MAX_REJECTIONS
@@ -54,6 +56,7 @@ def decide_as_handler(claim_id: str, resolution: HandlerDecisionIn, conn: Db) ->
     """Approve or decline, as a handler, a claim the agent referred or that was
     left for a handler, paying an approval."""
     claim = load_claim(conn, claim_id)
+    refuse_copy(claim)
     check_handler(conn, resolution.handler_id)
     require_status(claim, *FOR_A_HANDLER)
     add_decision(conn, claim_id, resolution.handler_id, resolution, None)

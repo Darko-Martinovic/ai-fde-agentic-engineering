@@ -22,6 +22,17 @@ def check_handler(conn: Connection, handler_id: str) -> None:
     found(records.handler(conn, handler_id), "Handler", handler_id)
 
 
+def refuse_copy(claim: Claim) -> None:
+    """Nobody reviews or decides an evaluation's copy: it's scored on the
+    agent's work alone."""
+    if claim.evaluation_id is not None:
+        raise HTTPException(
+            409,
+            f"Claim {claim.claim_id} is a copy in an evaluation and can't be"
+            " reviewed or decided",
+        )
+
+
 def require_status(claim: Claim, *statuses: str) -> None:
     if claim.status not in statuses:
         wanted = " or ".join(statuses)

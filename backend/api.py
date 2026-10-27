@@ -68,6 +68,8 @@ def load_claim(conn: Connection, claim_id: str) -> Claim:
             "run_id": latest["run_id"],
             "thread_id": latest["thread_id"],
             "attempts": len(attempts),
+            "evaluation_id": row["evaluation_id"],
+            "copy_of": row["copy_of"],
         }
     )
 

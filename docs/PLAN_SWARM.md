@@ -202,16 +202,16 @@ Add `start_dispatch` and `stop_run` to the backend and `agent_service.py`, the f
 
 Seed the held-out claims and the handlers' decisions, add copies, `scoring.py`, `create_evaluation`, `list_evaluations`, `get_evaluation` and `start_evaluation`, the refusal of a review on a copy, and `start_evaluation` in the service.
 
-- [ ] `uv run -m backend.seed` reports 25 held-out claims and 50 handlers' decisions besides what it seeds today, and Supabase MCP shows 10 of the decisions `tiny`
-- [ ] pytest, scoring: each rule of the cost of mistakes, a payout 99 cents out right and $1.01 wrong, an undecided claim as a referral, and the measures of a hand-made evaluation
-- [ ] pytest, backend: the held-out set's `tiny` claims at N=5 make five waiting copies with their ids in their records; the whole set 25; an unknown set 422; `list_claims` and Insights the same before and after
-- [ ] pytest, backend: `get_claim` on every copy and `create_evaluation`'s response hold nothing from `handler_decisions`; a test checks `agent/api.py` has no function for the scoreboard's operations
-- [ ] pytest, backend: `review_payout` on a held copy, sign-off or rejection, is 409 and changes nothing
-- [ ] Stub model test through the service: an evaluation of the five `tiny` claims at N=5, with scripted decisions including one held for sign-off and one that fails twice, finishes; the queue is the same before and after; the held copy has no saved progress; `get_evaluation` gives the measures worked out by hand
-- [ ] Stub model test: a dispatch after an evaluation leaves its copies alone, including one left in progress; a start of either while the other runs is 409
-- [ ] `grep -rn "evals" agent backend dashboard/src e2e --include=*.py --include=*.ts --include=*.tsx` finds it only in `backend/seed.py` and tests
-- [ ] Postman: the evaluation operations
-- [ ] `npm run check` passes
+- [x] `uv run -m backend.seed` reports 25 held-out claims and 50 handlers' decisions besides what it seeds today, and Supabase MCP shows 10 of the decisions `tiny`
+- [x] pytest, scoring: each rule of the cost of mistakes, a payout 99 cents out right and $1.01 wrong, an undecided claim as a referral, and the measures of a hand-made evaluation
+- [x] pytest, backend: the held-out set's `tiny` claims at N=5 make five waiting copies with their ids in their records; the whole set 25; an unknown set 422; `list_claims` and Insights the same before and after
+- [x] pytest, backend: `get_claim` on every copy and `create_evaluation`'s response hold nothing from `handler_decisions`; a test checks `agent/api.py` has no function for the scoreboard's operations
+- [x] pytest, backend: `review_payout` on a held copy, sign-off or rejection, is 409 and changes nothing
+- [x] Stub model test through the service: an evaluation of the five `tiny` claims at N=5, with scripted decisions including one held for sign-off and one that fails twice, finishes; the queue is the same before and after; the held copy has no saved progress; `get_evaluation` gives the measures worked out by hand
+- [x] Stub model test: a dispatch after an evaluation leaves its copies alone, including one left in progress; a start of either while the other runs is 409
+- [x] `grep -rn "evals" agent backend dashboard/src e2e --include=*.py --include=*.ts --include=*.tsx` finds it only in `backend/seed.py` and tests
+- [x] Postman: the evaluation operations
+- [x] `npm run check` passes
 
 ## Phase 5: The scoreboard, and the model comparison on evaluations
 

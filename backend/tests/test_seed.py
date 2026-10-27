@@ -1,6 +1,6 @@
 import shutil
 
-from sqlalchemy import Column, Integer, MetaData, Table, delete, inspect
+from sqlalchemy import Column, Integer, MetaData, Table, delete, func, inspect, select
 
 from backend import db, seed
 from backend.tests.direct_changes import count_claims, set_status
@@ -54,3 +54,13 @@ def test_seeding_drops_the_tables_earlier_builds_made(client):
     seed.reset()
     with db.engine().connect() as conn:
         assert not inspect(conn).has_table("usage")
+
+
+def test_seeding_stores_the_answer_key_apart(tmp_path):
+    assert seed.reset() == "25 held-out claims and 50 handlers' decisions"
+    with db.engine().connect() as conn:
+        held_out = conn.execute(select(func.count()).select_from(db.held_out_claims))
+        assert held_out.scalar_one() == 25
+        tiny = select(func.count()).where(db.handler_decisions.c.tiny)
+        assert conn.execute(tiny).scalar_one() == 10
+    assert count_claims() == 25
