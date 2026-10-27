@@ -1,95 +1,157 @@
-from backend.tests.claim_starts import a_run, start
+import pytest
 
-RUN = {"mode": "queue", "cap": 5, "model": "anthropic:claude-haiku-5-5"}
+from backend.tests.claim_starts import DISPATCH, a_run, start
+from backend.tests.workflow_steps import approved, decide, fail, pay, referred, review
+
+SPELL = {"thread_id": "t", "seconds": 12.5}
+CALL = {
+    "thread_id": "t",
+    "model": "test",
+    "input_tokens": 1200,
+    "output_tokens": 300,
+    "cost": 0.0042,
+    "seconds": 1.5,
+}
 
 
-def test_no_run_yet(client):
-    assert client.get("/api/runs/latest").json() is None
+def create(client, **changes):
+    return client.post("/api/runs/dispatches", json=DISPATCH | changes)
 
 
-def test_start_a_run(client):
-    run = client.post("/api/runs", json=RUN).json()
-    assert run["status"] == "running"
-    assert run["cap"] == 5
-    assert run["todos"] == []
-    assert run["claims_started"] == []
+def test_no_dispatch_yet(client):
+    assert client.get("/api/dispatches/latest").json() is None
+
+
+def test_a_dispatch_starts_running_with_its_n_and_model(client):
+    run = create(client, agents=7, model="openrouter:openai/gpt-6-luna").json()
+    assert (run["kind"], run["status"], run["agents"]) == ("dispatch", "running", 7)
+    assert (run["model"], run["reasoning_effort"]) == (
+        "openrouter:openai/gpt-6-luna",
+        "none",
+    )
+    assert (run["claims"], run["summary"], run["seconds"]) == ([], None, None)
     assert run["usage"] == {
         "model_calls": 0,
         "input_tokens": 0,
         "output_tokens": 0,
         "cost": 0,
-        "seconds": 0,
     }
-    assert client.get("/api/runs/latest").json()["run_id"] == run["run_id"]
+    assert client.get("/api/dispatches/latest").json()["run_id"] == run["run_id"]
 
 
-def test_a_cap_below_one_is_refused(client):
-    assert client.post("/api/runs", json=RUN | {"cap": 0}).status_code == 422
+@pytest.mark.parametrize("agents", [0, 26])
+def test_a_dispatch_has_one_to_25_agents(client, agents):
+    assert create(client, agents=agents).status_code == 422
 
 
-def test_write_the_todo_list(client):
-    run_id = client.post("/api/runs", json=RUN).json()["run_id"]
-    todos = [
-        {"content": "Work CLM-1001", "status": "completed"},
-        {"content": "Work CLM-1002", "status": "in_progress"},
-        {"content": "Work CLM-1003", "status": "left_for_handler"},
-    ]
-    response = client.put(f"/api/runs/{run_id}/todos", json={"todos": todos})
-    assert response.json()["todos"] == todos
-    bad = [{"content": "Work CLM-1004", "status": "maybe"}]
-    assert (
-        client.put(f"/api/runs/{run_id}/todos", json={"todos": bad}).status_code == 422
+def test_a_dispatchs_claims_keep_their_order_and_show_their_work(client):
+    run_id = a_run(client)
+    listed = ["CLM-1004", "CLM-1001", "CLM-1002"]
+    response = client.put(f"/api/runs/{run_id}/claims", json={"claim_ids": listed})
+    assert [c["claim_id"] for c in response.json()["claims"]] == listed
+    start(client, "CLM-1004", run_id)
+    client.post("/api/claims/CLM-1004/model-calls", json=CALL | {"run_id": run_id})
+    client.post("/api/claims/CLM-1004/work-times", json=SPELL | {"run_id": run_id})
+    client.post("/api/claims/CLM-1004/work-times", json=SPELL | {"run_id": None})
+    run = client.get("/api/dispatches/latest").json()
+    first, second, _ = run["claims"]
+    assert (first["status"], first["seconds"], first["model_cost"]) == (
+        "in_progress",
+        12.5,
+        0.0042,
     )
+    assert first["started_at"] is not None
+    assert first["customer_name"]
+    assert (second["status"], second["started_at"], second["seconds"]) == (
+        "waiting",
+        None,
+        0,
+    )
+    assert run["usage"]["model_calls"] == 1
 
 
-def test_finish_a_run(client):
-    run_id = client.post("/api/runs", json=RUN).json()["run_id"]
-    run = client.post(
-        f"/api/runs/{run_id}/finish", json={"summary": "Worked 5."}
-    ).json()
+def test_a_dispatchs_claims_must_be_known_and_it_must_be_running(client):
+    run_id = a_run(client)
+    unknown = client.put(f"/api/runs/{run_id}/claims", json={"claim_ids": ["CLM-9999"]})
+    assert unknown.status_code == 404
+    client.post(f"/api/runs/{run_id}/finish", json={"stopped": False})
+    late = client.put(f"/api/runs/{run_id}/claims", json={"claim_ids": ["CLM-1001"]})
+    assert late.status_code == 409
+
+
+def worked_every_way(client, run_id):
+    """Claims left in every state a dispatch can leave them in."""
+    approved(client, "CLM-1001", 420.0)
+    pay(client, "CLM-1001", 420.0)
+    start(client, "CLM-1005")
+    decide(client, "CLM-1005", "decline", 0)
+    referred(client, "CLM-1010")
+    approved(client, "CLM-1008", 2240.0)
+    for _ in range(2):
+        start(client, "CLM-1012")
+        fail(client, "CLM-1012")
+    start(client, "CLM-1004")
+    approved(client, "CLM-1003", 3750.0)
+    review(client, "CLM-1003", "HND-01")
+    approved(client, "CLM-1011", 1150.0)
+    review(client, "CLM-1011", "HND-01", approved=False, note="Too much.")
+    order = [
+        "CLM-1001",
+        "CLM-1005",
+        "CLM-1010",
+        "CLM-1008",
+        "CLM-1012",
+        "CLM-1004",
+        "CLM-1003",
+        "CLM-1011",
+        "CLM-1013",
+    ]
+    client.put(f"/api/runs/{run_id}/claims", json={"claim_ids": order})
+
+
+def test_finishing_builds_the_summary_from_the_records(client):
+    run_id = a_run(client)
+    worked_every_way(client, run_id)
+    run = client.post(f"/api/runs/{run_id}/finish", json={"stopped": False}).json()
     assert run["status"] == "finished"
-    assert run["summary"] == "Worked 5."
     assert run["finished_at"] is not None
-    again = client.post(f"/api/runs/{run_id}/finish", json={"summary": "Again."})
-    assert again.status_code == 409
-    todos = client.put(f"/api/runs/{run_id}/todos", json={"todos": []})
-    assert todos.status_code == 409
-
-
-def test_usage_adds_up_by_run(client):
-    first = client.post("/api/runs", json=RUN).json()["run_id"]
-    call = {
-        "claim_id": "CLM-1001",
-        "model": "anthropic:claude-haiku-5-5",
-        "input_tokens": 1000,
-        "output_tokens": 200,
-        "cost": 0.0002,
-        "seconds": 1.5,
+    assert run["seconds"] >= 0
+    assert run["summary"] == {
+        "approved": 2,
+        "declined": 1,
+        "referred": 1,
+        "waiting_for_sign_off": [{"claim_id": "CLM-1008", "payout": 2240.0}],
+        "left_for_handler": ["CLM-1012"],
+        "unfinished": ["CLM-1004", "CLM-1003", "CLM-1011", "CLM-1013"],
     }
-    client.post(f"/api/runs/{first}/usage", json=call)
-    run = client.post(f"/api/runs/{first}/usage", json=call | {"claim_id": None}).json()
-    assert run["usage"]["model_calls"] == 2
-    assert run["usage"]["input_tokens"] == 2000
-    assert run["usage"]["seconds"] == 3
-    second = client.post("/api/runs", json=RUN).json()
-    assert second["usage"]["model_calls"] == 0
+    again = client.post(f"/api/runs/{run_id}/finish", json={"stopped": False})
+    assert again.status_code == 409
+
+
+def test_a_dispatch_asked_to_stop_finishes_as_stopped(client):
+    run_id = a_run(client)
+    run = client.post(f"/api/runs/{run_id}/finish", json={"stopped": True}).json()
+    assert run["status"] == "stopped"
+    assert run["summary"]["unfinished"] == []
+
+
+def test_stopping_runs_stops_every_running_one_and_leaves_finished_ones(client):
+    finished = create(client).json()["run_id"]
+    client.post(f"/api/runs/{finished}/finish", json={"stopped": False})
+    first = create(client).json()["run_id"]
+    second = create(client).json()["run_id"]
+    assert client.post("/api/runs/stop").json() == {"run_ids": [first, second]}
+    assert client.get("/api/dispatches/latest").json()["status"] == "stopped"
+    assert client.post("/api/runs/stop").json() == {"run_ids": []}
 
 
 def test_an_unknown_run(client):
-    assert client.post("/api/runs/99/finish", json={"summary": "x"}).status_code == 404
+    response = client.post("/api/runs/99/finish", json={"stopped": False})
+    assert response.status_code == 404
 
 
-def test_claims_started_count_once(client):
-    run_id = a_run(client)
-    start(client, "CLM-1001", run_id)
-    start(client, "CLM-1002", run_id)
-    run = client.get("/api/runs/latest").json()
-    assert run["claims_started"] == ["CLM-1001", "CLM-1002"]
-
-
-def test_the_latest_run_is_the_last_started(client):
-    run = {"mode": "queue", "cap": 1, "model": "test"}
-    first = client.post("/api/runs", json=run).json()["run_id"]
-    second = client.post("/api/runs", json=run).json()["run_id"]
+def test_the_latest_dispatch_is_the_last_started(client):
+    first = create(client).json()["run_id"]
+    second = create(client).json()["run_id"]
     assert second > first
-    assert client.get("/api/runs/latest").json()["run_id"] == second
+    assert client.get("/api/dispatches/latest").json()["run_id"] == second

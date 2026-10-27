@@ -1,6 +1,6 @@
 import shutil
 
-from sqlalchemy import delete
+from sqlalchemy import Column, Integer, MetaData, Table, delete, inspect
 
 from backend import db, seed
 from backend.tests.direct_changes import count_claims, set_status
@@ -45,3 +45,12 @@ def test_a_database_with_no_claims_is_seeded_again(client):
         conn.execute(delete(db.claims))
     seed.ready.cache_clear()
     assert len(client.get("/api/claims").json()) == 25
+
+
+def test_seeding_drops_the_tables_earlier_builds_made(client):
+    client.get("/api/claims")
+    with db.engine().begin() as conn:
+        Table("usage", MetaData(), Column("usage_id", Integer)).create(conn)
+    seed.reset()
+    with db.engine().connect() as conn:
+        assert not inspect(conn).has_table("usage")

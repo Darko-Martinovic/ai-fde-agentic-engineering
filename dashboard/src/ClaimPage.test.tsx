@@ -1,21 +1,8 @@
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { Step } from "./api";
 import { ClaimPage } from "./ClaimPage";
-import {
-  IDLE,
-  calledWith,
-  claim,
-  claimRoutes,
-  decision,
-  mockFetch,
-} from "./testing";
+import { claim, claimRoutes, decision, mockFetch } from "./testing";
 
 afterEach(() => {
   cleanup();
@@ -108,12 +95,6 @@ it("shows the agent's steps live while it works", async () => {
     claimRoutes({
       "GET /api/claims/CLM-1001": claim({ status: "in_progress" }),
       "GET /api/claims/CLM-1001/steps": steps,
-      "GET /api/agent": {
-        ...IDLE,
-        running: true,
-        mode: "claim",
-        claim_id: "CLM-1001",
-      },
     }),
   );
   render(<ClaimPage claimId="CLM-1001" />);
@@ -131,57 +112,6 @@ it("shows the agent's steps live while it works", async () => {
   expect(
     screen.getByText("Approved; the payment waits for sign-off."),
   ).toBeDefined();
-  fireEvent.click(await screen.findByRole("button", { name: "Stop" }));
-  await waitFor(() => {
-    expect(screen.getByText("No route for POST /api/agent/stop")).toBeDefined();
-  });
-});
-
-it("runs the agent on a waiting claim", async () => {
-  const fetchMock = mockFetch(
-    claimRoutes({
-      "POST /api/agent/claims/CLM-1001": {
-        ...IDLE,
-        running: true,
-        mode: "claim",
-        claim_id: null,
-      },
-    }),
-  );
-  render(<ClaimPage claimId="CLM-1001" />);
-  const run = await screen.findByRole("button", { name: "Run the agent" });
-  await waitFor(() => {
-    expect(calledWith(fetchMock, "GET /api/agent/models")).toBe(true);
-  });
-  fireEvent.click(run);
-  await waitFor(() => {
-    expect(calledWith(fetchMock, "POST /api/agent/claims/CLM-1001")).toBe(true);
-  });
-  const sent = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
-  expect(JSON.parse(sent?.[1]?.body as string)).toEqual({
-    model: "openrouter:deepseek/deepseek-v4.1-flash",
-  });
-});
-
-it("carries on with a claim a stopped run left in progress", async () => {
-  const fetchMock = mockFetch(
-    claimRoutes({
-      "GET /api/claims/CLM-1001": claim({ status: "in_progress" }),
-      "POST /api/agent/claims/CLM-1001": IDLE,
-    }),
-  );
-  render(<ClaimPage claimId="CLM-1001" />);
-  expect(
-    await screen.findByText("Waiting for the agent's first step."),
-  ).toBeDefined();
-  const carryOn = await screen.findByRole("button", { name: "Carry on" });
-  await waitFor(() => {
-    expect(carryOn).toHaveProperty("disabled", false);
-  });
-  fireEvent.click(carryOn);
-  await waitFor(() => {
-    expect(calledWith(fetchMock, "POST /api/agent/claims/CLM-1001")).toBe(true);
-  });
 });
 
 it("shows when the claim can't load", async () => {

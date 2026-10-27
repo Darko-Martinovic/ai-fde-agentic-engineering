@@ -165,26 +165,26 @@ Add GPT-6 Luna to `settings/models.toml` (reasoning `low`, $0.10 and $0.50 a mil
 
 Add `dispatcher.py`, `work_in_run`, `TRANSIENT`, the pool with a saver per claim run, and the retry fixture. Rework `runs` and add `run_claims`, `create_dispatch`, `record_run_claims`, `finish_run` with its summary, `stop_runs` and `get_latest_dispatch`. Give the service `start_dispatch`, one run at a time, the stop at startup, the graceful stop and the claims it is resuming. Remove the queue agent, its middleware and instructions, the to-do list, `runner.py`, and the claim page's Run and Carry on. On the dashboard, the dispatch panel shows the latest dispatch, without the form yet.
 
-- [ ] `grep -rn "create_agent\|Middleware\|write_todos\|run_queue\|queue.md\|getLatestRun\|runner" agent backend dashboard/src e2e` finds nothing outside tests that check it is gone
-- [ ] pytest: a model's reasoning effort is its option, or `none`, and a dispatch records the model's spec and reasoning effort
-- [ ] pytest: the dispatcher's nodes and edges match the table; `work_claim`'s `RetryPolicy` has three attempts on `TRANSIENT`, waiting 10 seconds first; in the tests its waits are zero, and no dispatcher test takes a second
-- [ ] pytest: LangGraph's `error_handler` with two workers failing side by side, recorded as it behaves in our version, so we know which way `work_claim` goes
-- [ ] Stub model test: six waiting claims at N=3, with a stub that counts the claims working at once: never more than 3, 3 at the start, each claim decided on its own thread
-- [ ] Stub model test: a claim graph run by the dispatcher saves its checkpoints under its thread with no namespace, and one held for sign-off pauses without pausing the dispatch
-- [ ] Stub model test: a dispatch lists the claims in progress then waiting, oldest first, and leaves decided, held, referred and left-for-a-handler claims alone
-- [ ] Stub model test: a claim that hits `ModelRateLimitError` once carries on as the same attempt with one decision; one that hits it every time is tried three times, stays in progress with no `error` step, and the others finish. The same for `ModelTimeoutError`
-- [ ] Stub model test: a claim that fails with another error is worked once more as attempt 2; one that fails twice is left for a handler
-- [ ] Stub model test: when `start_claim` is refused, because another process started the claim, the dispatch reports it and works the rest
-- [ ] Stub model test: a dispatch stopped with `KeyboardInterrupt` partway leaves its claims in progress, and the next carries them on as the same attempts, and pays a claim signed off while the service was away
-- [ ] Stub model test: a dispatch started while the service resumes a claim leaves it out; Stop during a dispatch starts no more claims, lets the working ones finish, and the run shows stopped with the rest unfinished
-- [ ] pytest: the pool opens at most `DATABASE_CONNECTIONS` with `timeout=120`, and each claim run's saver is its own; the backend's engine waits up to two minutes for a connection too (`pool_timeout=120`), since 25 claim agents send it requests at once
-- [ ] pytest, backend: `create_dispatch` (N of 0 or 26 is 422), `record_run_claims` in order, `get_latest_dispatch` with each claim's state, decision, payout, start, seconds and cost, `finish_run` with the summary on a hand-made set of claims (paid, declined, referred, held, left for a handler, in progress, signed off but unpaid, rejected and waiting for the agent, never started), a second finish 409, `stop_runs`
-- [ ] pytest, service: `start_dispatch` with N=2 runs with `max_concurrency` 2; a second start is 409 with "A dispatch or an evaluation is already running"; the lifespan marks a running run stopped; a dispatcher that fails marks the run stopped and frees the lock
-- [ ] Command line: `uv run -m agent` asks for a claim id; `uv run -m agent CLM-1001` works one claim with no run
-- [ ] vitest and e2e: the dispatch panel shows "No dispatch yet.", a dispatch played out through the API with its claims moving from Waiting to Decided, then Finished with its summary lines, cost and time, and a stopped dispatch
-- [ ] Reseed, then Supabase MCP: the new tables are there and `todos` and `usage` aren't; restarting `npm run dev` after a dispatch created with curl leaves it Stopped
-- [ ] Postman: the run operations, with the removed ones gone
-- [ ] `npm run check` passes
+- [x] `grep -rn "create_agent\|Middleware\|write_todos\|run_queue\|queue.md\|getLatestRun\|runner" agent backend dashboard/src e2e` finds nothing outside tests that check it is gone
+- [x] pytest: a model's reasoning effort is its option, or `none`, and a dispatch records the model's spec and reasoning effort
+- [x] pytest: the dispatcher's nodes and edges match the table; `work_claim`'s `RetryPolicy` has three attempts on `TRANSIENT`, waiting 10 seconds first; in the tests its waits are zero, and no dispatcher test waits through a backoff (the slowest works 24 claims in about 4 s)
+- [x] pytest: LangGraph's `error_handler` with two workers failing side by side, recorded as it behaves in our version, so we know which way `work_claim` goes
+- [x] Stub model test: six waiting claims at N=3, with a stub that counts the claims working at once: never more than 3, 3 at the start, each claim decided on its own thread
+- [x] Stub model test: a claim graph run by the dispatcher saves its checkpoints under its thread with no namespace, and one held for sign-off pauses without pausing the dispatch
+- [x] Stub model test: a dispatch lists the claims in progress then waiting, oldest first, and leaves decided, held, referred and left-for-a-handler claims alone
+- [x] Stub model test: a claim that hits `ModelRateLimitError` once carries on as the same attempt with one decision; one that hits it every time is tried three times, stays in progress with no `error` step, and the others finish. The same for `ModelTimeoutError`
+- [x] Stub model test: a claim that fails with another error is worked once more as attempt 2; one that fails twice is left for a handler
+- [x] Stub model test: when `start_claim` is refused, because another process started the claim, the dispatch reports it and works the rest
+- [x] Stub model test: a dispatch stopped with `KeyboardInterrupt` partway leaves its claims in progress, and the next carries them on as the same attempts, and pays a claim signed off while the service was away
+- [x] Stub model test: a dispatch started while the service resumes a claim leaves it out; Stop during a dispatch starts no more claims, lets the working ones finish, and the run shows stopped with the rest unfinished
+- [x] pytest: the pool opens at most `DATABASE_CONNECTIONS` with `timeout=120`, and each claim run's saver is its own; the backend's engine waits up to two minutes for a connection too (`pool_timeout=120`), since 25 claim agents send it requests at once
+- [x] pytest, backend: `create_dispatch` (N of 0 or 26 is 422), `record_run_claims` in order, `get_latest_dispatch` with each claim's state, decision, payout, start, seconds and cost, `finish_run` with the summary on a hand-made set of claims (paid, declined, referred, held, left for a handler, in progress, signed off but unpaid, rejected and waiting for the agent, never started), a second finish 409, `stop_runs`
+- [x] pytest, service: `start_dispatch` with N=2 runs with `max_concurrency` 2; a second start is 409 with "A dispatch or an evaluation is already running"; the lifespan marks a running run stopped; a dispatcher that fails marks the run stopped and frees the lock
+- [x] Command line: `uv run -m agent` asks for a claim id; `uv run -m agent CLM-1001` works one claim with no run
+- [x] vitest and e2e: the dispatch panel shows "No dispatch yet.", a dispatch played out through the API with its claims moving from Waiting to Decided, then Finished with its summary lines, cost and time, and a stopped dispatch
+- [x] Reseed, then Supabase MCP: the new tables are there and `todos` and `usage` aren't; restarting `npm run dev` after a dispatch created with curl leaves it Stopped
+- [x] Postman: the run operations, with the removed ones gone
+- [x] `npm run check` passes
 
 ## Phase 3: Starting and stopping a dispatch from the dashboard
 

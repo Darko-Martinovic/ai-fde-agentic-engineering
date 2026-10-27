@@ -3,12 +3,11 @@ import {
   fireEvent,
   render,
   screen,
-  waitFor,
   within,
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { QueuePage } from "./Queue";
-import { IDLE, MODELS, QUEUE, calledWith, mockFetch } from "./testing";
+import { QUEUE, mockFetch } from "./testing";
 
 afterEach(() => {
   cleanup();
@@ -26,8 +25,7 @@ function rows() {
 it("shows the counts, the money and the claims", async () => {
   mockFetch({
     "GET /api/claims": QUEUE,
-    "GET /api/agent": IDLE,
-    "GET /api/runs/latest": null,
+    "GET /api/dispatches/latest": null,
   });
   render(<QueuePage />);
   expect(await screen.findByText("CLM-1001")).toBeDefined();
@@ -46,8 +44,7 @@ it("shows the counts, the money and the claims", async () => {
 it("filters by tile, search and type, and sorts", async () => {
   mockFetch({
     "GET /api/claims": QUEUE,
-    "GET /api/agent": IDLE,
-    "GET /api/runs/latest": null,
+    "GET /api/dispatches/latest": null,
   });
   render(<QueuePage />);
   await screen.findByText("CLM-1001");
@@ -83,8 +80,7 @@ it("filters by tile, search and type, and sorts", async () => {
 it("says when nothing matches", async () => {
   mockFetch({
     "GET /api/claims": QUEUE,
-    "GET /api/agent": IDLE,
-    "GET /api/runs/latest": null,
+    "GET /api/dispatches/latest": null,
   });
   render(<QueuePage />);
   await screen.findByText("CLM-1001");
@@ -100,8 +96,7 @@ it("shows an error and tries again", async () => {
       { detail: "Database locked" },
       { status: 500 },
     ),
-    "GET /api/agent": IDLE,
-    "GET /api/runs/latest": null,
+    "GET /api/dispatches/latest": null,
   };
   mockFetch(routes);
   render(<QueuePage />);
@@ -109,72 +104,4 @@ it("shows an error and tries again", async () => {
   routes["GET /api/claims"] = QUEUE;
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
   expect(await screen.findByText("CLM-1001")).toBeDefined();
-});
-
-it("runs the queue and stops the agent", async () => {
-  const routes: Record<string, unknown> = {
-    "GET /api/claims": QUEUE,
-    "GET /api/agent": IDLE,
-    "GET /api/runs/latest": null,
-    "GET /api/agent/models": MODELS,
-    "POST /api/agent/queue": {
-      ...IDLE,
-      running: true,
-      mode: "queue",
-      claim_id: null,
-    },
-    "POST /api/agent/stop": IDLE,
-  };
-  const fetchMock = mockFetch(routes);
-  render(<QueuePage />);
-  expect(await screen.findByText("The agent is idle")).toBeDefined();
-
-  routes["GET /api/agent"] = {
-    ...IDLE,
-    running: true,
-    mode: "queue",
-    claim_id: "CLM-1001",
-  };
-  await screen.findByRole("option", { name: "Claude Haiku 5.5" });
-  fireEvent.change(screen.getByLabelText("Model"), {
-    target: { value: "anthropic:claude-haiku-5-5" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "Run 1" }));
-  expect(
-    await screen.findByText("Working through the queue, on CLM-1001"),
-  ).toBeDefined();
-  const sent = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
-  expect(JSON.parse(sent?.[1]?.body as string)).toEqual({
-    cap: 1,
-    model: "anthropic:claude-haiku-5-5",
-  });
-  expect(screen.getByRole("button", { name: "Run 1" })).toHaveProperty(
-    "disabled",
-    true,
-  );
-
-  routes["GET /api/agent"] = IDLE;
-  fireEvent.click(screen.getByRole("button", { name: "Stop" }));
-  expect(await screen.findByText("The agent is idle")).toBeDefined();
-  expect(calledWith(fetchMock, "POST /api/agent/stop")).toBe(true);
-});
-
-it("shows why the agent didn't start", async () => {
-  mockFetch({
-    "GET /api/claims": QUEUE,
-    "GET /api/agent": IDLE,
-    "GET /api/runs/latest": null,
-    "GET /api/agent/models": MODELS,
-    "POST /api/agent/queue": Response.json(
-      { detail: "The agent is already running" },
-      { status: 409 },
-    ),
-  });
-  render(<QueuePage />);
-  await screen.findByText("The agent is idle");
-  await screen.findByRole("option", { name: "DeepSeek V4.1 Flash (default)" });
-  fireEvent.click(screen.getByRole("button", { name: "Run all 1" }));
-  await waitFor(() => {
-    expect(screen.getByText("The agent is already running")).toBeDefined();
-  });
 });

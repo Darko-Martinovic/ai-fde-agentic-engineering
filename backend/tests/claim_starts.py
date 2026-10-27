@@ -1,13 +1,15 @@
-"""Starting a claim in a run, as the agent does, for the backend's tests."""
+"""Starting a claim, in a dispatch as the agent does or on its own, for the
+backend's tests."""
+
+DISPATCH = {"agents": 3, "model": "test", "reasoning_effort": "none"}
 
 
-def a_run(client, cap=25):
-    """Return the run that's running, starting one if there's none."""
-    latest = client.get("/api/runs/latest").json()
+def a_run(client):
+    """Return the dispatch that's running, starting one if there's none."""
+    latest = client.get("/api/dispatches/latest").json()
     if latest and latest["status"] == "running":
         return latest["run_id"]
-    run = {"mode": "queue", "cap": cap, "model": "test"}
-    return client.post("/api/runs", json=run).json()["run_id"]
+    return client.post("/api/runs/dispatches", json=DISPATCH).json()["run_id"]
 
 
 def start(client, claim_id, run_id=None):

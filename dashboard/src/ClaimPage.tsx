@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { api, type AgentState, type Claim, type Step } from "./api";
+import { api, type Claim, type Step } from "./api";
 import {
   CustomerPanel,
   DocumentsPanel,
@@ -10,81 +10,12 @@ import {
 import { ClaimType, ErrorNote, Loading, StatusBadge } from "./components";
 import { DecisionPanel } from "./Decisions";
 import { date, money } from "./format";
-import { useAction, useModelChoice, usePoll } from "./hooks";
+import { usePoll } from "./hooks";
 import { SectionsPanel } from "./Sections";
 import { StepsPanel } from "./Steps";
 import { paths } from "./paths";
 
-type AgentAction = "run" | "stop" | "carry_on" | null;
-
-// Running the agent on a waiting claim, or carrying on with one left in progress
-const RUN_LABEL = { run: "Run the agent", carry_on: "Carry on" } as const;
-
-/** What the agent can do on this claim now: run on it, stop working on it, or
- *  carry on with it from its saved progress after a run that was stopped. */
-function agentAction(claim: Claim, agent: AgentState | null): AgentAction {
-  const running = agent?.running ?? false;
-  if (claim.status === "waiting") return "run";
-  if (running && agent?.claim_id === claim.claim_id) return "stop";
-  if (!running && claim.status === "in_progress") return "carry_on";
-  return null;
-}
-
-function AgentControls({
-  claim,
-  agent,
-  onChange,
-}: Readonly<{
-  claim: Claim;
-  agent: AgentState | null;
-  onChange: () => void;
-}>) {
-  const { busy, error, run } = useAction(onChange);
-  const { model } = useModelChoice();
-  const running = agent?.running ?? false;
-  const action = agentAction(claim, agent);
-
-  return (
-    <div className="agent-controls">
-      {(action === "run" || action === "carry_on") && (
-        <button
-          type="button"
-          className="button button--primary"
-          disabled={busy || running || model === ""}
-          title={running ? "The agent is working on another claim" : undefined}
-          onClick={() => {
-            run(() => api.runClaim(claim.claim_id, model));
-          }}
-        >
-          {RUN_LABEL[action]}
-        </button>
-      )}
-      {action === "stop" && (
-        <button
-          type="button"
-          className="button button--danger"
-          disabled={busy}
-          onClick={() => {
-            run(api.stopAgent);
-          }}
-        >
-          Stop
-        </button>
-      )}
-      {error && <span className="form-error">{error}</span>}
-    </div>
-  );
-}
-
-function ClaimHead({
-  claim,
-  agent,
-  onChange,
-}: Readonly<{
-  claim: Claim;
-  agent: AgentState | null;
-  onChange: () => void;
-}>) {
+function ClaimHead({ claim }: Readonly<{ claim: Claim }>) {
   return (
     <header className="claim-head">
       <div>
@@ -99,7 +30,6 @@ function ClaimHead({
       </div>
       <div className="claim-head__side">
         <StatusBadge status={claim.status} />
-        <AgentControls claim={claim} agent={agent} onChange={onChange} />
       </div>
     </header>
   );
@@ -107,13 +37,11 @@ function ClaimHead({
 
 function ClaimView({
   claim,
-  agent,
   steps,
   live,
   onChange,
 }: Readonly<{
   claim: Claim;
-  agent: AgentState | null;
   steps: Step[] | null;
   live: boolean;
   onChange: () => void;
@@ -137,7 +65,7 @@ function ClaimView({
 
   return (
     <>
-      <ClaimHead claim={claim} agent={agent} onChange={onChange} />
+      <ClaimHead claim={claim} />
       <div className="claim-grid">
         <div className="claim-grid__main">
           <StoryPanel claim={claim} />
@@ -161,7 +89,6 @@ function ClaimView({
 }
 
 export function ClaimPage({ claimId }: Readonly<{ claimId: string }>) {
-  const agent = usePoll(api.getAgent, 2000);
   const claim = usePoll(
     useCallback(
       (signal: AbortSignal) => api.getClaim(claimId, signal),
@@ -169,9 +96,7 @@ export function ClaimPage({ claimId }: Readonly<{ claimId: string }>) {
     ),
     2000,
   );
-  const live =
-    claim.data?.status === "in_progress" ||
-    (agent.data?.running === true && agent.data.claim_id === claimId);
+  const live = claim.data?.status === "in_progress";
   const steps = usePoll(
     useCallback(
       (signal: AbortSignal) => api.listSteps(claimId, signal),
@@ -181,7 +106,6 @@ export function ClaimPage({ claimId }: Readonly<{ claimId: string }>) {
   );
   const refresh = () => {
     claim.reload();
-    agent.reload();
     steps.reload();
   };
 
@@ -199,7 +123,6 @@ export function ClaimPage({ claimId }: Readonly<{ claimId: string }>) {
       {claim.data && (
         <ClaimView
           claim={claim.data}
-          agent={agent.data}
           steps={steps.data}
           live={live}
           onChange={refresh}

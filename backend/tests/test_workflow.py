@@ -217,32 +217,7 @@ def test_queue_shows_decisions_and_payments(client):
     assert queue["CLM-1003"]["decision"] is None
 
 
-def test_a_run_stops_at_its_cap(client):
-    run_id = client.post(
-        "/api/runs", json={"mode": "queue", "cap": 2, "model": "ollama:qwen3.5:4b"}
-    ).json()["run_id"]
-    assert start(client, "CLM-1001", run_id).status_code == 200
-    assert start(client, "CLM-1002", run_id).status_code == 200
-    third = start(client, "CLM-1003", run_id)
-    assert third.status_code == 409
-    assert third.json()["detail"] == f"Run {run_id} has reached its cap of 2 claims"
-    assert client.get("/api/claims/CLM-1003").json()["status"] == "waiting"
-
-
-def test_a_claim_tried_again_counts_once_against_the_cap(client):
-    run_id = client.post(
-        "/api/runs", json={"mode": "queue", "cap": 1, "model": "ollama:qwen3.5:4b"}
-    ).json()["run_id"]
-    start(client, "CLM-1001", run_id)
-    fail(client, "CLM-1001")
-    assert start(client, "CLM-1001", run_id).status_code == 200
-
-
-def test_a_claim_started_on_its_own_has_no_run_and_no_cap(client):
-    run_id = client.post(
-        "/api/runs", json={"mode": "queue", "cap": 1, "model": "ollama:qwen3.5:4b"}
-    ).json()["run_id"]
-    start(client, "CLM-1001", run_id)
+def test_a_claim_started_on_its_own_has_no_run(client):
     response = start_alone(client, "CLM-1002")
     assert response.status_code == 200
     claim = response.json()
@@ -254,9 +229,14 @@ def test_a_claim_started_on_its_own_has_no_run_and_no_cap(client):
     assert claim["thread_id"] == "CLM-1002-test"
 
 
+def test_a_claim_in_a_run_records_the_run(client):
+    run_id = a_run(client)
+    assert start(client, "CLM-1001", run_id).json()["run_id"] == run_id
+
+
 def test_a_claim_needs_a_running_run(client):
     run_id = a_run(client)
-    client.post(f"/api/runs/{run_id}/finish", json={"summary": "Done."})
+    client.post(f"/api/runs/{run_id}/finish", json={"stopped": False})
     response = start(client, "CLM-1001", run_id)
     assert response.status_code == 409
     assert response.json()["detail"] == f"Run {run_id} is finished, not running"

@@ -4,16 +4,12 @@ agent with KeyboardInterrupt, which the harness doesn't catch, so the claim is
 left as a crash leaves it."""
 
 import pytest
-from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.messages import ToolMessage
 
-import agent.__main__ as cli
-from agent import api, harness, queue_agent
+from agent import api, harness
 from agent.tests.stub import (
     FREE,
-    REASONS,
     StubModel,
-    call,
-    calls,
     decide,
     stub,
     tool_call,
@@ -141,7 +137,7 @@ def test_the_limit_of_model_calls_holds_across_a_restart(backend, run, memory_sa
     forever = StubModel(messages=(tool_call("get_claim") for _ in range(40)))
     report = harness.carry_on("CLM-1001", run, FREE, memory_saver, forever)
     assert "TooManyModelCalls" in report
-    assert backend.get("/api/runs/latest").json()["usage"]["model_calls"] == 30
+    assert backend.get("/api/dispatches/latest").json()["usage"]["model_calls"] == 30
 
 
 def test_an_error_while_carrying_on_starts_the_claim_afresh(backend, run, memory_saver):
@@ -160,97 +156,3 @@ def test_an_error_while_carrying_on_starts_the_claim_afresh(backend, run, memory
     after = claim(backend)
     assert after["attempts"] == 2
     assert after["thread_id"] != first
-
-
-def test_a_queue_run_carries_on_first_outside_its_cap(
-    backend, run, memory_saver, capsys
-):
-    stopped_partway(run, memory_saver, "CLM-1001", tool_call("get_claim"))
-    harness.work_claim(
-        "CLM-1003", run, FREE, memory_saver, stub(decide("approve", 3750.0))
-    )
-    body = {"handler_id": "HND-01", "approved": True, "note": ""}
-    backend.post("/api/claims/CLM-1003/review", json=body)
-    capsys.readouterr()
-    queue = stub(
-        calls(call("work_claim", claim_id="CLM-1005")),
-        AIMessage(content="Worked CLM-1005."),
-    )
-    claims = stub(decide("approve", 420.0), decide("decline", 0))
-    summary = queue_agent.run_queue(1, FREE, memory_saver, queue, claims)
-    printed = capsys.readouterr().out.splitlines()
-    assert printed[:2] == [
-        "CLM-1001: approved $420.00, paid",
-        "CLM-1003: approved $3,750.00, paid",
-    ]
-    latest = backend.get("/api/runs/latest").json()
-    assert latest["claims_started"] == ["CLM-1005"]
-    assert latest["summary"].startswith("CLM-1001: approved $420.00, paid\n")
-    assert summary == "Worked CLM-1005."
-    assert claim(backend, "CLM-1005")["status"] == "decided"
-
-
-def test_a_stopped_run_is_finished_by_the_next(backend, run, monkeypatch):
-    """`run` is still running, as a run whose process was killed is."""
-    monkeypatch.setattr(cli, "run_queue", lambda cap, model, saver: "Done.")
-    cli.main(["--cap", "1"])
-    stopped = api.get_latest_run()
-    assert stopped is not None
-    assert (stopped["run_id"], stopped["status"]) == (run, "finished")
-    assert stopped["summary"] == harness.STOPPED_RUN
-
-
-def test_with_nothing_waiting_a_claim_in_progress_is_still_carried_on(
-    backend, run, memory_saver, monkeypatch, capsys
-):
-    stopped_partway(run, memory_saver, "CLM-1001", tool_call("get_claim"))
-    for listed in api.list_claims():
-        if listed["claim_id"] != "CLM-1001":
-            backend.post(
-                f"/api/claims/{listed['claim_id']}/start",
-                json={"run_id": run, "thread_id": f"{listed['claim_id']}-x"},
-            )
-            backend.post(
-                f"/api/claims/{listed['claim_id']}/decision",
-                json={
-                    "decision": "decline",
-                    "payout": 0,
-                    "reasons": "Set up.",
-                    "policy_section": "Section 9",
-                },
-            )
-    thread_id = claim(backend)["thread_id"]
-    monkeypatch.setattr(harness, "chat_model", lambda model: stub(decide("decline", 0)))
-    capsys.readouterr()
-    cli.main([])
-    assert (claim(backend)["thread_id"], claim(backend)["attempts"]) == (thread_id, 1)
-    assert capsys.readouterr().out.splitlines() == [
-        f"CLM-1001: declined, because: {REASONS}",
-        "No claims are waiting.",
-    ]
-
-
-def test_a_claim_that_cant_be_picked_up_never_stops_a_run(backend, run, memory_saver):
-    """CLM-1003's decision was made through the API, so the graph saved nothing
-    to carry on: the run reports it and works the queue all the same."""
-    api.start_claim("CLM-1003", run, "CLM-1003-api")
-    api.decide_claim(
-        "CLM-1003",
-        {
-            "decision": "approve",
-            "payout": 3750.0,
-            "reasons": "Set up through the API.",
-            "policy_section": "Section 7, Emergency Medical",
-        },
-    )
-    body = {"handler_id": "HND-01", "approved": True, "note": ""}
-    backend.post("/api/claims/CLM-1003/review", json=body)
-    queue = stub(
-        calls(call("work_claim", claim_id="CLM-1005")),
-        AIMessage(content="Worked CLM-1005."),
-    )
-    queue_agent.run_queue(1, FREE, memory_saver, queue, stub(decide("decline", 0)))
-    latest = backend.get("/api/runs/latest").json()
-    assert latest["status"] == "finished"
-    assert latest["summary"].startswith("CLM-1003: not picked up (RuntimeError")
-    assert claim(backend, "CLM-1005")["status"] == "decided"

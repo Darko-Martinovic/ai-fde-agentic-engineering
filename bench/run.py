@@ -1,5 +1,6 @@
 """Running a trial once: a fresh database, the claims worked through the harness
-in a run of their own, and what came of them, read through the API."""
+one at a time in a dispatch of their own, and what came of them, read through
+the API."""
 
 import json
 import time
@@ -7,8 +8,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from agent import api
-from agent.__main__ import work_claims
+from agent import api, checkpoints, harness
+from agent.config import Model
 from backend.seed import reset
 from bench.plan import Trial
 from bench.score import (
@@ -89,16 +90,29 @@ def tally(
     )
 
 
+def work_claims(claim_ids: list[str], model: Model) -> dict[str, Any]:
+    """Work the claims one at a time on a model, in a dispatch of one claim agent
+    that takes only them, and return the finished dispatch."""
+    run_id = api.create_dispatch(1, model.spec, model.reasoning_effort)["run_id"]
+    api.record_run_claims(run_id, claim_ids)
+    try:
+        with checkpoints.pool() as connections:
+            for claim_id in claim_ids:
+                harness.work_in_run(
+                    claim_id, run_id, model, checkpoints.savers(connections)
+                )
+    finally:
+        finished = api.finish_run(run_id, False)
+    return finished
+
+
 def run_repeat(trial: Trial, repeat: int, key: dict[str, Answer]) -> Repeat:
     """Reseed, work the trial's claims on its model, and score what came of it."""
     claim_ids = chosen(key, trial.claims)
     reset()
     started = time.monotonic()
-    work_claims(claim_ids, trial.model)
+    run = work_claims(claim_ids, trial.model)
     seconds = time.monotonic() - started
-    run = api.get_latest_run()
-    if run is None:
-        raise RuntimeError("The claims were worked, but no run was recorded")
     usage = run["usage"] | {"wall_seconds": seconds}
     outcomes = [outcome(api.get_claim(claim_id)) for claim_id in claim_ids]
     return tally(trial, repeat, outcomes, key, usage)

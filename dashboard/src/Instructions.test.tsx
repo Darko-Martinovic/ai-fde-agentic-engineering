@@ -10,16 +10,12 @@ afterEach(() => {
 
 it("shows the instructions and the policy wording", async () => {
   mockFetch({
-    "GET /api/instructions/queue": "# UnderCover queue agent\n\nRun the queue.",
-    "GET /api/instructions/claim":
+    "GET /api/instructions":
       "# UnderCover claim agent\n\nRead the claim with `get_claim`.",
     "GET /api/policy-wording":
       "# Policy Wording\n\n| Benefit | Economy |\n|---|---|\n| Deductible | $100 |",
   });
   render(<InstructionsPage />);
-  expect(
-    await screen.findByRole("heading", { name: "UnderCover queue agent" }),
-  ).toBeDefined();
   expect(
     await screen.findByRole("heading", { name: "UnderCover claim agent" }),
   ).toBeDefined();
@@ -32,6 +28,6 @@ it("shows when the instructions can't load", async () => {
   mockFetch({});
   render(<InstructionsPage />);
   expect(
-    await screen.findByText("No route for GET /api/instructions/claim"),
+    await screen.findByText("No route for GET /api/instructions"),
   ).toBeDefined();
 });

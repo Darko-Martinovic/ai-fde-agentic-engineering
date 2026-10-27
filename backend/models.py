@@ -22,8 +22,6 @@ Review = Literal["signed_off", "rejected"]
 
 
 DocumentName = Literal["wording", "manual"]
-# The agents with instructions of their own
-AgentName = Literal["queue", "claim"]
 
 
 class SectionTitle(BaseModel):

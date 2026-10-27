@@ -2,8 +2,7 @@
 its state, its nodes and its edges. The agent works the claim with its tools; the
 graph pays an approval, straight after the decision or after a handler's
 sign-off, which it waits for with interrupt() when the backend says a claim
-needs one. Its nodes record each step and each model call on the claim, which
-middleware did for create_agent."""
+needs one. Its nodes record each step and each model call on the claim."""
 
 import time
 from collections.abc import Callable
@@ -32,6 +31,7 @@ from langgraph.types import Command, interrupt
 
 from agent import api, config, recording
 from agent.config import Model
+from agent.reports import IN_PROGRESS
 from agent.tools import CLAIM_TOOLS, ClaimContext, read_section
 
 # A claim agent's model calls before it's stopped, across restarts
@@ -157,7 +157,7 @@ def after_tools(state: ClaimState) -> str:
         return "agent"
     if status == "awaiting_sign_off":
         return "wait_for_sign_off"
-    if decision == "approve" and status == "in_progress":
+    if decision == "approve" and status == IN_PROGRESS:
         return "pay"
     return END
 

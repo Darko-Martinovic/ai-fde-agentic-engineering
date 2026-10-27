@@ -4,7 +4,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langfuse.langchain import CallbackHandler
 
-from agent import config, harness, queue_agent
+from agent import config, harness
 from agent.tests.stub import (
     FREE,
     REASONS,
@@ -105,7 +105,7 @@ def test_the_agent_stops_at_its_limit_of_model_calls(backend, run, memory_saver)
     forever = StubModel(messages=(tool_call("get_claim") for _ in range(40)))
     report = harness.work_claim("CLM-1001", run, FREE, memory_saver, forever)
     assert report.startswith("CLM-1001: failed, back in the queue (TooManyModelCalls")
-    assert backend.get("/api/runs/latest").json()["usage"]["model_calls"] == 30
+    assert backend.get("/api/dispatches/latest").json()["usage"]["model_calls"] == 30
     assert saved(memory_saver, backend, "CLM-1001").values["model_calls"] == 30
 
 
@@ -177,22 +177,6 @@ def test_every_claim_graph_run_saves_each_step_and_is_traced(
     assert durability == ["sync"]
     [config] = invoked
     assert any(isinstance(handler, CallbackHandler) for handler in config["callbacks"])
-
-
-def test_a_queue_runs_claims_are_saved_under_their_own_threads(backend, memory_saver):
-    queue = stub(
-        calls(call("work_claim", claim_id="CLM-1001")),
-        calls(call("work_claim", claim_id="CLM-1005")),
-        AIMessage(content="Two worked."),
-    )
-    claims = stub(decide("approve", 420.0), decide("decline", 0))
-    queue_agent.run_queue(2, FREE, memory_saver, queue, claims)
-    threads = {
-        item.config["configurable"]["thread_id"] for item in memory_saver.list(None)
-    }
-    assert threads == {thread_of(backend, "CLM-1001"), thread_of(backend, "CLM-1005")}
-    for item in memory_saver.list(None):
-        assert item.config["configurable"]["checkpoint_ns"] == ""
 
 
 def test_two_decisions_at_once_are_recorded_once(backend, run, memory_saver):

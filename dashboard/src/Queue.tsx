@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { AgentBar } from "./AgentBar";
 import { api, type ClaimStatus, type ClaimSummary } from "./api";
 import {
   ClaimType,
@@ -21,7 +20,7 @@ import {
   totals,
 } from "./filters";
 import { paths } from "./paths";
-import { RunPanel } from "./RunPanel";
+import { DispatchPanel } from "./DispatchPanel";
 
 const COLUMNS: { key: SortKey; label: string; numeric?: boolean }[] = [
   { key: "claim_id", label: "Claim" },
@@ -156,7 +155,6 @@ function ClaimTable({
 
 export function QueuePage() {
   const claims = usePoll(api.listClaims, 3000);
-  const agent = usePoll(api.getAgent, 2000);
   const [filters, setFilters] = useState<Filters>({
     status: "all",
     type: "all",
@@ -168,19 +166,10 @@ export function QueuePage() {
     () => sortClaims(filterClaims(all, filters), sort),
     [all, filters, sort],
   );
-  const refresh = () => {
-    claims.reload();
-    agent.reload();
-  };
 
   return (
     <div className="page">
-      <AgentBar
-        agent={agent.data}
-        waiting={countByStatus(all).waiting}
-        onChange={refresh}
-      />
-      <RunPanel claims={all} />
+      <DispatchPanel />
       {claims.error && (
         <ErrorNote message={claims.error} onRetry={claims.reload} />
       )}

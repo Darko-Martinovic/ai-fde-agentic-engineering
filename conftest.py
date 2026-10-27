@@ -17,13 +17,14 @@ from agent import checkpoints  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def memory_saver(monkeypatch):
-    """The claim graph saves its progress in memory, never on Postgres. Returns
-    the saver a command-line run opens."""
+    """The claim graphs save their progress in memory, never on Postgres: the
+    process's pool is nothing, and every claim run's saver is this one."""
     saver = InMemorySaver()
 
     @contextmanager
-    def in_memory():
-        yield saver
+    def no_pool():
+        yield None
 
-    monkeypatch.setattr(checkpoints, "saver", in_memory)
+    monkeypatch.setattr(checkpoints, "pool", no_pool)
+    monkeypatch.setattr(checkpoints, "saver", lambda connections: saver)
     return saver

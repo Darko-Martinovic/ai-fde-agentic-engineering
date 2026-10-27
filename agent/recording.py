@@ -1,7 +1,6 @@
-"""What the agents record on the backend as they work: each reply, tool call,
-tool result and section read as a step on the claim; each claim agent's model
-call, with its tokens, cost and time, and each spell of its work, on the claim,
-with its run; and each of the queue agent's model calls on its run."""
+"""What the claim agents record on the backend as they work, on the claim: each
+reply, tool call, tool result and section read as a step, and each model call,
+with its tokens, cost and time, and each spell of work, with its run."""
 
 import json
 
@@ -9,7 +8,7 @@ from langchain_core.messages import AIMessage, ToolMessage
 
 from agent import api
 from agent.config import Model
-from agent.tools import ClaimContext, RunContext
+from agent.tools import ClaimContext
 
 
 def steps(message: AIMessage) -> list[tuple[str, str]]:
@@ -79,22 +78,4 @@ def work_time(context: ClaimContext, seconds: float) -> None:
     api.record_work_time(
         context.claim_id,
         {"thread_id": context.thread_id, "run_id": context.run_id, "seconds": seconds},
-    )
-
-
-def usage(
-    context: RunContext, model: Model, message: AIMessage | None, seconds: float
-) -> None:
-    """Record one of the queue agent's model calls on its run."""
-    tokens_in, tokens_out = tokens(message)
-    api.record_usage(
-        context.run_id,
-        {
-            "claim_id": None,
-            "model": model.spec,
-            "input_tokens": tokens_in,
-            "output_tokens": tokens_out,
-            "cost": model.cost(tokens_in, tokens_out),
-            "seconds": seconds,
-        },
     )

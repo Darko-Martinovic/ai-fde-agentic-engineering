@@ -4,8 +4,9 @@ labs/week2day3.ipynb. The agent is synchronous, with the synchronous
 checkpointer, because async Postgres connections don't work with Windows'
 default event loop."""
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from typing import Any
 
 from langgraph.checkpoint.postgres import PostgresSaver
 from psycopg import Connection, sql
@@ -14,6 +15,8 @@ from psycopg_pool import ConnectionPool
 
 from settings import optional_setting, setting
 
+# How long a claim agent waits for one of the pool's connections
+POOL_WAIT_SECONDS = 120
 NO_DATABASE = (
     "The agent saves its progress on Postgres, so a handler's sign-off can pick a"
     " claim back up: set DATABASE_URL in .env"
@@ -52,10 +55,14 @@ def enable_row_level_security(conn: Connection[DictRow], schema: str) -> None:
         )
 
 
+Pool = ConnectionPool[Any]
+
+
 @contextmanager
-def saver() -> Iterator[PostgresSaver]:
-    """Open the checkpointer on a pool of at most DATABASE_CONNECTIONS
-    connections, making its tables the first time, with row level security on
+def pool() -> Iterator[Pool]:
+    """Open the process's pool of at most DATABASE_CONNECTIONS connections, which
+    every claim agent in it shares, waiting for one rather than failing, and
+    make the checkpointer's tables the first time, with row level security on
     like UnderCover's own."""
     url = optional_setting("DATABASE_URL")
     if url is None:
@@ -67,11 +74,22 @@ def saver() -> Iterator[PostgresSaver]:
         max_size=int(setting("DATABASE_CONNECTIONS")),
         kwargs=connection_options(schema),
         check=ConnectionPool.check_connection,
-    ) as pool:
-        with pool.connection() as conn:
+        timeout=POOL_WAIT_SECONDS,
+    ) as connections:
+        with connections.connection() as conn:
             create_schema(conn, schema)
-        checkpointer = PostgresSaver(pool)  # type: ignore[arg-type]
-        checkpointer.setup()
-        with pool.connection() as conn:
+        saver(connections).setup()
+        with connections.connection() as conn:
             enable_row_level_security(conn, schema)
-        yield checkpointer
+        yield connections
+
+
+def savers(connections: Pool) -> Callable[[], PostgresSaver]:
+    """A new checkpointer on the pool for each claim run that asks."""
+    return lambda: saver(connections)
+
+
+def saver(connections: Pool) -> PostgresSaver:
+    """A checkpointer for one claim run, on the process's pool. Each claim run
+    has its own, since a checkpointer lets one read or write at a time."""
+    return PostgresSaver(connections)  # type: ignore[arg-type]

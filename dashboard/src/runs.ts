@@ -1,4 +1,5 @@
-import type { ClaimStatus, ClaimWork, Run, Step } from "./api";
+import type { ClaimStatus, ClaimWork, Run, RunSummary } from "./api";
+import { money } from "./format";
 
 const RUN_GAP_SECONDS = 300;
 
@@ -46,63 +47,37 @@ export function layout(run: ClaimWork[]): Layout {
   };
 }
 
-export interface Progress {
-  done: number;
-  total: number;
-  current: string | null;
-  elapsed: number;
-  secondsLeft: number | null;
-}
-
-// A started claim in one of these is not done: being worked, or back in the
-// queue after a failed attempt (or a Stop) for this run or another to try again
+// A dispatch's claim in one of these isn't done: being worked, or waiting to be
 const NOT_DONE: ClaimStatus[] = ["in_progress", "waiting"];
 
-/** How many claims the run will work: its cap, or fewer when fewer were left
- *  for it, once the claims' states are known. */
-function planned(run: Run, statuses: Map<string, ClaimStatus>): number {
-  if (statuses.size === 0) return run.cap;
-  const waiting = [...statuses].filter(
-    ([id, status]) => status === "waiting" && !run.claims_started.includes(id),
-  ).length;
-  return Math.min(run.cap, run.claims_started.length + waiting);
+/** How many of a dispatch's claims are done, out of all it takes. */
+export function claimsDone(run: Run): { done: number; total: number } {
+  const done = run.claims.filter((c) => !NOT_DONE.includes(c.status)).length;
+  return { done, total: run.claims.length };
 }
 
-/** How far a run has got: the claims it started that are done, out of those
- *  it will work; the claim it's on; how long it has taken; and, once a claim
- *  is done, the time left at the pace so far. */
-export function progress(
-  run: Run,
-  statuses: Map<string, ClaimStatus>,
-  now: number,
-): Progress {
-  const state = (id: string) => statuses.get(id) ?? "in_progress";
-  const done = run.claims_started.filter(
-    (id) => !NOT_DONE.includes(state(id)),
-  ).length;
-  const working = run.claims_started.find(
-    (id) => statuses.get(id) === "in_progress",
-  );
-  const total = planned(run, statuses);
-  const end = run.finished_at ? seconds(run.finished_at) : now / 1000;
-  const elapsed = Math.max(end - seconds(run.started_at), 0);
-  const live = run.status === "running";
-  return {
-    done,
-    total,
-    current: live ? (working ?? null) : null,
-    elapsed,
-    secondsLeft:
-      live && done > 0 && total > done
-        ? (elapsed / done) * (total - done)
-        : null,
-  };
+/** The claims named, joined for a line of the summary. */
+function listed(claimIds: string[]): string {
+  return claimIds.join(", ");
 }
 
-/** The steps of a claim's latest attempt: a claim tried again starts afresh,
- *  so after a failure there are none until the new attempt's first step. */
-export function latestAttempt(steps: Step[]): Step[] {
-  const last = steps.at(-1);
-  if (!last || last.kind === "failure") return [];
-  return steps.filter((step) => step.thread_id === last.thread_id);
+/** What a dispatch left, as lines for the handlers, leaving out empty ones. */
+export function summaryLines(summary: RunSummary): string[] {
+  const { approved, declined, referred } = summary;
+  const lines = [
+    `${String(approved)} approved, ${String(declined)} declined and ${String(referred)} referred.`,
+  ];
+  if (summary.waiting_for_sign_off.length > 0) {
+    const held = summary.waiting_for_sign_off.map(
+      (h) => `${h.claim_id} ${money(h.payout)}`,
+    );
+    lines.push(`Waiting for sign-off: ${listed(held)}`);
+  }
+  if (summary.left_for_handler.length > 0) {
+    lines.push(`Left for a handler: ${listed(summary.left_for_handler)}`);
+  }
+  if (summary.unfinished.length > 0) {
+    lines.push(`Left for the next dispatch: ${listed(summary.unfinished)}`);
+  }
+  return lines;
 }

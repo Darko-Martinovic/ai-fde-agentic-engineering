@@ -1,4 +1,4 @@
-"""The agent's runs, the claims each run started, and what its model calls used."""
+"""The agent's runs, the claims each one works, and each claim's attempts."""
 
 from typing import Any
 
@@ -8,8 +8,9 @@ from backend import db
 
 
 def add(conn: Connection, run: dict[str, Any]) -> int:
-    """Record a new run, given as mode, cap, model and started_at; return its id."""
-    added = insert(db.runs).values(status="running", todos="[]", **run)
+    """Record a new run, running, given as kind, agents, model, reasoning_effort
+    and started_at; return its id."""
+    added = insert(db.runs).values(status="running", **run)
     return conn.execute(added.returning(db.runs.c.run_id)).scalar_one()
 
 
@@ -18,12 +19,33 @@ def run(conn: Connection, run_id: int) -> RowMapping | None:
     return conn.execute(found).mappings().first()
 
 
-def latest(conn: Connection) -> int | None:
-    return conn.execute(select(func.max(db.runs.c.run_id))).scalar_one()
+def latest(conn: Connection, kind: str) -> int | None:
+    """The newest run of a kind, or None before the first."""
+    found = select(func.max(db.runs.c.run_id)).where(db.runs.c.kind == kind)
+    return conn.execute(found).scalar_one()
 
 
-def set_todos(conn: Connection, run_id: int, todos: str) -> None:
-    conn.execute(update(db.runs).where(db.runs.c.run_id == run_id).values(todos=todos))
+def set_claims(conn: Connection, run_id: int, claim_ids: list[str]) -> None:
+    """Record the claims a run works, in order, in place of any before."""
+    conn.execute(db.run_claims.delete().where(db.run_claims.c.run_id == run_id))
+    if claim_ids:
+        conn.execute(
+            insert(db.run_claims),
+            [
+                {"run_id": run_id, "position": position, "claim_id": claim_id}
+                for position, claim_id in enumerate(claim_ids)
+            ],
+        )
+
+
+def claims_of(conn: Connection, run_id: int) -> list[str]:
+    """A run's claims, in the order it takes them."""
+    found = (
+        select(db.run_claims.c.claim_id)
+        .where(db.run_claims.c.run_id == run_id)
+        .order_by(db.run_claims.c.position)
+    )
+    return list(conn.execute(found).scalars())
 
 
 def finish(
@@ -36,13 +58,15 @@ def finish(
     )
 
 
-def stop_running(conn: Connection, at: str) -> None:
-    """Mark every run still running as stopped."""
-    conn.execute(
+def stop_running(conn: Connection, at: str) -> list[int]:
+    """Mark every run still running as stopped; return their ids."""
+    stopped = conn.execute(
         update(db.runs)
         .where(db.runs.c.status == "running")
         .values(status="stopped", finished_at=at)
+        .returning(db.runs.c.run_id)
     )
+    return sorted(stopped.scalars())
 
 
 def add_attempt(
@@ -64,26 +88,3 @@ def attempts(conn: Connection, claim_id: str) -> list[RowMapping]:
         .order_by(attempt.attempt_id)
     )
     return list(conn.execute(found).mappings())
-
-
-def claims_started(conn: Connection, run_id: int) -> set[str]:
-    found = select(db.attempts.c.claim_id).where(db.attempts.c.run_id == run_id)
-    return set(conn.execute(found).scalars())
-
-
-def add_usage(conn: Connection, run_id: int, usage: dict[str, Any]) -> None:
-    """Record one model call, given as claim_id, model, input_tokens,
-    output_tokens, cost, seconds and recorded_at."""
-    conn.execute(insert(db.usage).values(run_id=run_id, **usage))
-
-
-def usage(conn: Connection, run_id: int) -> RowMapping:
-    used = db.usage.c
-    found = select(
-        func.count().label("model_calls"),
-        func.coalesce(func.sum(used.input_tokens), 0).label("input_tokens"),
-        func.coalesce(func.sum(used.output_tokens), 0).label("output_tokens"),
-        func.coalesce(func.sum(used.cost), 0).label("cost"),
-        func.coalesce(func.sum(used.seconds), 0).label("seconds"),
-    ).where(used.run_id == run_id)
-    return conn.execute(found).mappings().one()

@@ -1,19 +1,21 @@
+import threading
+from functools import partial
+
 from langchain_core.messages import AIMessage
 
 import agent.__main__ as cli
-from agent import harness, queue_agent, tracing
-from agent.tests.stub import FREE, StubModel, decide, stub, tool_call
+from agent import api, dispatcher, harness
+from agent.tests.stub import FREE, ByClaim, StubModel, decide, stub, tool_call
+from backend.tests.direct_changes import set_status
+
+# Every waiting claim but CLM-1001 and CLM-1004, so a dispatch works those two
+DECIDED_ELSEWHERE = [f"CLM-{n}" for n in range(1002, 1026) if n != 1004]
 
 TYPE = "langfuse.observation.type"
 INPUT = "langfuse.observation.input"
 OUTPUT = "langfuse.observation.output"
 SESSION = "session.id"
 TAGS = "langfuse.trace.tags"
-# The queue agent's middleware hooks, which are left out of its trace
-HOOKS = {
-    "ModelCallLimitMiddleware.before_model",
-    "ModelCallLimitMiddleware.after_model",
-}
 
 
 def approves(monkeypatch):
@@ -43,7 +45,7 @@ def parent(spans, span):
 
 def test_a_claim_named_is_a_trace_of_its_own(backend, monkeypatch, traces):
     approves(monkeypatch)
-    cli.work_claims(["CLM-1001"], FREE)
+    cli.main(["CLM-1001"])
     spans = traces()
     [root] = roots(spans)
     assert (root.name, root.attributes[INPUT]) == ("work-claim", "CLM-1001")
@@ -67,52 +69,13 @@ def test_a_claim_named_is_a_trace_of_its_own(backend, monkeypatch, traces):
 
 def test_each_claim_has_a_session_of_its_own(backend, monkeypatch, traces):
     approves(monkeypatch)
-    cli.work_claims(["CLM-1001", "CLM-1002"], FREE)
+    cli.main(["CLM-1001"])
+    cli.main(["CLM-1002"])
     claims = roots(traces())
     assert [root.attributes[INPUT] for root in claims] == ["CLM-1001", "CLM-1002"]
     for root in claims:
         claim = backend.get(f"/api/claims/{root.attributes[INPUT]}/steps").json()
         assert root.attributes[SESSION] == claim[0]["thread_id"]
-
-
-def test_middleware_hooks_are_not_sent(backend, traces, memory_saver):
-    queue_llm = stub(AIMessage(content="Nothing to do."), AIMessage(content="Done."))
-    queue_agent.run_queue(1, FREE, memory_saver, queue_llm, stub())
-    names = {span.name for span in traces()}
-    assert names >= HOOKS
-    assert {span.name for span in traces() if tracing.sent(span)} == names - HOOKS
-
-
-def test_a_queue_runs_claims_are_traces_of_their_own(backend, traces, memory_saver):
-    queue_llm = stub(
-        tool_call("work_claim", claim_id="CLM-1001"),
-        tool_call("work_claim", claim_id="CLM-1004"),
-        AIMessage(content="Two claims worked."),
-    )
-    claim_llm = stub(
-        decide("approve", 420.0),
-        decide("decline", 0.0),
-    )
-    summary = queue_agent.run_queue(2, FREE, memory_saver, queue_llm, claim_llm)
-    spans = traces()
-    [run] = [root for root in roots(spans) if root.name == "run-queue"]
-    assert run.attributes[INPUT] == "Work up to 2 waiting claims in this run."
-    assert run.attributes[OUTPUT] == summary
-    assert SESSION not in run.attributes
-    [queue] = named(spans, "queue-agent")
-    assert parent(spans, queue) == run
-    handed_on = [span.attributes[OUTPUT] for span in named(spans, "work_claim")]
-    assert any("CLM-1001: approved $420.00, paid" in out for out in handed_on)
-    worked = [root for root in roots(spans) if root.name == "work-claim"]
-    assert [root.attributes[INPUT] for root in worked] == ["CLM-1001", "CLM-1004"]
-    for root in worked:
-        assert root.context.trace_id != run.context.trace_id
-        steps = backend.get(f"/api/claims/{root.attributes[INPUT]}/steps").json()
-        assert root.attributes[SESSION] == steps[0]["thread_id"]
-    assert worked[0].attributes[SESSION] != worked[1].attributes[SESSION]
-    assert {parent(spans, claim) for claim in named(spans, "claim-agent")} == set(
-        worked
-    )
 
 
 def test_naming_the_agents_leaves_the_conversation_alone(backend, monkeypatch):
@@ -127,7 +90,7 @@ def test_naming_the_agents_leaves_the_conversation_alone(backend, monkeypatch):
 
     monkeypatch.setattr(StubModel, "_generate", recording)
     approves(monkeypatch)
-    cli.work_claims(["CLM-1001"], FREE)
+    cli.main(["CLM-1001"])
     replies = [m for m in seen[-1] if isinstance(m, AIMessage)]
     assert len(replies) == 1
     assert all(reply.name is None for reply in replies)
@@ -136,7 +99,7 @@ def test_naming_the_agents_leaves_the_conversation_alone(backend, monkeypatch):
 def test_nothing_is_sent_with_tracing_off(backend, monkeypatch, traces):
     approves(monkeypatch)
     monkeypatch.setenv("LANGFUSE_TRACING_ENABLED", "false")
-    cli.work_claims(["CLM-1001"], FREE)
+    cli.main(["CLM-1001"])
     assert traces() == ()
     assert backend.get("/api/claims/CLM-1001").json()["status"] == "decided"
 
@@ -156,26 +119,38 @@ def test_a_claim_carried_on_is_traced_in_the_same_session(
     assert first.attributes[SESSION] == then.attributes[SESSION] == thread_id
 
 
-def test_a_queue_runs_claims_carry_its_tag(backend, memory_saver, traces):
-    queue_llm = stub(
-        tool_call("work_claim", claim_id="CLM-1001"),
-        tool_call("work_claim", claim_id="CLM-1004"),
-        AIMessage(content="Two claims worked."),
-    )
-    claim_llm = stub(decide("approve", 420.0), decide("decline", 0.0))
-    queue_agent.run_queue(2, FREE, memory_saver, queue_llm, claim_llm)
-    run_id = backend.get("/api/runs/latest").json()["run_id"]
-    spans = traces()
-    agents = named(spans, "claim-agent")
-    assert len(agents) == 2
-    assert all(span.attributes[TAGS] == (f"run-{run_id}",) for span in agents)
-    worked = [root for root in roots(spans) if root.name == "work-claim"]
-    metadata = "langfuse.trace.metadata.run_id"
-    assert all(root.attributes[metadata] == f'"{run_id}"' for root in worked)
-
-
 def test_a_claim_worked_alone_has_no_tag(backend, memory_saver, traces):
     harness.work_claim(
         "CLM-1001", None, FREE, memory_saver, stub(decide("approve", 420.0))
     )
     assert all(TAGS not in span.attributes for span in traces())
+
+
+def test_a_dispatchs_claims_are_traces_of_their_own_tagged_with_it(
+    backend, memory_saver, traces
+):
+    set_status("decided", *DECIDED_ELSEWHERE)
+    run = api.create_dispatch(2, FREE.spec, FREE.reasoning_effort)
+    llm = ByClaim(
+        messages=iter([]),
+        scripts={
+            "CLM-1001": iter([decide("approve", 420.0)]),
+            "CLM-1004": iter([decide("decline", 0.0)]),
+        },
+    )
+    work = partial(
+        harness.work_in_run, model=FREE, new_saver=lambda: memory_saver, llm=llm
+    )
+    dispatcher.work_run(run, work, (), threading.Event())
+    spans = traces()
+    worked = roots(spans)
+    assert sorted(root.attributes[INPUT] for root in worked) == ["CLM-1001", "CLM-1004"]
+    assert len({root.context.trace_id for root in worked}) == 2
+    for root in worked:
+        steps = backend.get(f"/api/claims/{root.attributes[INPUT]}/steps").json()
+        assert root.attributes[SESSION] == steps[0]["thread_id"]
+        metadata = "langfuse.trace.metadata.run_id"
+        assert root.attributes[metadata] == f'"{run["run_id"]}"'
+    agents = named(spans, "claim-agent")
+    assert len(agents) == 2
+    assert all(a.attributes[TAGS] == (f"run-{run['run_id']}",) for a in agents)

@@ -32,3 +32,8 @@ def test_every_model_has_a_price_and_a_known_provider():
         assert allowed.provider in {"openrouter", "anthropic", "ollama"}
         assert allowed.input_price >= 0
         assert allowed.output_price >= 0
+
+
+def test_a_models_reasoning_effort_is_its_option_or_none():
+    assert config.model("openrouter:openai/gpt-6-luna").reasoning_effort == "low"
+    assert config.model("openrouter:openrouter/free").reasoning_effort == "none"

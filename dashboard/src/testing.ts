@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 import type { Claim, ClaimSummary, Customer, Decision, Policy } from "./api";
-import { IDLE, MODELS } from "./agentFixtures";
+import { MODELS } from "./agentFixtures";
 
 export * from "./agentFixtures";
 
@@ -209,8 +209,7 @@ export function claimRoutes(overrides: Routes = {}): Routes {
     "GET /api/policies/POL-2001": POLICY,
     "GET /api/customers/CUS-3001": CUSTOMER,
     "GET /api/handlers": HANDLERS,
-    "GET /api/agent": IDLE,
-    "GET /api/agent/models": MODELS,
+    "GET /api/models": MODELS,
     ...overrides,
   };
 }

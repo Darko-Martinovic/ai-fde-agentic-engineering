@@ -1,10 +1,4 @@
-import type {
-  AgentName,
-  AgentState,
-  Insights,
-  ModelChoice,
-  Run,
-} from "./agentTypes";
+import type { Insights, ModelChoice, Run } from "./agentTypes";
 
 import type {
   Claim,
@@ -79,24 +73,18 @@ export const api = {
     getJson<Customer>(`/api/customers/${id}`, signal),
   listHandlers: (signal?: AbortSignal) =>
     getJson<Handler[]>("/api/handlers", signal),
-  getInstructions: (agent: AgentName, signal?: AbortSignal) =>
-    getText(`/api/instructions/${agent}`, signal),
+  getInstructions: (signal?: AbortSignal) =>
+    getText("/api/instructions", signal),
   getPolicyWording: (signal?: AbortSignal) =>
     getText("/api/policy-wording", signal),
-  getAgent: (signal?: AbortSignal) => getJson<AgentState>("/api/agent", signal),
-  getLatestRun: (signal?: AbortSignal) =>
-    getJson<Run | null>("/api/runs/latest", signal),
+  getLatestDispatch: (signal?: AbortSignal) =>
+    getJson<Run | null>("/api/dispatches/latest", signal),
   getInsights: (signal?: AbortSignal) =>
     getJson<Insights>("/api/insights", signal),
   health: (signal?: AbortSignal) =>
     getJson<{ status: string }>("/api/health", signal),
   listModels: (signal?: AbortSignal) =>
-    getJson<ModelChoice[]>("/api/agent/models", signal),
-  runClaim: (id: string, model: string) =>
-    post<AgentState>(`/api/agent/claims/${id}`, { model }),
-  runQueue: (cap: number, model: string) =>
-    post<AgentState>("/api/agent/queue", { cap, model }),
-  stopAgent: () => post<AgentState>("/api/agent/stop"),
+    getJson<ModelChoice[]>("/api/models", signal),
   reviewPayout: (
     id: string,
     review: { handler_id: string; approved: boolean; note: string },
