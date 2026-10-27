@@ -856,6 +856,135 @@
           ]
         },
         {
+          "name": "Record a model call on CLM-1001",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1001/model-calls",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1001",
+                "model-calls"
+              ]
+            },
+            "description": "`record_model_call`: one model call's tokens, cost and time, in the run.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"thread_id\": \"postman-1\",\n  \"run_id\": {{runId}},\n  \"model\": \"openrouter:openai/gpt-6-luna\",\n  \"input_tokens\": 1200,\n  \"output_tokens\": 300,\n  \"cost\": 0.0042,\n  \"seconds\": 1.5\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the cost is recorded with the run\", () => {",
+                  "  pm.expect(pm.response.json().cost).to.eql(0.0042);",
+                  "  pm.expect(pm.response.json().run_id).to.eql(pm.collectionVariables.get(\"runId\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record a spell of work on CLM-1001, with no run",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1001/work-times",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1001",
+                "work-times"
+              ]
+            },
+            "description": "`record_work_time`: one spell of the agent's work, outside any run.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"thread_id\": \"postman-1\",\n  \"run_id\": null,\n  \"seconds\": 12.5\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"it has no run and starts 12.5 seconds back\", () => {",
+                  "  const spell = pm.response.json();",
+                  "  pm.expect(spell.run_id).to.eql(null);",
+                  "  pm.expect(spell.seconds).to.eql(12.5);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record a model call on CLM-1005, not started",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/claims/CLM-1005/model-calls",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "claims",
+                "CLM-1005",
+                "model-calls"
+              ]
+            },
+            "description": "`record_model_call`: refused on a claim nobody has started.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"thread_id\": \"postman-1\",\n  \"run_id\": null,\n  \"model\": \"openrouter:openai/gpt-6-luna\",\n  \"input_tokens\": 1,\n  \"output_tokens\": 1,\n  \"cost\": 0,\n  \"seconds\": 0\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "List steps on CLM-1001",
           "request": {
             "method": "GET",
@@ -1557,7 +1686,7 @@
           ]
         },
         {
-          "name": "Record a model call",
+          "name": "Record the queue agent's model call",
           "request": {
             "method": "POST",
             "header": [
@@ -1591,7 +1720,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
-                  "pm.test(\"one call\", () => pm.expect(pm.response.json().usage.model_calls).to.eql(1));"
+                  "pm.test(\"the queue agent's call and the claim agent's\", () => pm.expect(pm.response.json().usage.model_calls).to.eql(2));"
                 ]
               }
             }

@@ -46,7 +46,7 @@ def stop_running(conn: Connection, at: str) -> None:
 
 
 def add_attempt(
-    conn: Connection, run_id: int, claim_id: str, thread_id: str, at: str
+    conn: Connection, run_id: int | None, claim_id: str, thread_id: str, at: str
 ) -> None:
     conn.execute(
         insert(db.attempts).values(

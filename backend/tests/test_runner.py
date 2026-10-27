@@ -214,7 +214,7 @@ def test_list_models(client):
     models = client.get("/api/agent/models").json()
     assert {"spec": SPEC, "label": "Claude Haiku 5.5", "default": False} in models
     assert [m["spec"] for m in models if m["default"]] == [
-        "openrouter:deepseek/deepseek-v4.1-flash"
+        "openrouter:openai/gpt-6-luna"
     ]
 
 

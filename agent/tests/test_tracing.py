@@ -8,6 +8,7 @@ TYPE = "langfuse.observation.type"
 INPUT = "langfuse.observation.input"
 OUTPUT = "langfuse.observation.output"
 SESSION = "session.id"
+TAGS = "langfuse.trace.tags"
 # The queue agent's middleware hooks, which are left out of its trace
 HOOKS = {
     "ModelCallLimitMiddleware.before_model",
@@ -153,3 +154,28 @@ def test_a_claim_carried_on_is_traced_in_the_same_session(
     assert (first.name, then.name) == ("work-claim", "carry-on")
     thread_id = backend.get("/api/claims/CLM-1003").json()["thread_id"]
     assert first.attributes[SESSION] == then.attributes[SESSION] == thread_id
+
+
+def test_a_queue_runs_claims_carry_its_tag(backend, memory_saver, traces):
+    queue_llm = stub(
+        tool_call("work_claim", claim_id="CLM-1001"),
+        tool_call("work_claim", claim_id="CLM-1004"),
+        AIMessage(content="Two claims worked."),
+    )
+    claim_llm = stub(decide("approve", 420.0), decide("decline", 0.0))
+    queue_agent.run_queue(2, FREE, memory_saver, queue_llm, claim_llm)
+    run_id = backend.get("/api/runs/latest").json()["run_id"]
+    spans = traces()
+    agents = named(spans, "claim-agent")
+    assert len(agents) == 2
+    assert all(span.attributes[TAGS] == (f"run-{run_id}",) for span in agents)
+    worked = [root for root in roots(spans) if root.name == "work-claim"]
+    metadata = "langfuse.trace.metadata.run_id"
+    assert all(root.attributes[metadata] == f'"{run_id}"' for root in worked)
+
+
+def test_a_claim_worked_alone_has_no_tag(backend, memory_saver, traces):
+    harness.work_claim(
+        "CLM-1001", None, FREE, memory_saver, stub(decide("approve", 420.0))
+    )
+    assert all(TAGS not in span.attributes for span in traces())

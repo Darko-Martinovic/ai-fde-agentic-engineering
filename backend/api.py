@@ -13,7 +13,7 @@ from backend import db
 from backend.models import Claim, Policy
 from backend.run_models import Run
 from backend.seed import ready
-from backend.store import claims, records, runs
+from backend.store import claims, records, runs, usage
 
 
 def database() -> Iterator[Connection]:
@@ -82,14 +82,17 @@ def company(conn: Connection) -> dict[str, Any]:
 
 
 def load_run(conn: Connection, run_id: int) -> Run:
-    """Load one run with its to-do list, the claims it started and its usage."""
+    """Load one run with its to-do list, the claims it started and its usage:
+    the queue agent's model calls and its claim agents'."""
     row = found(runs.run(conn, run_id), "Run", str(run_id))
+    queue_agent = runs.usage(conn, run_id)
+    claim_agents = usage.run_model_calls(conn, run_id)
     return Run.model_validate(
         dict(row)
         | {
             "todos": json.loads(row["todos"]),
             "claims_started": sorted(runs.claims_started(conn, run_id)),
-            "usage": dict(runs.usage(conn, run_id)),
+            "usage": {key: queue_agent[key] + claim_agents[key] for key in queue_agent},
         }
     )
 

@@ -70,7 +70,7 @@ def read_section(document: str, number: int) -> dict[str, Any]:
     return send("GET", f"/api/documents/{document}/sections/{number}").json()
 
 
-def start_claim(claim_id: str, run_id: int, thread_id: str) -> dict[str, Any]:
+def start_claim(claim_id: str, run_id: int | None, thread_id: str) -> dict[str, Any]:
     body = {"run_id": run_id, "thread_id": thread_id}
     return send("POST", f"/api/claims/{claim_id}/start", body).json()
 
@@ -99,6 +99,14 @@ def finish_run(run_id: int, summary: str) -> dict[str, Any]:
 
 def record_usage(run_id: int, usage: dict[str, Any]) -> None:
     send("POST", f"/api/runs/{run_id}/usage", usage)
+
+
+def record_model_call(claim_id: str, call: dict[str, Any]) -> None:
+    send("POST", f"/api/claims/{claim_id}/model-calls", call)
+
+
+def record_work_time(claim_id: str, spell: dict[str, Any]) -> None:
+    send("POST", f"/api/claims/{claim_id}/work-times", spell)
 
 
 def record_step(claim_id: str, thread_id: str, kind: str, text: str) -> None:

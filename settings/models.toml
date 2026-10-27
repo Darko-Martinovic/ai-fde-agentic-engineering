@@ -1,7 +1,15 @@
 # The models the agent may run on, chosen by MODEL_NAME or in the dashboard.
-# `spec` is provider:model. Prices are US dollars per million tokens, which the
-# agent records each model call's cost from. `options` go to the model's
-# LangChain class.
+# `spec` is provider:model. Prices are US dollars per million tokens. OpenRouter
+# reports each call's cost, which the agent records; for the other providers it
+# works the cost out from these prices. `options` go to the model's LangChain
+# class.
+
+[[models]]
+spec = "openrouter:openai/gpt-6-luna"
+label = "GPT-6 Luna"
+input_price = 0.10
+output_price = 0.50
+options = { reasoning_effort = "low" }
 
 [[models]]
 spec = "openrouter:deepseek/deepseek-v4.1-flash"

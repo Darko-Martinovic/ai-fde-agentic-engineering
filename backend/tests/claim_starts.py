@@ -15,3 +15,11 @@ def start(client, claim_id, run_id=None):
         f"/api/claims/{claim_id}/start",
         json={"run_id": run_id or a_run(client), "thread_id": f"{claim_id}-test"},
     )
+
+
+def start_alone(client, claim_id):
+    """Start a claim outside any run, as a claim worked on its own is."""
+    return client.post(
+        f"/api/claims/{claim_id}/start",
+        json={"run_id": None, "thread_id": f"{claim_id}-test"},
+    )

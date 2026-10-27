@@ -62,11 +62,16 @@ def claim_trace(
     claim_id: str,
     thread_id: str,
     work: Callable[[RunnableConfig], str],
+    run_id: int | None,
     **metadata: str,
 ) -> str:
     """Do `work` on one claim in a trace named `name`, in the claim's session,
-    named after its thread. It runs in a fresh context, so the trace is one of
-    its own even when a queue run's trace is current."""
+    named after its thread. A claim worked in a run is tagged with the run, so a
+    whole run's claims are found together. It runs in a fresh context, so the
+    trace is one of its own even when a queue run's trace is current."""
+    if run_id is not None:
+        metadata = metadata | {"run_id": str(run_id)}
+        work = tagged(work, f"run-{run_id}")
 
     def in_session() -> str:
         with propagate_attributes(session_id=thread_id):
@@ -75,3 +80,13 @@ def claim_trace(
             )
 
     return contextvars.Context().run(in_session)
+
+
+def tagged(
+    work: Callable[[RunnableConfig], str], tag: str
+) -> Callable[[RunnableConfig], str]:
+    """`work`, with Langfuse's tag in the metadata of the config it's given,
+    which the claim agent's root run puts on its trace."""
+    return lambda config: work(
+        {**config, "metadata": {**config.get("metadata", {}), "langfuse_tags": [tag]}}
+    )

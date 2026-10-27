@@ -10,11 +10,22 @@ from backend import (
     reviews,
     runner,
     runs,
+    usage,
     workflow,
 )
 
 app = FastAPI(title="UnderCover")
-for module in (claims, records, documents, workflow, reviews, runs, runner, insights):
+for module in (
+    claims,
+    records,
+    documents,
+    workflow,
+    usage,
+    reviews,
+    runs,
+    runner,
+    insights,
+):
     app.include_router(module.router)
 
 
