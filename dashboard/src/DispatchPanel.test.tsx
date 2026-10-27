@@ -31,7 +31,7 @@ it("follows a running dispatch, claim by claim", async () => {
   const link = within(claims).getByRole("link", { name: "CLM-1002" });
   expect(link.getAttribute("href")).toBe("#/claims/CLM-1002");
   expect(within(claims).getByText("In progress")).toBeDefined();
-  expect(within(claims).getByText("None yet")).toBeDefined();
+  expect(within(claims).getByText("No decision")).toBeDefined();
   expect(within(claims).getByText("$420.00")).toBeDefined();
   expect(within(claims).getByText("12 s")).toBeDefined();
   expect(screen.queryByRole("region", { name: "Summary" })).toBeNull();

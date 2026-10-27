@@ -1,4 +1,10 @@
-import type { Insights, ModelChoice, Run } from "./agentTypes";
+import type {
+  Insights,
+  ModelChoice,
+  Run,
+  Started,
+  Stopping,
+} from "./agentTypes";
 
 import type {
   Claim,
@@ -85,6 +91,9 @@ export const api = {
     getJson<{ status: string }>("/api/health", signal),
   listModels: (signal?: AbortSignal) =>
     getJson<ModelChoice[]>("/api/models", signal),
+  startDispatch: (agents: number, model: string) =>
+    post<Started>("/api/dispatches", { agents, model }),
+  stopRun: () => post<Stopping>("/api/runs/stop-request"),
   reviewPayout: (
     id: string,
     review: { handler_id: string; approved: boolean; note: string },

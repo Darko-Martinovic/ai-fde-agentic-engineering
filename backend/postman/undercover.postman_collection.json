@@ -1906,14 +1906,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/runs/stop",
+              "raw": "{{baseUrl}}/api/runs/stop-all",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "runs",
-                "stop"
+                "stop-all"
               ]
             },
             "description": "`stop_runs`: marks every run still running stopped, as the agent's service does when it starts.",
@@ -1930,6 +1930,83 @@
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "pm.test(\"none was running\", () => pm.expect(pm.response.json().run_ids).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start a dispatch with no claim agents",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/dispatches",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dispatches"
+              ]
+            },
+            "description": "`start_dispatch`: 422 for N below 1, before the agent's service is asked. A start with N from 1 to 25 starts a real dispatch, which calls the model, so the collection doesn't send one.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agents\": 0,\n  \"model\": \"openrouter:openai/gpt-6-luna\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stop with nothing running",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/runs/stop-request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "runs",
+                "stop-request"
+              ]
+            },
+            "description": "`stop_run`: the agent's service says nothing is running (409), or the backend says the service isn't running (503).",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"refused\", () => pm.expect(pm.response.code).to.be.oneOf([409, 503]));"
                 ]
               }
             }

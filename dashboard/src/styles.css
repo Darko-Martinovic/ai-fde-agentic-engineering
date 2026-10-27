@@ -1395,6 +1395,27 @@ main {
 
 /* The latest dispatch, on the queue page */
 
+.run-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px 16px;
+  padding: 16px 20px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.run-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.run-form .form-error {
+  flex-basis: 100%;
+}
+
 .run-facts {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));

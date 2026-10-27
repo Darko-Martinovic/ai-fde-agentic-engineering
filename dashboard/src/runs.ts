@@ -1,6 +1,11 @@
 import type { ClaimStatus, ClaimWork, Run, RunSummary } from "./api";
 import { money } from "./format";
 
+/** The most claim agents a run may have working at once, and the number a
+ *  form starts with. */
+export const MAX_AGENTS = Number(import.meta.env.VITE_MAX_AGENTS);
+export const FIRST_AGENTS = 3;
+
 const RUN_GAP_SECONDS = 300;
 
 function seconds(iso: string): number {

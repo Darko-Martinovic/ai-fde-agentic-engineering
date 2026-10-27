@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
+import { started } from "./stand-in";
 
 // The dispatch is played out through the API, as the agent's service and its
 // claim agents record it, so no model is called.
@@ -92,4 +93,39 @@ test("the queue page follows a dispatch as it happens", async ({
   await expect(
     summary.getByText("Left for the next dispatch: CLM-1014"),
   ).toBeVisible();
+});
+
+test("the queue page starts a dispatch and stops one", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/");
+  const form = page.getByRole("form", { name: "Start a dispatch" });
+  await form.getByLabel("Claim agents at once").selectOption("7");
+  await expect(form.getByLabel("Model")).toHaveValue(
+    "openrouter:openai/gpt-6-luna",
+  );
+  await form.getByRole("button", { name: "Start a dispatch" }).click();
+  await expect
+    .poll(() => started(request))
+    .toContainEqual({
+      dispatch: { agents: 7, model: "openrouter:openai/gpt-6-luna" },
+    });
+
+  const { run_id: runId } = await send(
+    request,
+    "post",
+    "/api/runs/dispatches",
+    {
+      agents: 7,
+      model: "e2e",
+      reasoning_effort: "none",
+    },
+  );
+  await form.getByRole("button", { name: "Stop" }).click();
+  await expect.poll(() => started(request)).toContainEqual({ stop: {} });
+  await send(request, "post", `/api/runs/${String(runId)}/finish`, {
+    stopped: true,
+  });
+  await expect(page.getByText("Stopped")).toBeVisible();
 });

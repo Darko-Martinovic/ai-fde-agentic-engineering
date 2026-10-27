@@ -1,9 +1,6 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
-import { setting } from "../settings/settings.config";
 import { startClaim } from "./claim-starts";
-
-// The stand-in for the agent's service, which playwright.config.ts starts
-const AGENT = setting("E2E_AGENT_URL");
+import { resumed } from "./stand-in";
 
 // The agent's decisions are set up through the API, so no model is called.
 async function agentDecides(
@@ -44,10 +41,6 @@ test("a claim opens from the queue", async ({ page }) => {
 });
 
 /** The claims the stand-in for the agent's service was asked to pick back up. */
-async function resumed(request: APIRequestContext): Promise<string[]> {
-  return (await (await request.get(`${AGENT}/api/resumed`)).json()) as string[];
-}
-
 test("a sign-off reaches the agent, which pays the claim", async ({
   page,
   request,

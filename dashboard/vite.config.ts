@@ -11,6 +11,9 @@ export default defineConfig(({ mode }) => {
   loadSettings(mode === "test" ? DEFAULTS_ONLY : undefined);
   return {
     plugins: [react()],
+    define: {
+      "import.meta.env.VITE_MAX_AGENTS": JSON.stringify(setting("MAX_AGENTS")),
+    },
     server: {
       host: setting("DASHBOARD_HOST"),
       port: Number(setting("DASHBOARD_PORT")),

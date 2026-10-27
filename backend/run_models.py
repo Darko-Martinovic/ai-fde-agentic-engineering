@@ -4,8 +4,9 @@ model calls used, and its summary once it finishes."""
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from agent.config import model
 from backend.models import ClaimSummary
 from settings import setting
 
@@ -19,6 +20,26 @@ class DispatchIn(BaseModel):
     agents: int = Field(ge=1, le=MAX_AGENTS)
     model: str = Field(min_length=1)
     reasoning_effort: str = Field(min_length=1)
+
+
+class DispatchStart(BaseModel):
+    agents: int = Field(ge=1, le=MAX_AGENTS)
+    model: str
+
+    @field_validator("model")
+    @classmethod
+    def model_is_allowed(cls, spec: str) -> str:
+        """Only a model in models.toml runs."""
+        return model(spec).spec
+
+
+class Started(BaseModel):
+    agents: int
+    model: str
+
+
+class Stopping(BaseModel):
+    stopping: bool
 
 
 class RunClaimsIn(BaseModel):

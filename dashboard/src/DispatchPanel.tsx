@@ -4,6 +4,7 @@ import { clock, cost, duration, money } from "./format";
 import { useModelLabel, useNow, usePoll } from "./hooks";
 import { paths } from "./paths";
 import { claimsDone, summaryLines } from "./runs";
+import { DispatchForm } from "./DispatchForm";
 
 const RUN_LABELS: Record<RunStatus, string> = {
   running: "Running",
@@ -57,7 +58,8 @@ function RunFacts({ run }: Readonly<{ run: Run }>) {
 }
 
 function Outcome({ claim }: Readonly<{ claim: RunClaim }>) {
-  if (claim.decision === null) return <span className="muted">None yet</span>;
+  if (claim.decision === null)
+    return <span className="muted">No decision</span>;
   return (
     <>
       <DecisionBadge decision={claim.decision} />{" "}
@@ -136,15 +138,19 @@ function RunView({ run }: Readonly<{ run: Run }>) {
  *  what it left, from the records. */
 export function DispatchPanel() {
   const latest = usePoll(api.getLatestDispatch, 2000);
-  if (latest.error) {
-    return <ErrorNote message={latest.error} onRetry={latest.reload} />;
-  }
-  if (latest.data === null) {
-    return (
-      <Panel title="The latest dispatch" className="panel--run">
-        <p className="muted">No dispatch yet.</p>
-      </Panel>
-    );
-  }
-  return <RunView run={latest.data} />;
+  const running = latest.data?.status === "running";
+  return (
+    <>
+      <DispatchForm running={running} onChange={latest.reload} />
+      {latest.error && (
+        <ErrorNote message={latest.error} onRetry={latest.reload} />
+      )}
+      {!latest.error && latest.data === null && (
+        <Panel title="The latest dispatch" className="panel--run">
+          <p className="muted">No dispatch yet.</p>
+        </Panel>
+      )}
+      {latest.data && <RunView run={latest.data} />}
+    </>
+  );
 }

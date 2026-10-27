@@ -10,6 +10,16 @@ export interface ModelChoice {
 
 export type RunStatus = "running" | "finished" | "stopped";
 
+/** What the agent's service says when it takes a start or a stop. */
+export interface Started {
+  agents: number;
+  model: string;
+}
+
+export interface Stopping {
+  stopping: boolean;
+}
+
 export interface RunUsage {
   model_calls: number;
   input_tokens: number;
