@@ -1469,3 +1469,31 @@ main {
 .run-summary p {
   margin: 4px 0;
 }
+
+/* The scoreboard */
+
+.badge--right {
+  --tone: var(--sea-green);
+  --tone-ink: var(--green-ink);
+}
+
+.badge--miss {
+  --tone: var(--raspberry);
+  --tone-ink: var(--raspberry-ink);
+}
+
+.scoreboard th {
+  white-space: normal;
+  vertical-align: bottom;
+}
+
+.queue-table td.reasons {
+  min-width: 320px;
+  white-space: normal;
+}
+
+.claim-head__copy {
+  margin: 0 0 4px;
+  color: var(--ink-soft);
+  font-weight: 600;
+}

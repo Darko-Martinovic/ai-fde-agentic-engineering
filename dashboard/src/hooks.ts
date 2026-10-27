@@ -182,8 +182,14 @@ export function useModelChoice() {
   };
 }
 
+/** How to name a model: its label from models.toml, or its id when it is no
+ *  longer listed. The models load once, however many are named. */
+export function useModelLabels(): (spec: string) => string {
+  const models = usePoll(api.listModels, null);
+  return (spec) => models.data?.find((m) => m.spec === spec)?.label ?? spec;
+}
+
 /** A model's label from models.toml, or its id when it is no longer listed. */
 export function useModelLabel(spec: string): string {
-  const models = usePoll(api.listModels, null);
-  return models.data?.find((m) => m.spec === spec)?.label ?? spec;
+  return useModelLabels()(spec);
 }

@@ -1,7 +1,8 @@
-# The model comparison: each trial runs one model on a set of claims, `all` 25
-# in the queue or the five `tiny` ones, a number of times, each from a fresh
-# database. Models are specs from models.toml. Trials run in this order: the
-# hosted models first, as they are quick, then the local ones.
+# The model comparison: each trial evaluates one model on the evaluation set,
+# `all` 25 claims of the queue or its five `tiny` ones, with N claim agents at
+# once, a number of times, each an evaluation on the Scoreboard. Models are
+# specs from models.toml. Trials run in this order: the hosted models first, as
+# they are quick, then the local ones, one claim agent at a time.
 
 # What a claim is expected to use, for the cost estimate that BENCH_BUDGET_USD
 # guards: one Claude Haiku 5.5 claim, measured on October 21, 2026
@@ -13,18 +14,21 @@ output_tokens_per_claim = 3400
 model = "anthropic:claude-haiku-5-5"
 claims = "all"
 repeats = 3
+agents = 5
 
 # About $0.32 a claim, so only the tiny claims
 [[trials]]
 model = "anthropic:claude-opus-5-5"
 claims = "tiny"
 repeats = 3
+agents = 5
 
 # Free, but OpenRouter allows a free account about 50 requests a day
 [[trials]]
 model = "openrouter:google/gemma-4-31b-it:free"
 claims = "tiny"
 repeats = 1
+agents = 1
 
 # Ollama qwen3.5:9b was left out: on this machine it took three to four
 # minutes a claim, so 25 claims would take well over an hour
@@ -32,3 +36,4 @@ repeats = 1
 model = "ollama:qwen3.5:4b"
 claims = "all"
 repeats = 2
+agents = 1

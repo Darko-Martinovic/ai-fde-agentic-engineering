@@ -136,13 +136,15 @@ def misses(summaries: list[Summary]) -> str:
 
 INTRO = """# Model comparison
 
-Each run reseeds the database and works the claims through the harness, one
-claim agent per claim, then reads each claim's decision and payout and the run's
-usage through the API. A decision is right when it matches the handlers' in
-`data/evals/decisions.json`; a payout is right when the decision is right and,
-for an approval, the payout is within a dollar of theirs. A claim left
-undecided counts as wrong. Model calls, tokens, cost and time are per claim;
-the cost is at the prices in `models.toml`, and the local models cost nothing.
+Each run is an evaluation of the evaluation set on the Scoreboard, started
+through the backend with the trial's model and claim agents at once; the
+backend scores it against the handlers' decisions and the comparison reads it
+back. A decision is right when it matches the handlers'; a payout is right when
+the decision is right and the payout is within a dollar of theirs. A claim left
+undecided counts as a referral. Model calls, tokens, cost and time are per
+claim; the cost is OpenRouter's, or else at the prices in `models.toml`, and
+the local models cost nothing. Runs before the Scoreboard worked the claims one
+at a time and counted an undecided claim as wrong.
 Percentages are the mean of the runs, with their range when they differ. A run
 in which the provider answered no model call at all, as when a free model is
 rate-limited, says nothing about the model: it isn't scored, it is listed under

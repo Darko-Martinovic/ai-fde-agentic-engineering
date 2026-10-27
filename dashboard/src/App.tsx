@@ -6,6 +6,8 @@ import { InsightsPage } from "./Insights";
 import { paths, type Route } from "./paths";
 import { InstructionsPage } from "./Instructions";
 import { QueuePage } from "./Queue";
+import { EvaluationPage } from "./EvaluationPage";
+import { ScoreboardPage } from "./Scoreboard";
 
 const THEMES: { value: Theme; label: string }[] = [
   { value: "system", label: "Auto" },
@@ -23,6 +25,10 @@ function Page({ route }: Readonly<{ route: Route }>) {
       return <InsightsPage />;
     case "queue":
       return <QueuePage />;
+    case "scoreboard":
+      return <ScoreboardPage />;
+    case "evaluation":
+      return <EvaluationPage key={route.runId} runId={route.runId} />;
   }
 }
 
@@ -68,6 +74,16 @@ export function App() {
             aria-current={route.page === "insights" ? "page" : undefined}
           >
             Insights
+          </a>
+          <a
+            href={paths.scoreboard}
+            aria-current={
+              route.page === "scoreboard" || route.page === "evaluation"
+                ? "page"
+                : undefined
+            }
+          >
+            Scoreboard
           </a>
           <a
             href={paths.instructions}

@@ -44,21 +44,55 @@ export interface RunSummary {
   unfinished: string[];
 }
 
-/** A dispatch: N claim agents at once on the queue, on a model, with its
- *  claims, what its model calls cost, and its time and summary once it ends. */
-export interface Run {
+/** The labelled sets an evaluation works copies of. */
+export type EvaluationSet = "evaluation" | "held_out";
+
+/** What every run shows: a dispatch on the queue, or an evaluation on copies
+ *  of a labelled set's claims, with N claim agents at once on a model, what
+ *  its model calls cost, and its time and summary once it ends. */
+export interface RunFacts {
   run_id: number;
-  kind: "dispatch";
+  kind: "dispatch" | "evaluation";
   agents: number;
   model: string;
   reasoning_effort: string;
+  evaluation_set: EvaluationSet | null;
+  tiny: boolean | null;
   status: RunStatus;
   started_at: string;
   finished_at: string | null;
   seconds: number | null;
   summary: RunSummary | null;
   usage: RunUsage;
+}
+
+export interface Run extends RunFacts {
   claims: RunClaim[];
+}
+
+export interface Measures {
+  decision_accuracy: number;
+  accuracy: number;
+  cost_of_mistakes: number;
+  straight_through: number;
+  model_cost_per_claim: number;
+  seconds_per_claim: number;
+  run_seconds: number | null;
+}
+
+/** An evaluation's copy, the agent's decision beside the handler's. */
+export interface EvaluationClaim extends RunClaim {
+  copy_of: string;
+  reasons: string | null;
+  handler_decision: DecisionKind;
+  handler_payout: number;
+  right: boolean;
+  mistake_cost: number;
+}
+
+export interface Evaluation extends RunFacts {
+  measures: Measures;
+  claims: EvaluationClaim[];
 }
 
 export interface InsightTotals {

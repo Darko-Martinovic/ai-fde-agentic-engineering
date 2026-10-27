@@ -20,6 +20,14 @@ function ClaimHead({ claim }: Readonly<{ claim: Claim }>) {
     <header className="claim-head">
       <div>
         <p className="claim-head__id mono">{claim.claim_id}</p>
+        {claim.evaluation_id !== null && (
+          <p className="claim-head__copy">
+            {`A copy of ${claim.copy_of ?? ""} in `}
+            <a href={paths.evaluation(claim.evaluation_id)}>
+              {`evaluation #${String(claim.evaluation_id)}`}
+            </a>
+          </p>
+        )}
         <h1>{claim.summary}</h1>
         <p className="claim-head__meta">
           <ClaimType type={claim.claim_type} />

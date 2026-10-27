@@ -75,6 +75,9 @@ export interface Claim {
   status: ClaimStatus;
   decisions: Decision[];
   payment: Payment | null;
+  /** For an evaluation's copy: the evaluation, and the claim it copies. */
+  evaluation_id: number | null;
+  copy_of: string | null;
 }
 
 export interface Plan {

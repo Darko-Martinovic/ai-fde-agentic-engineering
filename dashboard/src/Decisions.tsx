@@ -207,6 +207,47 @@ function PaymentNote({
   );
 }
 
+/** What a handler can do on a claim: sign off or reject a held payout, or
+ *  decide a claim referred or left for them. */
+function HandlerForms({
+  claim,
+  handlers,
+  onChange,
+}: Readonly<{ claim: Claim; handlers: Handler[]; onChange: () => void }>) {
+  return (
+    <>
+      {claim.status === "awaiting_sign_off" && (
+        <ReviewForm claim={claim} handlers={handlers} onDone={onChange} />
+      )}
+      {FOR_A_HANDLER.includes(claim.status) && (
+        <ReferralForm claim={claim} handlers={handlers} onDone={onChange} />
+      )}
+    </>
+  );
+}
+
+/** An evaluation's copy is scored on the agent's work alone: nobody reviews
+ *  or decides it. */
+function CopyNote({ claim }: Readonly<{ claim: Claim }>) {
+  if (claim.status === "awaiting_sign_off") {
+    return (
+      <p className="note">
+        Held for sign-off. In an evaluation this counts as finished, and a copy
+        can&apos;t be signed off.
+      </p>
+    );
+  }
+  if (FOR_A_HANDLER.includes(claim.status)) {
+    return (
+      <p className="note">
+        Left for a handler. In an evaluation this counts as the agent&apos;s
+        answer, and a handler doesn&apos;t decide a copy.
+      </p>
+    );
+  }
+  return null;
+}
+
 export function DecisionPanel({
   claim,
   handlers,
@@ -225,11 +266,10 @@ export function DecisionPanel({
         />
       ))}
       <PaymentNote claim={claim} handlers={handlers} />
-      {claim.status === "awaiting_sign_off" && (
-        <ReviewForm claim={claim} handlers={handlers} onDone={onChange} />
-      )}
-      {FOR_A_HANDLER.includes(claim.status) && (
-        <ReferralForm claim={claim} handlers={handlers} onDone={onChange} />
+      {claim.evaluation_id === null ? (
+        <HandlerForms claim={claim} handlers={handlers} onChange={onChange} />
+      ) : (
+        <CopyNote claim={claim} />
       )}
     </Panel>
   );

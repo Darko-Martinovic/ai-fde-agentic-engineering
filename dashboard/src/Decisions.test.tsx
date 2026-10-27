@@ -226,3 +226,49 @@ it("lets a handler decide a claim left for them", async () => {
     ).toBe(true);
   });
 });
+
+it("names a copy's evaluation and offers no review of its held payout", async () => {
+  mockFetch(
+    claimRoutes({
+      "GET /api/claims/CLM-1001": claim({
+        ...HELD,
+        claim_id: "CLM-1112-E4",
+        evaluation_id: 4,
+        copy_of: "CLM-1112",
+      }),
+    }),
+  );
+  render(<ClaimPage claimId="CLM-1001" />);
+  const link = await screen.findByRole("link", { name: "evaluation #4" });
+  expect(link.getAttribute("href")).toBe("#/scoreboard/4");
+  expect(screen.getByText(/A copy of CLM-1112 in/)).toBeDefined();
+  expect(
+    screen.getByText(
+      "Held for sign-off. In an evaluation this counts as finished, and a copy can't be signed off.",
+    ),
+  ).toBeDefined();
+  expect(screen.queryByRole("button", { name: /Sign off/ })).toBeNull();
+});
+
+it("offers no handler's decision on a copy left for a handler", async () => {
+  mockFetch(
+    claimRoutes({
+      "GET /api/claims/CLM-1001": claim({
+        status: "referred",
+        decisions: [decision({ decision: "refer", payout: 0 })],
+        evaluation_id: 4,
+        copy_of: "CLM-1110",
+      }),
+    }),
+  );
+  render(<ClaimPage claimId="CLM-1001" />);
+  expect(
+    await screen.findByText(/a handler doesn't decide a copy/),
+  ).toBeDefined();
+  expect(
+    screen.queryByRole("button", {
+      name: /Record the decision|Approve and pay/,
+    }),
+  ).toBeNull();
+  expect(screen.queryByLabelText("Handler")).toBeNull();
+});

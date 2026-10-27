@@ -217,13 +217,13 @@ Seed the held-out claims and the handlers' decisions, add copies, `scoring.py`, 
 
 Add the Scoreboard page with its form and list, an evaluation's page, the header link, and a copy's claim page without a review form. Rebuild `bench/` on evaluations.
 
-- [ ] vitest: the Scoreboard lists evaluations newest first, measures formatted (80%, $1,600.00, $0.0125, 40 s, 2 min 41 s); the form posts the choices; refusals show
-- [ ] vitest: an evaluation's page shows each claim beside the handler's, Right and Miss chips, "No decision", links to the copies; a copy's page names its evaluation and has no review form
-- [ ] e2e: choosing the held-out set, the five tiny claims and 5 agents reaches the stand-in with them
-- [ ] e2e: an evaluation played out through the API shows the measures worked out by hand on the Scoreboard and its page
-- [ ] pytest, bench: a trial starts an evaluation through the backend, waits for it and reads its measures, with a stub service; `--estimate` and the budget still work; `bench/score.py` is gone
-- [ ] Browser: the Scoreboard and an evaluation's page in light and dark mode, chips in Sea Green and Raspberry, no console errors; reseed afterwards
-- [ ] `npm run check` passes
+- [x] vitest: the Scoreboard lists evaluations newest first, measures formatted (80%, $1,600.00, $0.0125, 40 s, 2 min 41 s); the form posts the choices; refusals show
+- [x] vitest: an evaluation's page shows each claim beside the handler's, Right and Miss chips, "No decision", links to the copies; a copy's page names its evaluation and has no review form
+- [x] e2e: choosing the held-out set, the five tiny claims and 5 agents reaches the stand-in with them
+- [x] e2e: an evaluation played out through the API shows the measures worked out by hand on the Scoreboard and its page
+- [x] pytest, bench: a trial starts an evaluation through the backend, waits for it and reads its measures, with a stub service; `--estimate` and the budget still work; `bench/score.py` is gone
+- [x] Browser: the Scoreboard and an evaluation's page in light and dark mode, chips in Sea Green and Raspberry, no console errors; reseed afterwards
+- [x] `npm run check` passes
 
 ## Phase 6: The live runs, and the documents
 

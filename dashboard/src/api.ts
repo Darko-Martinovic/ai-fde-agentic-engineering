@@ -1,4 +1,6 @@
 import type {
+  Evaluation,
+  EvaluationSet,
   Insights,
   ModelChoice,
   Run,
@@ -94,6 +96,16 @@ export const api = {
   startDispatch: (agents: number, model: string) =>
     post<Started>("/api/dispatches", { agents, model }),
   stopRun: () => post<Stopping>("/api/runs/stop-request"),
+  startEvaluation: (start: {
+    evaluation_set: EvaluationSet;
+    tiny: boolean;
+    agents: number;
+    model: string;
+  }) => post<Started>("/api/evaluations", start),
+  listEvaluations: (signal?: AbortSignal) =>
+    getJson<Evaluation[]>("/api/evaluations", signal),
+  getEvaluation: (runId: number, signal?: AbortSignal) =>
+    getJson<Evaluation>(`/api/evaluations/${String(runId)}`, signal),
   reviewPayout: (
     id: string,
     review: { handler_id: string; approved: boolean; note: string },
