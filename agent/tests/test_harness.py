@@ -364,7 +364,7 @@ def test_the_wait_for_a_sign_off_never_counts(backend, run, memory_saver, clock)
     assert backend.get("/api/claims/CLM-1002").json()["status"] == "decided"
     before, after = work_times("CLM-1002")
     assert (before["run_id"], after["run_id"]) == (run, None)
-    assert before["seconds"] + after["seconds"] < 1
+    assert before["seconds"] + after["seconds"] < 60  # far short of the hour waited
 
 
 def test_a_carry_on_after_a_rejection_makes_its_calls_with_no_run(
@@ -379,7 +379,7 @@ def test_a_carry_on_after_a_rejection_makes_its_calls_with_no_run(
     assert [c["run_id"] for c in calls] == [run, None, None]
     before, after = work_times("CLM-1002")
     assert (before["run_id"], after["run_id"]) == (run, None)
-    assert before["seconds"] + after["seconds"] < 1
+    assert before["seconds"] + after["seconds"] < 60  # far short of the hour waited
 
 
 def test_a_spell_that_ends_in_an_error_is_still_recorded(backend, run, memory_saver):

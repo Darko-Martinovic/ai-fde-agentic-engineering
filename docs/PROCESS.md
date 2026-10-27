@@ -45,6 +45,7 @@ The checks show that the code works, but not that it is fit to merge. Every code
 - Outside a plan, commit each change once you have checked and reviewed it.
 - Run `npm run check` before you hand work over.
 - Never use `git commit --no-verify`.
+- Runs on a real model: estimate the cost first, reseed once, then start a dispatch from the dashboard; evaluations work copies and need no reseed. Keep to the runs a brief asks for.
 - Never lower a threshold, turn off a rule or exclude a file to get a green run. If a rule looks wrong, stop and ask.
 - Keep `docs/STATUS.md` up to date.
 - Never push.

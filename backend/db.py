@@ -29,8 +29,6 @@ from backend.config import database_path
 from settings import optional_setting, setting
 
 metadata = MetaData()
-# How long a request waits for one of the pool's connections
-POOL_WAIT_SECONDS = 120
 
 
 def text_column(
@@ -262,7 +260,7 @@ def engine_for(url: str) -> Engine:
         pool_size=int(setting("DATABASE_CONNECTIONS")),
         max_overflow=0,
         # Many claim agents at once share the pool: wait for a connection
-        pool_timeout=POOL_WAIT_SECONDS,
+        pool_timeout=int(setting("DATABASE_WAIT_SECONDS")),
         pool_pre_ping=True,
     )
 

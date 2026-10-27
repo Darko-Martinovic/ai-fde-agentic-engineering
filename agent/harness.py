@@ -34,8 +34,10 @@ def timeout() -> float:
     return float(setting("MODEL_TIMEOUT"))
 
 
-# How to reach each provider, from the settings. A call that takes too long
-# fails, and only the claim graph's model retries it, not the provider's client.
+# How to reach each provider, from the settings. A call fails when the provider
+# sends nothing for MODEL_TIMEOUT seconds, which doesn't bound a reply that
+# keeps coming (models.toml caps a reply's tokens for that), and only the claim
+# graph's model retries it, not the provider's client.
 CONNECTIONS: dict[str, Callable[[], dict[str, Any]]] = {
     "openrouter": lambda: {
         "base_url": setting("OPENROUTER_BASE_URL"),

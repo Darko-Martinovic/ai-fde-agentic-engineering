@@ -7,7 +7,7 @@ def test_the_default_model_is_gpt_6_luna_at_low_reasoning():
     default = config.current_model()
     assert default.spec == "openrouter:openai/gpt-6-luna"
     assert default.label == "GPT-6 Luna"
-    assert default.options == {"reasoning_effort": "low"}
+    assert default.options == {"reasoning_effort": "low", "max_tokens": 16000}
 
 
 def test_model_name_chooses_the_model(monkeypatch):
