@@ -17,7 +17,7 @@ from langchain_core.messages import AIMessage
 
 from agent import api, recording
 from agent.config import Model
-from agent.tools import RunScope
+from agent.tools import RunContext
 
 
 class UsageRecorder(AgentMiddleware[AgentState[Any], Any]):
@@ -36,7 +36,7 @@ class UsageRecorder(AgentMiddleware[AgentState[Any], Any]):
         response = handler(request)
         seconds = time.monotonic() - started
         replies = [m for m in response.result if isinstance(m, AIMessage)]
-        context = cast(RunScope, request.runtime.context)
+        context = cast(RunContext, request.runtime.context)
         recording.usage(context, self.model, replies[0] if replies else None, seconds)
         return response
 

@@ -124,7 +124,7 @@ attempts = Table(
     "attempts",
     metadata,
     counter("attempt_id"),
-    Column("run_id", Integer, nullable=False),
+    Column("run_id", Integer, nullable=True),
     text_column("claim_id"),
     text_column("thread_id"),
     text_column("started_at"),
@@ -142,6 +142,34 @@ usage = Table(
     Column("cost", Float, nullable=False),
     Column("seconds", Float, nullable=False),
     text_column("recorded_at"),
+    sqlite_autoincrement=True,
+)
+# Each model call a claim agent makes, and each spell of its work on a claim,
+# with the run it happened in, or none
+model_calls = Table(
+    "model_calls",
+    metadata,
+    counter("model_call_id"),
+    text_column("claim_id"),
+    text_column("thread_id"),
+    Column("run_id", Integer, nullable=True),
+    text_column("model"),
+    Column("input_tokens", Integer, nullable=False),
+    Column("output_tokens", Integer, nullable=False),
+    Column("cost", Float, nullable=False),
+    Column("seconds", Float, nullable=False),
+    text_column("recorded_at"),
+    sqlite_autoincrement=True,
+)
+work_times = Table(
+    "work_times",
+    metadata,
+    counter("work_time_id"),
+    text_column("claim_id"),
+    text_column("thread_id"),
+    Column("run_id", Integer, nullable=True),
+    text_column("started_at"),
+    Column("seconds", Float, nullable=False),
     sqlite_autoincrement=True,
 )
 payments = Table(

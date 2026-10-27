@@ -97,6 +97,8 @@ def test_operations_are_documented(client):
         "read_section",
         "list_handlers",
         "start_claim",
+        "record_model_call",
+        "record_work_time",
         "record_step",
         "list_steps",
         "decide_claim",

@@ -2,8 +2,8 @@
 its state, its nodes and its edges. The agent works the claim with its tools; the
 graph pays an approval, straight after the decision or after a handler's
 sign-off, which it waits for with interrupt() when the backend says a claim
-needs one. Its nodes record each step on the claim and each model call's usage
-on the run, which middleware did for create_agent."""
+needs one. Its nodes record each step and each model call on the claim, which
+middleware did for create_agent."""
 
 import time
 from collections.abc import Callable
@@ -71,12 +71,12 @@ def agent(
     instructions: SystemMessage,
 ) -> dict[str, Any]:
     """Call the model with the conversation so far, recording its reply as steps
-    on the claim and the call's usage on the run."""
+    on the claim and the call's tokens, cost and time on the claim."""
     if state["model_calls"] >= MAX_MODEL_CALLS:
         raise TooManyModelCalls(f"the agent made {MAX_MODEL_CALLS} model calls")
     started = time.monotonic()
     reply = cast(AIMessage, llm.invoke([instructions, *state["messages"]]))
-    recording.usage(runtime.context, model, reply, time.monotonic() - started)
+    recording.model_call(runtime.context, model, reply, time.monotonic() - started)
     recording.reply(runtime.context, reply)
     return {"messages": [reply], "model_calls": state["model_calls"] + 1}
 

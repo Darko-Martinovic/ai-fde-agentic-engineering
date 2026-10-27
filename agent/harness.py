@@ -2,6 +2,7 @@
 and its work on the claim, reported in a line."""
 
 from collections.abc import Callable
+from time import monotonic
 from typing import Any
 from uuid import uuid4
 
@@ -12,21 +13,13 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.types import Command
 
-from agent import api, graph, tracing
+from agent import api, graph, recording, tracing
 from agent.claims import claims_in
 from agent.config import Model
+from agent.reports import report
 from agent.tools import ClaimContext
 from settings import setting
 
-# How a claim's report reads, by the claim's state and by the agent's decision
-BY_STATE = {
-    "decided": "paid",
-    "in_progress": "not paid yet",
-    "awaiting_sign_off": "waiting for a handler's sign-off",
-    "waiting": "failed, back in the queue",
-    "left_for_handler": "failed twice, left for a handler",
-}
-BY_DECISION = {"decline": "declined", "refer": "referred to a handler"}
 STOPPED = "The agent stopped before finishing the claim: it replied with no decision"
 STOPPED_RUN = "The run stopped before it finished."
 
@@ -93,19 +86,6 @@ def claim_graph(
     return graph.claim_graph(llm or chat_model(model), model, saver, instructions())
 
 
-def report(claim: dict[str, Any]) -> str:
-    """The line a claim's work reports: its outcome, from the backend's record,
-    with the reasons for a decline or a referral, which the handlers need."""
-    claim_id, status = claim["claim_id"], claim["status"]
-    decision = claim["decisions"][-1] if claim["decisions"] else None
-    if decision is None or status == "left_for_handler":
-        return f"{claim_id}: {BY_STATE[status]}"
-    if decision["decision"] != "approve":
-        outcome = BY_DECISION[decision["decision"]]
-        return f"{claim_id}: {outcome}, because: {decision['reasons']}"
-    return f"{claim_id}: approved ${decision['payout']:,.2f}, {BY_STATE[status]}"
-
-
 def undecided(claim: dict[str, Any]) -> bool:
     """Whether a claim in progress waits for the agent's decision: it has none,
     or a handler rejected the payout it had."""
@@ -125,16 +105,19 @@ def failed(context: ClaimContext, reason: str) -> str:
     return f"{report(claim)} ({reason})"
 
 
-def run_graph(
+def work_one_spell(
     claim_graph: graph.ClaimGraph,
     context: ClaimContext,
     start: dict[str, Any] | Command[Any] | None,
     config: RunnableConfig,
-) -> str:
+) -> None:
     """Run the claim graph on the claim's thread, saving each step before the
-    next, and report in a line: the decision and payout, or what went wrong,
-    failing a claim left undecided."""
+    next, until it ends or pauses for a handler: one spell of work, whose time is
+    recorded however it ends, so a wait for a handler never counts. A process
+    that is killed records nothing, and should the recording fail, its error
+    stands in for the graph's."""
     claim = {"claim_id": context.claim_id, "thread_id": context.thread_id}
+    started = monotonic()
     try:
         claim_graph.invoke(
             start,
@@ -147,6 +130,20 @@ def run_graph(
             },
             durability="sync",
         )
+    finally:
+        recording.work_time(context, monotonic() - started)
+
+
+def run_graph(
+    claim_graph: graph.ClaimGraph,
+    context: ClaimContext,
+    start: dict[str, Any] | Command[Any] | None,
+    config: RunnableConfig,
+) -> str:
+    """Work the claim for a spell and report in a line: the decision and payout,
+    or what went wrong, failing a claim left undecided."""
+    try:
+        work_one_spell(claim_graph, context, start, config)
     except Exception as error:  # noqa: BLE001 - one bad claim never stops a run
         return failed(context, f"{type(error).__name__}: {error}")
     worked = api.get_claim(context.claim_id)
@@ -157,13 +154,14 @@ def run_graph(
 
 def work_claim(
     claim_id: str,
-    run_id: int,
+    run_id: int | None,
     model: Model,
     saver: BaseCheckpointSaver[Any],
     llm: BaseChatModel | None = None,
 ) -> str:
-    """Work one claim in a run as a new attempt on a new thread, in a trace of
-    its own in the claim's session, and report in a line."""
+    """Work one claim as a new attempt on a new thread, in a run or on its own
+    (`run_id` None), in a trace of its own in the claim's session, and report in
+    a line."""
     context = ClaimContext(
         run_id=run_id, claim_id=claim_id, thread_id=f"{claim_id}-{uuid4().hex[:8]}"
     )
@@ -176,7 +174,7 @@ def work_claim(
         lambda config: run_graph(
             claim_graph_on_model, context, first_message(claim_id), config
         ),
-        run_id=str(run_id),
+        run_id,
         model=model.spec,
     )
 
@@ -215,14 +213,15 @@ def where_from(
 
 def carry_on(
     claim_id: str,
-    run_id: int,
+    run_id: int | None,
     model: Model,
     saver: BaseCheckpointSaver[Any],
     llm: BaseChatModel | None = None,
 ) -> str:
     """Carry a claim in progress on from its saved progress, on its latest
     attempt's thread, without a new attempt, in a trace of its own in the
-    claim's session, and report in a line. Its model calls count on `run_id`. A
+    claim's session, and report in a line. Its model calls and its time count on
+    `run_id`, or on no run when it's None, as after a handler's review. A
     claim that can't be picked up, as one whose decision the graph never saved,
     reports why and stays in progress, so it never stops a run."""
     try:
@@ -239,7 +238,7 @@ def carry_on(
         claim_id,
         context.thread_id,
         lambda config: run_graph(claim_graph_on_model, context, start, config),
-        run_id=str(run_id),
+        run_id,
         model=model.spec,
     )
 

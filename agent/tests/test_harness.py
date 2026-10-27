@@ -1,4 +1,5 @@
 import json
+from time import monotonic
 
 import pytest
 from langchain_anthropic import ChatAnthropic
@@ -7,10 +8,12 @@ from langchain_core.utils.function_calling import convert_to_openai_tool
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 
-from agent import harness
+import agent.__main__ as cli
+from agent import harness, queue_agent
 from agent.config import model
 from agent.tests.stub import FREE, REASONS, StubModel, decide, stub, tool_call
 from agent.tools import CLAIM_TOOLS
+from backend.tests.usage_rows import model_calls, work_times
 
 
 def test_work_claim_approves_and_the_graph_pays(backend, run, memory_saver):
@@ -271,3 +274,149 @@ def test_an_error_while_paying_leaves_the_approval_in_progress(
     assert (claim["status"], claim["payment"]) == ("in_progress", None)
     steps = backend.get("/api/claims/CLM-1001/steps").json()
     assert "failure" not in [s["kind"] for s in steps]
+
+
+def costing(cost=None, tokens=(1200, 300)):
+    """A reply that reads the claim, with its tokens, and the cost OpenRouter
+    reports, if any."""
+    reply = tool_call("get_claim")
+    reply.usage_metadata = {
+        "input_tokens": tokens[0],
+        "output_tokens": tokens[1],
+        "total_tokens": sum(tokens),
+    }
+    if cost is not None:
+        reply.response_metadata = {"token_usage": {"cost": cost}}
+    return reply
+
+
+def test_the_cost_openrouter_reports_is_recorded(backend, memory_saver):
+    llm = stub(costing(cost=0.0042), decide("approve", 420.0))
+    harness.work_claim("CLM-1001", None, FREE, memory_saver, llm)
+    first, second = model_calls("CLM-1001")
+    assert (first["input_tokens"], first["output_tokens"]) == (1200, 300)
+    assert first["cost"] == 0.0042
+    assert second["cost"] == 0.0
+
+
+def test_with_no_cost_reported_the_models_prices_are_used(backend, memory_saver):
+    priced = model("anthropic:claude-haiku-5-5")
+    llm = stub(costing(tokens=(20000, 1000)), decide("approve", 420.0))
+    harness.work_claim("CLM-1001", None, priced, memory_saver, llm)
+    first, _ = model_calls("CLM-1001")
+    assert first["cost"] == pytest.approx(priced.cost(20000, 1000))
+    assert first["model"] == "anthropic:claude-haiku-5-5"
+
+
+def test_a_claim_worked_alone_records_its_calls_and_its_spell_with_no_run(
+    backend, memory_saver
+):
+    llm = stub(tool_call("get_claim"), costing(), decide("approve", 420.0))
+    harness.work_claim("CLM-1001", None, FREE, memory_saver, llm)
+    thread_id = backend.get("/api/claims/CLM-1001").json()["thread_id"]
+    calls = model_calls("CLM-1001")
+    assert len(calls) == 3
+    assert {(c["run_id"], c["thread_id"]) for c in calls} == {(None, thread_id)}
+    [spell] = work_times("CLM-1001")
+    assert (spell["run_id"], spell["thread_id"]) == (None, thread_id)
+    assert 0 <= spell["seconds"] < 1
+
+
+def test_both_attempts_of_a_claim_count_on_its_run(backend, run, memory_saver):
+    harness.work_claim(
+        "CLM-1001", run, FREE, memory_saver, stub(AIMessage(content="Hmm."))
+    )
+    harness.work_claim(
+        "CLM-1001", run, FREE, memory_saver, stub(decide("approve", 420.0))
+    )
+    calls, spells = model_calls("CLM-1001"), work_times("CLM-1001")
+    assert len({c["thread_id"] for c in calls}) == 2
+    assert [c["run_id"] for c in calls] == [run, run]
+    assert [s["run_id"] for s in spells] == [run, run]
+    assert backend.get("/api/runs/latest").json()["usage"]["model_calls"] == 2
+
+
+@pytest.fixture
+def clock(monkeypatch):
+    """The harness's clock, which a test can move on, as if time passed."""
+    moved = {"by": 0.0}
+    monkeypatch.setattr(harness, "monotonic", lambda: monotonic() + moved["by"])
+    return moved
+
+
+def held(backend, run, memory_saver):
+    """CLM-1002 approved for $1,350.00 in a run, waiting for a sign-off."""
+    harness.work_claim(
+        "CLM-1002", run, FREE, memory_saver, stub(decide("approve", 1350.0))
+    )
+    assert backend.get("/api/claims/CLM-1002").json()["status"] == "awaiting_sign_off"
+
+
+def review(backend, approved, note=""):
+    body = {"handler_id": "HND-01", "approved": approved, "note": note}
+    backend.post("/api/claims/CLM-1002/review", json=body)
+
+
+def test_the_wait_for_a_sign_off_never_counts(backend, run, memory_saver, clock):
+    held(backend, run, memory_saver)
+    clock["by"] = 3600
+    review(backend, approved=True)
+    harness.carry_on("CLM-1002", None, FREE, memory_saver, StubModel(messages=iter([])))
+    assert backend.get("/api/claims/CLM-1002").json()["status"] == "decided"
+    before, after = work_times("CLM-1002")
+    assert (before["run_id"], after["run_id"]) == (run, None)
+    assert before["seconds"] + after["seconds"] < 1
+
+
+def test_a_carry_on_after_a_rejection_makes_its_calls_with_no_run(
+    backend, run, memory_saver, clock
+):
+    held(backend, run, memory_saver)
+    clock["by"] = 3600
+    review(backend, approved=False, note="The deductible is $100.00.")
+    llm = stub(tool_call("get_claim"), decide("approve", 1250.0))
+    harness.carry_on("CLM-1002", None, FREE, memory_saver, llm)
+    calls = model_calls("CLM-1002")
+    assert [c["run_id"] for c in calls] == [run, None, None]
+    before, after = work_times("CLM-1002")
+    assert (before["run_id"], after["run_id"]) == (run, None)
+    assert before["seconds"] + after["seconds"] < 1
+
+
+def test_a_queue_runs_claims_record_its_run(backend, memory_saver):
+    queue_llm = stub(
+        tool_call("work_claim", claim_id="CLM-1001"),
+        tool_call("work_claim", claim_id="CLM-1004"),
+        AIMessage(content="Two claims worked."),
+    )
+    claim_llm = stub(decide("approve", 420.0), decide("decline", 0.0))
+    queue_agent.run_queue(2, FREE, memory_saver, queue_llm, claim_llm)
+    run_id = backend.get("/api/runs/latest").json()["run_id"]
+    for claim_id in ("CLM-1001", "CLM-1004"):
+        assert [c["run_id"] for c in model_calls(claim_id)] == [run_id]
+        assert [s["run_id"] for s in work_times(claim_id)] == [run_id]
+
+
+def test_the_command_line_counts_a_claim_on_its_run(backend, monkeypatch):
+    monkeypatch.setattr(
+        harness, "chat_model", lambda chosen: stub(decide("approve", 420.0))
+    )
+    cli.work_claims(["CLM-1001"], FREE)
+    run_id = backend.get("/api/runs/latest").json()["run_id"]
+    assert [c["run_id"] for c in model_calls("CLM-1001")] == [run_id]
+
+
+def test_a_spell_that_ends_in_an_error_is_still_recorded(backend, run, memory_saver):
+    class BreaksAfterOne(StubModel):
+        def _generate(self, *args, **kwargs):
+            try:
+                return super()._generate(*args, **kwargs)
+            except (StopIteration, RuntimeError) as exhausted:
+                raise TimeoutError("the provider timed out") from exhausted
+
+    llm = BreaksAfterOne(messages=iter([tool_call("get_claim")]))
+    report = harness.work_claim("CLM-1001", run, FREE, memory_saver, llm)
+    assert report.startswith("CLM-1001: failed, back in the queue")
+    assert len(model_calls("CLM-1001")) == 1
+    [spell] = work_times("CLM-1001")
+    assert spell["run_id"] == run

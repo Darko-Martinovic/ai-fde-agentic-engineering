@@ -67,7 +67,7 @@ def test_the_queue_with_a_cap(backend, monkeypatch, capsys):
 def test_the_queue_without_a_cap_takes_every_waiting_claim(backend, monkeypatch):
     started = queue_runs(monkeypatch)
     cli.main([])
-    assert started == [(25, "openrouter:deepseek/deepseek-v4.1-flash")]
+    assert started == [(25, "openrouter:openai/gpt-6-luna")]
 
 
 def test_nothing_waiting(backend, monkeypatch, capsys):

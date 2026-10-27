@@ -2,7 +2,7 @@ import pytest
 
 from backend import db
 from backend.store import claims
-from backend.tests.claim_starts import a_run, start
+from backend.tests.claim_starts import a_run, start, start_alone
 from backend.tests.workflow_steps import approved, decide, fail, pay, referred, resolve
 
 
@@ -236,6 +236,22 @@ def test_a_claim_tried_again_counts_once_against_the_cap(client):
     start(client, "CLM-1001", run_id)
     fail(client, "CLM-1001")
     assert start(client, "CLM-1001", run_id).status_code == 200
+
+
+def test_a_claim_started_on_its_own_has_no_run_and_no_cap(client):
+    run_id = client.post(
+        "/api/runs", json={"mode": "queue", "cap": 1, "model": "ollama:qwen3.5:4b"}
+    ).json()["run_id"]
+    start(client, "CLM-1001", run_id)
+    response = start_alone(client, "CLM-1002")
+    assert response.status_code == 200
+    claim = response.json()
+    assert (claim["status"], claim["run_id"], claim["attempts"]) == (
+        "in_progress",
+        None,
+        1,
+    )
+    assert claim["thread_id"] == "CLM-1002-test"
 
 
 def test_a_claim_needs_a_running_run(client):

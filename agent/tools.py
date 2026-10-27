@@ -15,26 +15,21 @@ from agent.claims import waiting_claims
 
 
 @dataclass(frozen=True)
-class RunScope:
-    """What every agent in a run knows: the run."""
+class ClaimContext:
+    """What a claim agent's tools know: the run it works in, or None outside a
+    run, the claim it works on and the claim's thread."""
 
-    run_id: int
-
-
-@dataclass(frozen=True)
-class ClaimContext(RunScope):
-    """What a claim agent's tools know: its run, the claim it works on and the
-    claim's thread."""
-
+    run_id: int | None
     claim_id: str
     thread_id: str
 
 
 @dataclass(frozen=True)
-class RunContext(RunScope):
+class RunContext:
     """What the queue agent's tools know: its run, the run's cap, and how to hand
     a claim to a claim agent and get its one-line report back."""
 
+    run_id: int
     cap: int
     work: Callable[[str], str]
 

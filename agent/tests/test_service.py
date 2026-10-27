@@ -17,8 +17,8 @@ def agent_service(memory_saver):
     replies each test gives, and the tests' saver."""
     replies = {"llm": stub()}
     service.app.dependency_overrides[service.carrier] = lambda: (
-        lambda claim_id, run_id: harness.carry_on(
-            claim_id, run_id, FREE, memory_saver, replies["llm"]
+        lambda claim_id: harness.carry_on(
+            claim_id, None, FREE, memory_saver, replies["llm"]
         )
     )
     yield TestClient(service.app), replies

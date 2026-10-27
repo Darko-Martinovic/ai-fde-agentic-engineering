@@ -15,9 +15,8 @@ from agent import api, checkpoints, harness
 from agent.config import current_model
 from settings import setting
 
-# How the service carries a claim on: given the claim and the run its model
-# calls count on, it reports in a line
-Carrier = Callable[[str, int], str]
+# How the service carries a claim on: given the claim, it reports in a line
+Carrier = Callable[[str], str]
 
 
 @asynccontextmanager
@@ -33,12 +32,11 @@ router = APIRouter(prefix="/api")
 
 
 def carrier(request: Request) -> Carrier:
-    """Carry claims on on the default model, with the service's checkpointer. A
-    signed-off claim is only paid, so its model makes no call."""
+    """Carry claims on on the default model, with the service's checkpointer,
+    outside any run, so a run's costs are its own. A signed-off claim is only
+    paid, so its model makes no call."""
     saver = request.app.state.saver
-    return lambda claim_id, run_id: harness.carry_on(
-        claim_id, run_id, current_model(), saver
-    )
+    return lambda claim_id: harness.carry_on(claim_id, None, current_model(), saver)
 
 
 class Accepted(BaseModel):
@@ -68,13 +66,13 @@ def resume_claim(
         )
     if not claim["decisions"] or claim["decisions"][-1]["review"] is None:
         raise HTTPException(409, f"Claim {claim_id} has no handler's review")
-    background.add_task(report, carry, claim_id, claim["run_id"])
+    background.add_task(report, carry, claim_id)
     return Accepted(claim_id=claim_id)
 
 
-def report(carry: Carrier, claim_id: str, run_id: int) -> None:
+def report(carry: Carrier, claim_id: str) -> None:
     """Carry the claim on and print its report, as the command line does."""
-    print(carry(claim_id, run_id), flush=True)
+    print(carry(claim_id), flush=True)
 
 
 app.include_router(router)

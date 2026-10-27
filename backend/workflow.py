@@ -2,6 +2,7 @@
 decision and its payment, and a failure."""
 
 from fastapi import APIRouter, HTTPException
+from sqlalchemy import Connection
 
 from backend.api import Db, found, load_claim, now, require_running
 from backend.claim_rules import (
@@ -30,18 +31,24 @@ MAX_FAILURES = 2
 
 @router.post("/start", operation_id="start_claim")
 def start_claim(claim_id: str, start: StartIn, conn: Db) -> Claim:
-    """Start work on a waiting claim in a run, within the run's cap."""
+    """Start work on a waiting claim, in a run within its cap or on its own."""
     require_status(load_claim(conn, claim_id), "waiting")
-    run = require_running(conn, start.run_id)
+    if start.run_id is not None:
+        require_within_cap(conn, start.run_id, claim_id)
+    if not claims.start(conn, claim_id):
+        raise HTTPException(409, f"Claim {claim_id} has just been started")
+    runs.add_attempt(conn, start.run_id, claim_id, start.thread_id, now())
+    return load_claim(conn, claim_id)
+
+
+def require_within_cap(conn: Connection, run_id: int, claim_id: str) -> None:
+    """Refuse a claim a running run has no room left for."""
+    run = require_running(conn, run_id)
     started = run.claims_started
     if claim_id not in started and len(started) >= run.cap:
         raise HTTPException(
             409, f"Run {run.run_id} has reached its cap of {run.cap} claims"
         )
-    if not claims.start(conn, claim_id):
-        raise HTTPException(409, f"Claim {claim_id} has just been started")
-    runs.add_attempt(conn, run.run_id, claim_id, start.thread_id, now())
-    return load_claim(conn, claim_id)
 
 
 @router.post("/failure", operation_id="fail_claim")

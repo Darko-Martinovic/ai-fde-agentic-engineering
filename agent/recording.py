@@ -1,6 +1,7 @@
 """What the agents record on the backend as they work: each reply, tool call,
-tool result and section read as a step on the claim, and each model call's
-tokens, cost and time on the run."""
+tool result and section read as a step on the claim; each claim agent's model
+call, with its tokens, cost and time, and each spell of its work, on the claim,
+with its run; and each of the queue agent's model calls on its run."""
 
 import json
 
@@ -8,7 +9,7 @@ from langchain_core.messages import AIMessage, ToolMessage
 
 from agent import api
 from agent.config import Model
-from agent.tools import ClaimContext, RunScope
+from agent.tools import ClaimContext, RunContext
 
 
 def steps(message: AIMessage) -> list[tuple[str, str]]:
@@ -41,18 +42,55 @@ def section(context: ClaimContext, result: str) -> None:
     record(context, "section", json.dumps(read))
 
 
-def usage(
-    scope: RunScope, model: Model, message: AIMessage | None, seconds: float
-) -> None:
-    """Record one model call's tokens, cost and time on its run, and on its claim
-    when a claim agent made it."""
+def tokens(message: AIMessage | None) -> tuple[int, int]:
+    """A reply's input and output tokens, or none when the call gave no reply."""
     used = (message.usage_metadata if message else None) or {}
-    tokens_in = used.get("input_tokens", 0)
-    tokens_out = used.get("output_tokens", 0)
-    api.record_usage(
-        scope.run_id,
+    return used.get("input_tokens", 0), used.get("output_tokens", 0)
+
+
+def cost(model: Model, message: AIMessage) -> float:
+    """What a model call cost in US dollars: as the provider reports it, as
+    OpenRouter does, or else at the model's prices in models.toml."""
+    reported = (message.response_metadata.get("token_usage") or {}).get("cost")
+    return float(reported) if reported is not None else model.cost(*tokens(message))
+
+
+def model_call(
+    context: ClaimContext, model: Model, message: AIMessage, seconds: float
+) -> None:
+    """Record one of a claim agent's model calls on the claim, with its run."""
+    tokens_in, tokens_out = tokens(message)
+    api.record_model_call(
+        context.claim_id,
         {
-            "claim_id": scope.claim_id if isinstance(scope, ClaimContext) else None,
+            "thread_id": context.thread_id,
+            "run_id": context.run_id,
+            "model": model.spec,
+            "input_tokens": tokens_in,
+            "output_tokens": tokens_out,
+            "cost": cost(model, message),
+            "seconds": seconds,
+        },
+    )
+
+
+def work_time(context: ClaimContext, seconds: float) -> None:
+    """Record one spell of a claim agent's work on the claim, with its run."""
+    api.record_work_time(
+        context.claim_id,
+        {"thread_id": context.thread_id, "run_id": context.run_id, "seconds": seconds},
+    )
+
+
+def usage(
+    context: RunContext, model: Model, message: AIMessage | None, seconds: float
+) -> None:
+    """Record one of the queue agent's model calls on its run."""
+    tokens_in, tokens_out = tokens(message)
+    api.record_usage(
+        context.run_id,
+        {
+            "claim_id": None,
             "model": model.spec,
             "input_tokens": tokens_in,
             "output_tokens": tokens_out,

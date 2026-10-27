@@ -75,7 +75,8 @@ class DecisionIn(BaseModel):
 
 
 class StartIn(BaseModel):
-    run_id: int
+    # None for a claim worked on its own, outside any run
+    run_id: int | None
     thread_id: str = Field(min_length=1)
 
 
