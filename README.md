@@ -1,4 +1,4 @@
-# AI FDE UnderCover
+# AI FDE Claims Platform
 
 **Forward Deployed Engineering, built day by day on Ed Donner's UnderCover.**
 
@@ -14,11 +14,11 @@ This README describes what I added on top of Ed's builds. Each day's build here 
 
 | Branch | What it is | Compared with |
 |---|---|---|
-| [`week1day3-end`](https://github.com/Darko-Martinovic/ai-fde-undercover/tree/week1day3-end) | The pilot from `docs/SPEC.md` | Ed's `week1day3-end` |
-| [`week1day5-end`](https://github.com/Darko-Martinovic/ai-fde-undercover/tree/week1day5-end) | The harness from `docs/HARNESS.md`, with Insights and the model comparison | Ed's `week1day5-end` |
-| [`week2day1-end`](https://github.com/Darko-Martinovic/ai-fde-undercover/tree/week2day1-end) | Langfuse tracing, the Week 2 Day 1 lab and challenge | |
-| [`week2day2-end`](https://github.com/Darko-Martinovic/ai-fde-undercover/tree/week2day2-end) | The Week 2 Day 2 lab and challenge | |
-| [`week2day3-end`](https://github.com/Darko-Martinovic/ai-fde-undercover/tree/week2day3-end) | Durable state from `docs/DURABLE.md`, with a handler's rejection | Ed's `week2day3-end` |
+| [`week1day3-end`](https://github.com/Darko-Martinovic/ai-fde-claims-platform/tree/week1day3-end) | The pilot from `docs/SPEC.md` | Ed's `week1day3-end` |
+| [`week1day5-end`](https://github.com/Darko-Martinovic/ai-fde-claims-platform/tree/week1day5-end) | The harness from `docs/HARNESS.md`, with Insights and the model comparison | Ed's `week1day5-end` |
+| [`week2day1-end`](https://github.com/Darko-Martinovic/ai-fde-claims-platform/tree/week2day1-end) | Langfuse tracing, the Week 2 Day 1 lab and challenge | |
+| [`week2day2-end`](https://github.com/Darko-Martinovic/ai-fde-claims-platform/tree/week2day2-end) | The Week 2 Day 2 lab and challenge | |
+| [`week2day3-end`](https://github.com/Darko-Martinovic/ai-fde-claims-platform/tree/week2day3-end) | Durable state from `docs/DURABLE.md`, with a handler's rejection | Ed's `week2day3-end` |
 | `main` | The latest build, where work goes in through PRs | |
 
 ## Week 1: the AI Engineer
