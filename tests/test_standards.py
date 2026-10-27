@@ -142,7 +142,7 @@ def postman_requests() -> Iterator[dict[str, object]]:
                 yield item
 
     collection = json.loads(
-        (ROOT / "postman/undercover.postman_collection.json").read_text(
+        (ROOT / "backend/postman/undercover.postman_collection.json").read_text(
             encoding="utf-8"
         )
     )
