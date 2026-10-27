@@ -87,8 +87,16 @@ export function duration(seconds: number): string {
   return rest === 0 ? `${minutes} min` : `${minutes} min ${String(rest)} s`;
 }
 
+/** What a value reads as when there's none yet. */
+export const NOTHING = "—";
+
+/** A day and a time, such as Oct 27, 2026 1:22:53 PM. */
+export function when(isoTime: string): string {
+  return `${date(isoTime)} ${clock(isoTime)}`;
+}
+
 export function percent(part: number, whole: number): string {
-  if (whole === 0) return "—";
+  if (whole === 0) return NOTHING;
   return `${String(Math.round((part / whole) * 100))}%`;
 }
 

@@ -1,8 +1,11 @@
 import pytest
+from fastapi.testclient import TestClient
 
-from agent import harness
+from agent import harness, service
 from agent.tests.conftest import backend  # noqa: F401 - the agent's backend
-from bench.score import Answer
+from backend import agent_service
+from backend.main import app
+from bench import backend as bench_backend
 
 
 @pytest.fixture(autouse=True)
@@ -15,12 +18,19 @@ def no_model(monkeypatch):
     monkeypatch.setattr(harness, "chat_model", refuse)
 
 
-@pytest.fixture
-def key():
-    """Hand-made answers, not the handlers' own: CLM-1001 approved for $420.00,
-    CLM-1005 declined, both tiny, and CLM-1002 approved for $1,150.00."""
-    return {
-        "CLM-1001": Answer("CLM-1001", "approve", 420.0, True),
-        "CLM-1005": Answer("CLM-1005", "decline", 0.0, True),
-        "CLM-1002": Answer("CLM-1002", "approve", 1150.0, False),
-    }
+@pytest.fixture(autouse=True)
+def evaluations(backend, monkeypatch, memory_saver):  # noqa: F811 - the fixture above
+    """The comparison reaches the real backend in process, and the backend's
+    start of an evaluation reaches the agent's service in process too, which
+    works it before the start returns."""
+    monkeypatch.setattr(bench_backend, "client", lambda: TestClient(app))
+
+    def start(evaluation_set, tiny, agents, model):
+        asked = service.EvaluationIn(
+            evaluation_set=evaluation_set, tiny=tiny, agents=agents, model=model
+        )
+        service.RUNNING.acquire()
+        service.work_a_run(asked, lambda: memory_saver)
+        return {"agents": agents, "model": model}
+
+    monkeypatch.setattr(agent_service, "start_evaluation", start)

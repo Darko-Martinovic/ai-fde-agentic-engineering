@@ -12,6 +12,7 @@ const ROUTES = {
   "GET /api/models": MODELS,
   "GET /api/policy-wording": "# Policy Wording",
   "GET /api/insights": INSIGHTS,
+  "GET /api/evaluations": [],
 };
 
 afterEach(() => {
@@ -54,6 +55,15 @@ it("moves between pages", async () => {
   expect(await screen.findByText("Straight through")).toBeDefined();
   expect(
     screen.getByRole("link", { name: "Insights" }).getAttribute("aria-current"),
+  ).toBe("page");
+
+  window.location.hash = "#/scoreboard";
+  fireEvent(window, new HashChangeEvent("hashchange"));
+  expect(await screen.findByText("No evaluation yet.")).toBeDefined();
+  expect(
+    screen
+      .getByRole("link", { name: "Scoreboard" })
+      .getAttribute("aria-current"),
   ).toBe("page");
 
   window.location.hash = "#/claims/CLM-1001";

@@ -1,6 +1,6 @@
-"""Running a trial once: a fresh database, the claims worked through the harness
-one at a time in a dispatch of their own, and what came of them, read through
-the API."""
+"""Running a trial once: an evaluation of the queue's labelled claims on the
+trial's model, started through the backend like one from the Scoreboard, and
+its outcome as the backend scored it."""
 
 import json
 import time
@@ -8,20 +8,17 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from agent import api, checkpoints, harness
-from agent.config import Model
-from backend.seed import reset
+from bench import backend
 from bench.plan import Trial
-from bench.score import (
-    Answer,
-    Outcome,
-    chosen,
-    decision_right,
-    outcome,
-    payout_right,
-)
 
 RESULTS = Path(__file__).with_name("results.json")
+# The labelled set a comparison evaluates: the 25 claims of the queue
+EVALUATION_SET = "evaluation"
+# How often to look whether the evaluation has finished, and how long the
+# agent's service may take to record it, in seconds
+POLL_SECONDS = 5
+APPEAR_SECONDS = 60
+RUNNING, FINISHED = "running", "finished"
 
 
 @dataclass(frozen=True)
@@ -42,6 +39,8 @@ class Repeat:
     cost: float
     seconds: float
     misses: list[dict[str, Any]]
+    # Claim agents at once; runs before the Scoreboard worked one at a time
+    agents: int = 1
 
     @property
     def refused(self) -> bool:
@@ -50,72 +49,73 @@ class Repeat:
         return self.worked > 0 and self.model_calls == 0
 
 
-def miss(answer: Answer, got: Outcome) -> dict[str, Any]:
+def miss(copy: dict[str, Any]) -> dict[str, Any]:
     """A claim the agent got wrong: what the handlers decided, and what it did."""
     return {
-        "claim_id": answer.claim_id,
-        "expected": answer.decision,
-        "expected_payout": answer.payout,
-        "got": got.decision,
-        "got_payout": got.payout,
-        "status": got.status,
+        "claim_id": copy["copy_of"],
+        "expected": copy["handler_decision"],
+        "expected_payout": copy["handler_payout"],
+        "got": copy["decision"],
+        "got_payout": copy["payout"],
+        "status": copy["status"],
     }
 
 
-def tally(
-    trial: Trial,
-    repeat: int,
-    outcomes: list[Outcome],
-    key: dict[str, Answer],
-    usage: dict[str, Any],
-) -> Repeat:
-    """Score a run's outcomes against the answer key, with what it used: the
-    run's usage, and `wall_seconds`, the time it took from start to end."""
-    pairs = [(key[got.claim_id], got) for got in outcomes]
+def tally(trial: Trial, repeat: int, evaluation: dict[str, Any]) -> Repeat:
+    """A run of a trial, from its evaluation as the backend scored it: the
+    claims right, as its measures count them, and the seconds of every claim's
+    work added up."""
+    copies, usage = evaluation["claims"], evaluation["usage"]
+    measures = evaluation["measures"]
     return Repeat(
         model=trial.model.spec,
         label=trial.model.label,
         claims=trial.claims,
         repeat=repeat,
-        worked=len(outcomes),
-        decisions_right=sum(decision_right(a, got) for a, got in pairs),
-        payouts_right=sum(payout_right(a, got) for a, got in pairs),
-        undecided=sum(got.decision is None for got in outcomes),
+        worked=len(copies),
+        decisions_right=round(measures["decision_accuracy"] * len(copies)),
+        payouts_right=round(measures["accuracy"] * len(copies)),
+        undecided=sum(c["decision"] is None for c in copies),
         model_calls=usage["model_calls"],
         input_tokens=usage["input_tokens"],
         output_tokens=usage["output_tokens"],
         cost=usage["cost"],
-        seconds=usage["wall_seconds"],
-        misses=[miss(a, got) for a, got in pairs if not payout_right(a, got)],
+        seconds=measures["seconds_per_claim"] * len(copies),
+        misses=[miss(c) for c in copies if not c["right"]],
+        agents=trial.agents,
     )
 
 
-def work_claims(claim_ids: list[str], model: Model) -> dict[str, Any]:
-    """Work the claims one at a time on a model, in a dispatch of one claim agent
-    that takes only them, and return the finished dispatch."""
-    run_id = api.create_dispatch(1, model.spec, model.reasoning_effort)["run_id"]
-    api.record_run_claims(run_id, claim_ids)
-    try:
-        with checkpoints.pool() as connections:
-            for claim_id in claim_ids:
-                harness.work_in_run(
-                    claim_id, run_id, model, checkpoints.savers(connections)
-                )
-    finally:
-        finished = api.finish_run(run_id, False)
-    return finished
+def started_after(run_id: int) -> int:
+    """The id of the evaluation started after `run_id`, once the agent's
+    service has recorded it."""
+    deadline = time.monotonic() + APPEAR_SECONDS
+    while time.monotonic() < deadline:
+        newest = next(iter(backend.list_evaluations()), {"run_id": 0})["run_id"]
+        if newest > run_id:
+            return newest
+        time.sleep(POLL_SECONDS)
+    raise RuntimeError("The agent's service didn't start the evaluation")
 
 
-def run_repeat(trial: Trial, repeat: int, key: dict[str, Answer]) -> Repeat:
-    """Reseed, work the trial's claims on its model, and score what came of it."""
-    claim_ids = chosen(key, trial.claims)
-    reset()
-    started = time.monotonic()
-    run = work_claims(claim_ids, trial.model)
-    seconds = time.monotonic() - started
-    usage = run["usage"] | {"wall_seconds": seconds}
-    outcomes = [outcome(api.get_claim(claim_id)) for claim_id in claim_ids]
-    return tally(trial, repeat, outcomes, key, usage)
+def finished(run_id: int) -> dict[str, Any]:
+    """Wait for an evaluation to end, and return it; one that stopped partway
+    says nothing about the model."""
+    while (evaluation := backend.get_evaluation(run_id))["status"] == RUNNING:
+        time.sleep(POLL_SECONDS)
+    if evaluation["status"] != FINISHED:
+        raise RuntimeError(f"Evaluation {run_id} stopped before it finished")
+    return evaluation
+
+
+def run_repeat(trial: Trial) -> dict[str, Any]:
+    """Evaluate the trial's claims on its model, and return the evaluation once
+    it ends."""
+    before = next(iter(backend.list_evaluations()), {"run_id": 0})["run_id"]
+    backend.start_evaluation(
+        EVALUATION_SET, trial.claims == "tiny", trial.agents, trial.model.spec
+    )
+    return finished(started_after(before))
 
 
 def load_results(path: Path) -> list[Repeat]:

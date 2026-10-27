@@ -16,8 +16,6 @@ from backend.main import app
 
 ROOT = Path(__file__).resolve().parents[1]
 PARTS = ("backend", "agent", "bench")
-# The parts that make up the product, which never see the answer key
-PRODUCT = ("backend", "agent")
 MAX_LINES = 300
 MAX_FUNCTION_LINES = 40
 
@@ -81,11 +79,9 @@ def test_no_model_in_code():
 
 
 def test_nothing_reaches_the_answer_key():
-    """Only seeding reads data/evals/, into tables no claim operation reads, and
-    the agent never sees it; the comparison's scoring reads it too, until it
-    scores through evaluations."""
-    assert offending(ANSWER_KEY, PRODUCT, ("backend/seed.py",)) == []
-    assert offending(ANSWER_KEY, ("bench",), ("bench/score.py",)) == []
+    """Only seeding reads data/evals/, into tables no claim operation reads; the
+    agent never sees it, and the comparison reads the backend's scores."""
+    assert offending(ANSWER_KEY, PARTS, ("backend/seed.py",)) == []
 
 
 def test_only_the_api_module_calls_the_backend():
@@ -93,6 +89,12 @@ def test_only_the_api_module_calls_the_backend():
     allowed = ("agent/api.py",)
     assert offending(API_PATH, ("agent",), allowed) == []
     assert offending(HTTP_CLIENT, ("agent",), allowed) == []
+
+
+def test_only_one_module_calls_the_backend_from_the_comparison():
+    """The model comparison reaches the backend only through bench/backend.py."""
+    assert offending(HTTP_CLIENT, ("bench",), ("bench/backend.py",)) == []
+    assert offending(API_PATH, ("bench",), ("bench/backend.py",)) == []
 
 
 def test_only_one_module_calls_the_agents_service():

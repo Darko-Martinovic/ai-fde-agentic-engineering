@@ -1,20 +1,11 @@
-import { api, type Run, type RunClaim, type RunStatus } from "./api";
+import { api, type Run, type RunClaim } from "./api";
 import { DecisionBadge, ErrorNote, Panel, StatusBadge } from "./components";
 import { clock, cost, duration, money } from "./format";
 import { useModelLabel, useNow, usePoll } from "./hooks";
 import { paths } from "./paths";
 import { claimsDone, summaryLines } from "./runs";
 import { DispatchForm } from "./DispatchForm";
-
-const RUN_LABELS: Record<RunStatus, string> = {
-  running: "Running",
-  finished: "Finished",
-  stopped: "Stopped",
-};
-
-function RunBadge({ status }: Readonly<{ status: RunStatus }>) {
-  return <span className={`badge badge--${status}`}>{RUN_LABELS[status]}</span>;
-}
+import { RunBadge } from "./RunBadge";
 
 /** How long a dispatch has taken: to its finish, or so far while it runs. */
 function useRunSeconds(run: Run): number {

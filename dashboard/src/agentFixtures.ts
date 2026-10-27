@@ -1,4 +1,11 @@
-import type { Insights, ModelChoice, Run, RunClaim } from "./api";
+import type {
+  Evaluation,
+  EvaluationClaim,
+  Insights,
+  ModelChoice,
+  Run,
+  RunClaim,
+} from "./api";
 
 /* Test fixtures for the agent: its models, dispatches and insights. */
 
@@ -43,6 +50,8 @@ export function run(overrides: Partial<Run> = {}): Run {
     agents: 3,
     model: "openrouter:openai/gpt-6-luna",
     reasoning_effort: "low",
+    evaluation_set: null,
+    tiny: null,
     status: "running",
     started_at: "2026-10-27T10:00:00Z",
     finished_at: null,
@@ -65,6 +74,72 @@ export function run(overrides: Partial<Run> = {}): Run {
         paid: null,
         seconds: 6,
         model_cost: 0.0004,
+      }),
+    ],
+    ...overrides,
+  };
+}
+
+/** A copy in evaluation #4, right by default: CLM-1104 approved for $250.00
+ *  as the handler did. */
+export function copy(
+  overrides: Partial<EvaluationClaim> = {},
+): EvaluationClaim {
+  return {
+    ...runClaim({
+      claim_id: "CLM-1104-E4",
+      decision: "approve",
+      payout: 250,
+      seconds: 40,
+      model_cost: 0.0125,
+    }),
+    copy_of: "CLM-1104",
+    reasons: "The bag was delayed 30 hours, and the receipts cover it.",
+    handler_decision: "approve",
+    handler_payout: 250,
+    right: true,
+    mistake_cost: 0,
+    ...overrides,
+  };
+}
+
+/** Evaluation #4 of the held-out set's five tiny claims, finished: two right,
+ *  CLM-1106 over by $50.00, CLM-1110 referred, and CLM-1114 not decided. */
+export function evaluation(overrides: Partial<Evaluation> = {}): Evaluation {
+  return {
+    ...run({ run_id: 4, kind: "evaluation", agents: 5, status: "finished" }),
+    evaluation_set: "held_out",
+    tiny: true,
+    finished_at: "2026-10-27T10:02:41Z",
+    seconds: 161,
+    measures: {
+      decision_accuracy: 0.8,
+      accuracy: 0.4,
+      cost_of_mistakes: 1600,
+      straight_through: 0.6,
+      model_cost_per_claim: 0.0125,
+      seconds_per_claim: 40,
+      run_seconds: 161,
+    },
+    claims: [
+      copy(),
+      copy({
+        claim_id: "CLM-1106-E4",
+        copy_of: "CLM-1106",
+        payout: 300,
+        right: false,
+        mistake_cost: 50,
+      }),
+      copy({
+        claim_id: "CLM-1114-E4",
+        copy_of: "CLM-1114",
+        decision: null,
+        payout: null,
+        reasons: null,
+        handler_decision: "decline",
+        handler_payout: 0,
+        right: false,
+        mistake_cost: 50,
       }),
     ],
     ...overrides,

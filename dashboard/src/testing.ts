@@ -115,6 +115,8 @@ export function claim(overrides: Partial<Claim> = {}): Claim {
     status: "waiting",
     decisions: [],
     payment: null,
+    evaluation_id: null,
+    copy_of: null,
     ...overrides,
   };
 }

@@ -10,6 +10,7 @@ const started: unknown[] = [];
 const RESUME = /^\/api\/claims\/([^/]+)\/resume$/;
 const STARTS: Record<string, string> = {
   "/api/dispatches": "dispatch",
+  "/api/evaluations": "evaluation",
   "/api/runs/stop": "stop",
 };
 
