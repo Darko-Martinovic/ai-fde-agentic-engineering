@@ -206,3 +206,4 @@ My contributions to Ed's repo, in `community_contributions/Darko-Martinovic/`:
 | [#57](https://github.com/ed-donner/undercover/pull/57) | Week 2 Day 4 | Challenge: `score_run`, and a restart partway through a dispatch |
 | [#67](https://github.com/ed-donner/undercover/pull/67) | Week 2 Day 4 | The swarm, with a graceful Stop and a model choice (`SWARM.md`) |
 | [#63](https://github.com/ed-donner/undercover/pull/63) | Week 2 Day 5 | Challenge: the short policy wording as a lever |
+| [#69](https://github.com/ed-donner/undercover/pull/69) | Week 2 Day 5 | The improver, with handlers who sign in and a rejection kept (`IMPROVE.md`) |
