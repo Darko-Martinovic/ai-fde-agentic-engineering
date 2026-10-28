@@ -7,6 +7,7 @@ import { InsightsPage } from "./pages/Insights";
 import { ConfigurationPage } from "./pages/ConfigurationPage";
 import { QueuePage } from "./pages/Queue";
 import { ScoreboardPage } from "./pages/Scoreboard";
+import { SettingsPage } from "./pages/SettingsPage";
 import { SignInPage } from "./pages/SignInPage";
 import { VersionPage } from "./pages/VersionPage";
 import type { Route } from "./paths";
@@ -19,6 +20,8 @@ function Page({ route }: Readonly<{ route: HandlerRoute }>) {
       return <ClaimPage key={route.claimId} claimId={route.claimId} />;
     case "configuration":
       return <ConfigurationPage />;
+    case "settings":
+      return <SettingsPage />;
     case "version":
       return <VersionPage key={route.number} number={route.number} />;
     case "insights":

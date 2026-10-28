@@ -2,7 +2,13 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { ConfigurationPage } from "./ConfigurationPage";
 import { VersionPage } from "./VersionPage";
-import { CONFIGURATION, HANDLERS, mockFetch, versionDetails } from "../testing";
+import {
+  CONFIGURATION,
+  SETTINGS_VIEW,
+  HANDLERS,
+  mockFetch,
+  versionDetails,
+} from "../testing";
 
 afterEach(() => {
   cleanup();
@@ -11,6 +17,7 @@ afterEach(() => {
 
 const ROUTES = {
   "GET /api/configuration": CONFIGURATION,
+  "GET /api/settings": SETTINGS_VIEW,
   "GET /api/handlers": HANDLERS,
   "GET /api/policy-wording": "# Policy Wording",
   "GET /api/configuration/versions/1": versionDetails({

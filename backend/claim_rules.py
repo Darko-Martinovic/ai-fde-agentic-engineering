@@ -4,9 +4,9 @@ agent's routes in workflow.py and the handlers' in reviews.py."""
 from fastapi import HTTPException
 from sqlalchemy import Connection
 
-from backend.api import company, now
+from backend.api import now
 from backend.models import Claim, ClaimStatus, Decision, DecisionIn, HandlerDecisionIn
-from backend.store import claims
+from backend.store import claims, platform_settings
 
 STATUS_AFTER: dict[str, ClaimStatus] = {"decline": "decided", "refer": "referred"}
 # A held payout rejected this many times is referred to a handler
@@ -14,8 +14,8 @@ MAX_REJECTIONS = 2
 
 
 def approval_limit(conn: Connection) -> float:
-    """Return the payout above which a handler must sign off."""
-    return company(conn)["payout_approval_limit"]
+    """The payout above which a handler must sign off, as the settings stand."""
+    return platform_settings.current(conn)["approval_limit"]
 
 
 def refuse_copy(claim: Claim) -> None:
@@ -59,7 +59,7 @@ def held(conn: Connection, claim: Claim, approval: Decision) -> str | None:
     can: it's over the limit, or follows a rejection, and isn't signed off."""
     if approval.review == "signed_off":
         return None
-    limit = approval_limit(conn)
+    limit = approval.approval_limit
     if approval.payout > limit:
         return f"A payout over ${limit:,.2f} waits for a handler's sign-off"
     if rejections(claim):
@@ -84,6 +84,7 @@ def add_decision(
             "reasons": decision.reasons,
             "policy_section": policy_section,
             "decided_at": now(),
+            "approval_limit": approval_limit(conn),
         },
     )
 

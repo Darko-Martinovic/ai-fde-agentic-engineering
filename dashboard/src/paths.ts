@@ -4,6 +4,7 @@ export type Route =
   | { page: "queue" }
   | { page: "claim"; claimId: string }
   | { page: "configuration" }
+  | { page: "settings" }
   | { page: "version"; number: number }
   | { page: "insights" }
   | { page: "scoreboard" }
@@ -20,6 +21,7 @@ const INSTRUCTIONS = "#/instructions";
 const EVALUATION = `${SCOREBOARD}/`;
 const NUMBER = /^\d+$/;
 const INSIGHTS = "#/insights";
+const SETTINGS = "#/settings";
 const SIGN_IN = "#/sign-in";
 const NEXT = `${SIGN_IN}?next=`;
 
@@ -27,6 +29,7 @@ export const paths = {
   queue: "#/",
   insights: INSIGHTS,
   configuration: CONFIGURATION,
+  settings: SETTINGS,
   scoreboard: SCOREBOARD,
   claim: (claimId: string) => `${CLAIM}${claimId}`,
   evaluation: (runId: number) => `${EVALUATION}${String(runId)}`,
@@ -72,6 +75,7 @@ const PAGES: Partial<Record<string, Route>> = {
   [CONFIGURATION]: { page: "configuration" },
   [INSTRUCTIONS]: { page: "configuration" },
   [INSIGHTS]: { page: "insights" },
+  [SETTINGS]: { page: "settings" },
 };
 
 export function parseRoute(hash: string): Route {

@@ -110,6 +110,9 @@ decisions = Table(
     text_column("reasons"),
     text_column("policy_section", nullable=True),
     text_column("decided_at"),
+    # The approval limit when the decision was recorded, which a payout over it
+    # waits for a handler's sign-off under, whatever the limit becomes
+    Column("approval_limit", Float, nullable=False),
     # A handler's review of a held payout: signed_off or rejected, by whom, when,
     # and a rejection's note
     text_column("review", nullable=True),

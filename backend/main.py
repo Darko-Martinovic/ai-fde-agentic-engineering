@@ -13,6 +13,7 @@ from backend import (
     evaluations,
     handlers,
     insights,
+    platform_settings,
     records,
     reviews,
     runs,
@@ -47,6 +48,7 @@ for module in (
     runs,
     evaluations,
     configuration,
+    platform_settings,
     insights,
 ):
     app.include_router(module.router)

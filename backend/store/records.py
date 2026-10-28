@@ -4,7 +4,7 @@ stored settings (the plans, the company's rules and the documents)."""
 import json
 from typing import Any
 
-from sqlalchemy import Connection, select, update
+from sqlalchemy import Connection, select
 from sqlalchemy import insert as insert_into
 
 from backend import db
@@ -38,13 +38,6 @@ def stored(conn: Connection, name: str) -> str:
     """Return one stored setting, such as the plans or the policy wording."""
     found = select(db.settings.c.value).where(db.settings.c.name == name)
     return conn.execute(found).scalar_one()
-
-
-def store(conn: Connection, name: str, value: str) -> None:
-    """Replace one stored setting, such as the company's rules."""
-    conn.execute(
-        update(db.settings).where(db.settings.c.name == name).values(value=value)
-    )
 
 
 def insert(

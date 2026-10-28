@@ -88,6 +88,8 @@ def test_operations_are_documented(client):
         "get_version",
         "get_configuration",
         "get_version_details",
+        "get_settings",
+        "change_settings",
         "list_sections",
         "search_documents",
         "read_section",

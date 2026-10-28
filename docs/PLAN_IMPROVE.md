@@ -273,17 +273,19 @@ Built on 2026-10-28. `get_version` and `get_current_version` also give the model
 
 `platform_settings` as a history, `data/improvement.json`, `get_settings` and `change_settings`, the approval limit from the settings, the Settings page with `ConfirmDialog`, and the appearance.
 
-- [ ] pytest: seeding makes row 1 from `company.json` and `improvement.json` with nobody as author, and the models allowed with numeric prices
-- [ ] pytest: `change_settings` as Dana records row 2 with her and the time; as Marcus 403 with why and nothing recorded; without a token 401
-- [ ] pytest: a limit of 0, an accuracy floor of 1.5, a grade floor of 4, a negative noise, a spending limit of 0 and 26 agents each 422
-- [ ] pytest: with the limit raised to $1,500.00, a 1,350.00 approval recorded after is paid without sign-off and one recorded before still waits; lowered to $500.00, a 600.00 approval waits and `pay_claim` refuses it
-- [ ] `payout_approval_limit` is read only by seeding, and no `1000` appears in the backend outside tests
-- [ ] vitest: each setting with its unit and "Last changed by"; Save opens the dialog listing old and new values, Cancel sends nothing, Confirm sends them; a refusal shows; Marcus sees it read only with why; the models allowed right-aligned; the appearance sets `data-theme` and remembers it
-- [ ] vitest: `ConfirmDialog` is a modal with a title, the changes and two buttons, closing on Cancel and Escape
-- [ ] e2e: Dana sets the spending limit to $0.75, which stays after a reload; Marcus has no Save and is told why; Dark sets `data-theme="dark"` and stays after a reload, Light holds under a dark system setting
-- [ ] Postman, Supabase MCP: one settings row and three models allowed after a seed
-- [ ] Browser: raise the limit to $1,500.00 and approve `CLM-1004` for 1,350.00 through the API: paid without a sign-off. The page in light, dark and the computer's setting. `npm run seed` afterwards
-- [ ] `npm run check` passes
+Built on 2026-10-28. Each decision records the approval limit it was recorded under (`decisions.approval_limit`), which its payment is held to, so a change applies to the decisions after it. The appearance moved from the header to the Settings page (`theme.ts`, applied before the first render). The dashboard names models through `get_settings`, and a handler who can't sign off over the limit sees why in place of the button to approve a referral over it.
+
+- [x] pytest: seeding makes row 1 from `company.json` and `improvement.json` with nobody as author, and the models allowed with numeric prices
+- [x] pytest: `change_settings` as Dana records row 2 with her and the time; as Marcus 403 with why and nothing recorded; without a token 401
+- [x] pytest: a limit of 0, an accuracy floor of 1.5, a grade floor of 4, a negative noise, a spending limit of 0 and 26 agents each 422
+- [x] pytest: with the limit raised to $1,500.00, a 1,350.00 approval recorded after is paid without sign-off and one recorded before still waits; lowered to $500.00, a 600.00 approval waits and `pay_claim` refuses it
+- [x] `payout_approval_limit` is read only by seeding, and no `1000` appears in the backend outside tests
+- [x] vitest: each setting with its unit and "Last changed by"; Save opens the dialog listing old and new values, Cancel sends nothing, Confirm sends them; a refusal shows; Marcus sees it read only with why; the models allowed right-aligned; the appearance sets `data-theme` and remembers it
+- [x] vitest: `ConfirmDialog` is a modal with a title, the changes and two buttons, closing on Cancel and Escape
+- [x] e2e: Dana sets the spending limit to $0.75, which stays after a reload; Marcus has no Save and is told why; Dark sets `data-theme="dark"` and stays after a reload, Light holds under a dark system setting
+- [x] Postman, Supabase MCP: one settings row and three models allowed after a seed
+- [x] Browser: raise the limit to $1,500.00 and approve `CLM-1004` for 1,350.00 through the API: paid without a sign-off. The page in light, dark and the computer's setting. `npm run seed` afterwards
+- [x] `npm run check` passes
 
 ## Phase 4: The judge
 

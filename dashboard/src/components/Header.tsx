@@ -1,14 +1,8 @@
 import { api, type Handler } from "../api";
 import { signOut } from "../auth";
-import { usePoll, useTheme, type Theme } from "../hooks";
+import { usePoll } from "../hooks";
 import { paths, type Route } from "../paths";
 import { Logo } from "./elements";
-
-const THEMES: { value: Theme; label: string }[] = [
-  { value: "system", label: "Auto" },
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
-];
 
 /** The pages in the header, each with the routes that mark it current. */
 const PAGES: { label: string; href: string; routes: Route["page"][] }[] = [
@@ -24,6 +18,7 @@ const PAGES: { label: string; href: string; routes: Route["page"][] }[] = [
     href: paths.configuration,
     routes: ["configuration", "version"],
   },
+  { label: "Settings", href: paths.settings, routes: ["settings"] },
 ];
 
 function healthLabel(data: unknown, error: string | null): string {
@@ -39,26 +34,6 @@ function BackendStatus() {
       <span className="health__dot" aria-hidden="true" />
       Backend: {label}
     </span>
-  );
-}
-
-function ThemeSwitch() {
-  const [theme, setTheme] = useTheme();
-  return (
-    <div className="segmented" role="group" aria-label="Theme">
-      {THEMES.map((option) => (
-        <button
-          type="button"
-          key={option.value}
-          aria-pressed={theme === option.value}
-          onClick={() => {
-            setTheme(option.value);
-          }}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
   );
 }
 
@@ -109,7 +84,6 @@ export function Header({
       </nav>
       <div className="topbar__end">
         <BackendStatus />
-        <ThemeSwitch />
         <SignedIn handler={handler} />
       </div>
     </header>

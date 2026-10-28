@@ -6,6 +6,7 @@ describe("parseRoute", () => {
     expect(parseRoute("")).toEqual({ page: "queue" });
     expect(parseRoute("#/")).toEqual({ page: "queue" });
     expect(parseRoute("#/configuration")).toEqual({ page: "configuration" });
+    expect(parseRoute("#/settings")).toEqual({ page: "settings" });
     expect(parseRoute("#/instructions")).toEqual({ page: "configuration" });
     expect(parseRoute("#/configuration/versions/3")).toEqual({
       page: "version",

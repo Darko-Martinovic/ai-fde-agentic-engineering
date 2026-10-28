@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "./api";
+import { api, type SettingsView } from "./api";
 import { modelLabel } from "./configuration";
 import { parseRoute, type Route } from "./paths";
 
@@ -122,38 +122,17 @@ export function useRoute(): Route {
   return parseRoute(hash);
 }
 
-export type Theme = "system" | "light" | "dark";
-const THEME_KEY = "undercover-theme";
-
-export function readTheme(): Theme {
-  try {
-    const saved = localStorage.getItem(THEME_KEY);
-    return saved === "light" || saved === "dark" ? saved : "system";
-  } catch {
-    return "system";
-  }
-}
-
-export function useTheme(): [Theme, (theme: Theme) => void] {
-  const [theme, setTheme] = useState<Theme>(readTheme);
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === "system") delete root.dataset.theme;
-    else root.dataset.theme = theme;
-    try {
-      localStorage.setItem(THEME_KEY, theme);
-    } catch {
-      // Private windows can refuse storage; the theme still applies.
-    }
-  }, [theme]);
-  return [theme, setTheme];
-}
-
 /** How to name a model: its label among the models allowed, or its name when
- *  it isn't one. The configuration loads once, however many are named. */
+ *  it isn't one. The settings load once, however many are named. */
 export function useModelLabels(): (model: string) => string {
-  const configuration = usePoll(api.getConfiguration, null);
-  return (model) => modelLabel(configuration.data?.models_allowed ?? [], model);
+  const settings = useSettings();
+  return (model) => modelLabel(settings?.models_allowed ?? [], model);
+}
+
+/** The platform's settings and the models allowed, loaded once, or null
+ *  until they load. */
+export function useSettings(): SettingsView | null {
+  return usePoll(api.getSettings, null).data;
 }
 
 /** A model's label among the models allowed, or its name. */
