@@ -5,7 +5,7 @@ from backend import agent_service, seed
 from backend.tests.sign_ins import DANA, MARCUS, headers
 from backend.tests.workflow_steps import decide, fail, pay
 
-LUNA = "openrouter:openai/gpt-6-luna"
+LUNA = "openai/gpt-6-luna"
 AS_MARCUS = headers(MARCUS)
 HELD_OUT_TINY = ["CLM-1114", "CLM-1106", "CLM-1112", "CLM-1104", "CLM-1110"]
 
@@ -15,8 +15,6 @@ def create(client, evaluation_set="held_out", tiny=True, agents=5):
         "evaluation_set": evaluation_set,
         "tiny": tiny,
         "agents": agents,
-        "model": LUNA,
-        "reasoning_effort": "low",
     }
     return client.post("/api/runs/evaluations", json=body)
 
@@ -28,7 +26,12 @@ def test_an_evaluation_makes_waiting_copies_of_a_sets_tiny_claims(client):
         "held_out",
         True,
     )
-    assert (run["agents"], run["model"], run["reasoning_effort"]) == (5, LUNA, "low")
+    assert (run["agents"], run["version"], run["model"], run["reasoning_effort"]) == (
+        5,
+        1,
+        LUNA,
+        "low",
+    )
     copies = [c["claim_id"] for c in run["claims"]]
     assert copies == [f"{claim_id}-E1" for claim_id in HELD_OUT_TINY]
     for copy_id in copies:
@@ -183,7 +186,7 @@ def test_the_scoreboard_lists_evaluations_newest_first(client):
     first = create(client).json()["run_id"]
     client.post(
         "/api/runs/dispatches",
-        json={"agents": 3, "model": LUNA, "reasoning_effort": "low"},
+        json={"agents": 3},
     )
     second = create(client, "evaluation").json()["run_id"]
     listed = client.get("/api/evaluations").json()
@@ -194,7 +197,7 @@ def test_the_scoreboard_lists_evaluations_newest_first(client):
 def test_a_dispatch_isnt_an_evaluation(client):
     client.post(
         "/api/runs/dispatches",
-        json={"agents": 3, "model": LUNA, "reasoning_effort": "low"},
+        json={"agents": 3},
     )
     assert client.get("/api/evaluations/1").status_code == 404
     assert client.get("/api/evaluations/99").status_code == 404
@@ -212,16 +215,14 @@ def service(monkeypatch):
             return httpx.Response(
                 409, json={"detail": "A dispatch or an evaluation is already running"}
             )
-        return httpx.Response(
-            202, json={"agents": json["agents"], "model": json["model"]}
-        )
+        return httpx.Response(202, json={"agents": json["agents"]})
 
     monkeypatch.setattr(agent_service.httpx, "post", post)
     return asked
 
 
 def test_a_start_passes_the_set_and_n_on_to_the_service(client, service):
-    body = {"evaluation_set": "held_out", "tiny": True, "agents": 5, "model": LUNA}
+    body = {"evaluation_set": "held_out", "tiny": True, "agents": 5}
     started = client.post("/api/evaluations", headers=AS_MARCUS, json=body)
     assert started.status_code == 202
     assert service == [("/api/evaluations", body)]
@@ -298,7 +299,7 @@ def test_a_dispatch_records_only_the_queues_claims(client):
     assert refused.status_code == 409
     dispatch = client.post(
         "/api/runs/dispatches",
-        json={"agents": 3, "model": LUNA, "reasoning_effort": "low"},
+        json={"agents": 3},
     ).json()
     copy = client.put(
         f"/api/runs/{dispatch['run_id']}/claims", json={"claim_ids": ["CLM-1104-E1"]}

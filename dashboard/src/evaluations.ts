@@ -1,8 +1,8 @@
 import type { EvaluationSet, Measures, RunFacts } from "./api";
 import { NOTHING, cost, duration, money, percent } from "./format";
 
-// The reasoning effort a run records for a model run without one
-const NO_REASONING = "none";
+// The reasoning effort a version records for a model run without one
+const NO_REASONING = "default";
 
 /* How an evaluation and its measures read on the scoreboard. */
 

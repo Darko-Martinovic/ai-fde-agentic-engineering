@@ -1,7 +1,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { EvaluationPage } from "./EvaluationPage";
-import { MODELS, evaluation, mockFetch } from "../testing";
+import { CONFIGURATION, evaluation, mockFetch } from "../testing";
 
 afterEach(() => {
   cleanup();
@@ -19,7 +19,7 @@ function rowOf(claimId: string) {
 it("shows each copy beside the handler's decision, the misses marked", async () => {
   mockFetch({
     "GET /api/evaluations/4": evaluation(),
-    "GET /api/models": MODELS,
+    "GET /api/configuration": CONFIGURATION,
   });
   render(<EvaluationPage runId={4} />);
   expect(
@@ -51,7 +51,7 @@ it("shows each copy beside the handler's decision, the misses marked", async () 
 });
 
 it("shows when the evaluation can't load", async () => {
-  mockFetch({ "GET /api/models": MODELS });
+  mockFetch({ "GET /api/configuration": CONFIGURATION });
   render(<EvaluationPage runId={9} />);
   expect(
     await screen.findByText("No route for GET /api/evaluations/9"),

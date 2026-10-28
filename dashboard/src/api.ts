@@ -2,7 +2,6 @@ import type {
   Evaluation,
   EvaluationSet,
   Insights,
-  ModelChoice,
   Run,
   Started,
   Stopping,
@@ -22,8 +21,11 @@ import type {
 
 import { accessToken } from "./auth";
 
+import type { Configuration, VersionDetails } from "./improvementTypes";
+
 export type * from "./agentTypes";
 export * from "./claimTypes";
+export type * from "./improvementTypes";
 
 export class ApiError extends Error {
   constructor(
@@ -91,8 +93,6 @@ export const api = {
     getJson<HandlerName[]>("/api/handlers", signal),
   getSignedInHandler: (signal?: AbortSignal) =>
     getJson<Handler>("/api/me", signal),
-  getInstructions: (signal?: AbortSignal) =>
-    getText("/api/instructions", signal),
   getPolicyWording: (signal?: AbortSignal) =>
     getText("/api/policy-wording", signal),
   getLatestDispatch: (signal?: AbortSignal) =>
@@ -101,16 +101,20 @@ export const api = {
     getJson<Insights>("/api/insights", signal),
   health: (signal?: AbortSignal) =>
     getJson<{ status: string }>("/api/health", signal),
-  listModels: (signal?: AbortSignal) =>
-    getJson<ModelChoice[]>("/api/models", signal),
-  startDispatch: (agents: number, model: string) =>
-    post<Started>("/api/dispatches", { agents, model }),
+  getConfiguration: (signal?: AbortSignal) =>
+    getJson<Configuration>("/api/configuration", signal),
+  getVersionDetails: (number: number, signal?: AbortSignal) =>
+    getJson<VersionDetails>(
+      `/api/configuration/versions/${String(number)}`,
+      signal,
+    ),
+  startDispatch: (agents: number) =>
+    post<Started>("/api/dispatches", { agents }),
   stopRun: () => post<Stopping>("/api/runs/stop-request"),
   startEvaluation: (start: {
     evaluation_set: EvaluationSet;
     tiny: boolean;
     agents: number;
-    model: string;
   }) => post<Started>("/api/evaluations", start),
   listEvaluations: (signal?: AbortSignal) =>
     getJson<Evaluation[]>("/api/evaluations", signal),

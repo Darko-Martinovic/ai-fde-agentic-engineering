@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { api } from "../api";
-import { useAction, useModelChoice } from "../hooks";
-import { AgentsChoice, ModelChoiceField } from "./RunChoices";
+import { useAction } from "../hooks";
+import { AgentsChoice } from "./RunChoices";
 import { FIRST_AGENTS } from "../runs";
 
-/** Start a dispatch of the queue with N claim agents at once on a model, or
- *  stop the one running: it starts no more claims, and those working finish. */
+/** Start a dispatch of the queue with N claim agents at once, on the current
+ *  version of the claim agent's configuration, or stop the one running: it
+ *  starts no more claims, and those working finish. */
 export function DispatchForm({
   running,
   onChange,
 }: Readonly<{ running: boolean; onChange: () => void }>) {
   const [agents, setAgents] = useState(FIRST_AGENTS);
-  const { models, model, error: modelsError, pick } = useModelChoice();
   const { busy, error, run } = useAction(onChange);
   const [stopping, setStopping] = useState(false);
   if (stopping && !running) setStopping(false);
@@ -22,21 +22,15 @@ export function DispatchForm({
       aria-label="Start a dispatch"
       onSubmit={(event) => {
         event.preventDefault();
-        run(() => api.startDispatch(agents, model));
+        run(() => api.startDispatch(agents));
       }}
     >
       <AgentsChoice value={agents} onChange={setAgents} />
-      <ModelChoiceField
-        models={models}
-        value={model}
-        error={modelsError}
-        onChange={pick}
-      />
       <div className="run-form__actions">
         <button
           type="submit"
           className="button button--primary"
-          disabled={busy || running || model === ""}
+          disabled={busy || running}
         >
           Start a dispatch
         </button>

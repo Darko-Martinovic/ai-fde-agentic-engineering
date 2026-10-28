@@ -1,4 +1,3 @@
-import type { ModelChoice } from "../api";
 import { MAX_AGENTS } from "../runs";
 
 const AGENT_COUNTS = Array.from({ length: MAX_AGENTS }, (_, n) => n + 1);
@@ -23,40 +22,6 @@ export function AgentsChoice({
           </option>
         ))}
       </select>
-    </label>
-  );
-}
-
-/** The model a run works on, from settings/models.toml, MODEL_NAME marked. */
-export function ModelChoiceField({
-  models,
-  value,
-  error,
-  onChange,
-}: Readonly<{
-  models: ModelChoice[];
-  value: string;
-  error: string | null;
-  onChange: (spec: string) => void;
-}>) {
-  return (
-    <label className="field">
-      <span>Model</span>
-      <select
-        value={value}
-        onChange={(event) => {
-          onChange(event.target.value);
-        }}
-      >
-        {models.map((model) => (
-          <option key={model.spec} value={model.spec}>
-            {model.default ? `${model.label} (default)` : model.label}
-          </option>
-        ))}
-      </select>
-      {error && (
-        <span className="form-error">Couldn't load the models: {error}</span>
-      )}
     </label>
   );
 }

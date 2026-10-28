@@ -25,23 +25,11 @@ from sqlalchemy import (
 from sqlalchemy.pool import NullPool
 from sqlalchemy.schema import CreateSchema
 
+# The tables for improving the claim agent are part of the same schema
+from backend import db_improvement  # noqa: F401
 from backend.config import database_path
+from backend.schema import counter, metadata, text_column
 from settings import optional_setting, setting
-
-metadata = MetaData()
-
-
-def text_column(
-    name: str, *, nullable: bool = False, primary_key: bool = False
-) -> Column:
-    """A column of text, required unless it's nullable."""
-    return Column(name, Text, nullable=nullable, primary_key=primary_key)
-
-
-def counter(name: str) -> Column:
-    """A key that counts up, as each row is added."""
-    return Column(name, Integer, primary_key=True, autoincrement=True)
-
 
 # Records seeded from data/ keep their JSON as text, as they came
 claims = Table(
@@ -132,7 +120,9 @@ decisions = Table(
 )
 # A dispatch or an evaluation: N claim agents at once on the claims of the
 # queue, or on copies of a labelled set's claims (all of them, or its tiny
-# ones), on a model. Its summary, built from the records when it finishes, is
+# ones), on a version of the claim agent's configuration, whose model and
+# reasoning effort it keeps too, and an evaluation in a round of improvement
+# names its round. Its summary, built from the records when it finishes, is
 # kept as JSON.
 runs = Table(
     "runs",
@@ -140,8 +130,10 @@ runs = Table(
     counter("run_id"),
     text_column("kind"),
     Column("agents", Integer, nullable=False),
+    Column("version", Integer, nullable=False),
     text_column("model"),
     text_column("reasoning_effort"),
+    Column("round_id", Integer, nullable=True),
     text_column("evaluation_set", nullable=True),
     Column("tiny", Boolean, nullable=True),
     text_column("status"),
@@ -268,7 +260,9 @@ def engine_for(url: str) -> Engine:
 
 
 def has_tables(conn: Connection) -> bool:
-    return inspect(conn).has_table(claims.name)
+    """Whether every table is there, as it isn't before a build's first seed."""
+    found = inspect(conn)
+    return all(found.has_table(name) for name in metadata.tables)
 
 
 def create_tables(conn: Connection) -> None:

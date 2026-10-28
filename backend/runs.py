@@ -11,7 +11,6 @@ from backend.api import Db, found, now
 from backend.run_models import (
     DISPATCH,
     DispatchIn,
-    DispatchStart,
     FinishIn,
     Run,
     RunClaimsIn,
@@ -21,7 +20,7 @@ from backend.run_models import (
 )
 from backend.run_views import load_run, require_running, run_claims, summary
 from backend.signed_in import signed_in
-from backend.store import claims, runs
+from backend.store import claims, runs, versions
 
 router = APIRouter(prefix="/api")
 
@@ -32,11 +31,9 @@ router = APIRouter(prefix="/api")
     status_code=202,
     dependencies=[Depends(signed_in)],
 )
-def start_dispatch(dispatch: DispatchStart) -> Started:
+def start_dispatch(dispatch: DispatchIn) -> Started:
     """Ask the agent's service to start a dispatch with N claim agents at once."""
-    return Started.model_validate(
-        agent_service.start_dispatch(dispatch.agents, dispatch.model)
-    )
+    return Started.model_validate(agent_service.start_dispatch(dispatch.agents))
 
 
 @router.post(
@@ -52,8 +49,12 @@ def stop_run() -> Stopping:
 
 @router.post("/runs/dispatches", operation_id="create_dispatch")
 def create_dispatch(dispatch: DispatchIn, conn: Db) -> Run:
-    """Record a new dispatch, running, with N claim agents at once on a model."""
-    started = dispatch.model_dump() | {"kind": DISPATCH, "started_at": now()}
+    """Record a new dispatch, running, with N claim agents on the current version."""
+    started = (
+        dispatch.model_dump()
+        | versions.run_on(conn, versions.current(conn))
+        | {"kind": DISPATCH, "started_at": now()}
+    )
     return load_run(conn, runs.add(conn, started))
 
 

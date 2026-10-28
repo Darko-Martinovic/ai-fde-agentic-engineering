@@ -3,6 +3,7 @@ backend.seed` resets the database the settings name, Supabase when .env has
 DATABASE_URL."""
 
 import json
+from datetime import UTC, datetime
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -10,9 +11,14 @@ from typing import Any
 from sqlalchemy import Connection, Engine
 
 from backend import db
-from backend.store import claims, evaluations, records
+from backend.free_model import free_model
+from backend.store import claims, evaluations, platform_settings, records, versions
+from backend.version_models import CLAIMS_TEAM, NO_EFFORT, Verdict
 
 DATA_DIR = Path(__file__).parent.parent / "data"
+INSTRUCTIONS = Path(__file__).parent / "instructions"
+# The models the claim agent may use, and the one version 1 runs on
+MODELS = "models.json"
 
 # The files the backend serves its records from. data/security/ stays out of
 # reach, and of data/evals/ only the answer key below is read, by seeding alone.
@@ -25,6 +31,7 @@ SEED_FILES = (
     "company.json",
     "policy_wording.md",
     "claims_manual.md",
+    MODELS,
 )
 # The answer key, which only seeding reads, into tables no claim operation reads:
 # the held-out claims, and the handlers' decisions on each labelled set
@@ -55,9 +62,48 @@ def seed_answer_key(conn: Connection) -> str:
     return f"{len(held_out)} held-out claims and {decided} handlers' decisions"
 
 
+def models_allowed() -> list[dict[str, Any]]:
+    """The models the claim agent may use: those in data/models.json, on their
+    provider, or the free model in MODEL_NAME alone."""
+    free = free_model()
+    if free:
+        return [free]
+    listed = read(MODELS)
+    return [model | {"provider": listed["provider"]} for model in listed["models"]]
+
+
+def first_model() -> dict[str, str]:
+    """The model version 1 runs on: the one data/models.json names for it, or
+    the free model at no reasoning effort of its own."""
+    free = free_model()
+    if free:
+        return {"model": free["model"], "reasoning_effort": NO_EFFORT}
+    return read(MODELS)["first_version"]
+
+
+def seed_configuration(conn: Connection, now: str) -> None:
+    """Store the models allowed and version 1 of the claim agent's
+    configuration, kept: today's instructions on its first model."""
+    platform_settings.add_models(conn, models_allowed())
+    versions.add(
+        conn,
+        first_model()
+        | {
+            "instructions": (INSTRUCTIONS / "claim.md").read_text(encoding="utf-8"),
+            "based_on": None,
+            "reason": "The claim agent as it was before versions.",
+            "proposed_by": CLAIMS_TEAM,
+            "created_at": now,
+            "verdict": Verdict.KEPT,
+            "verdict_reason": "The first version.",
+            "decided_at": now,
+        },
+    )
+
+
 def seed(conn: Connection) -> str:
-    """Load every record, with each claim waiting in the queue, and say what
-    the answer key holds."""
+    """Load every record, with each claim waiting in the queue, and version 1
+    of the claim agent's configuration, and say what the answer key holds."""
     claims.insert(conn, read("claims.json"))
     records.insert(
         conn,
@@ -71,6 +117,7 @@ def seed(conn: Connection) -> str:
             "claims_manual": read("claims_manual.md"),
         },
     )
+    seed_configuration(conn, datetime.now(UTC).isoformat())
     return seed_answer_key(conn)
 
 
@@ -100,4 +147,7 @@ def reset() -> str:
 
 if __name__ == "__main__":
     answer_key = reset()
-    print(f"Reset {db.where(db.engine())}, with {answer_key} for evaluations")
+    print(
+        f"Reset {db.where(db.engine())}, with {answer_key} for evaluations,"
+        " and version 1 of the configuration"
+    )

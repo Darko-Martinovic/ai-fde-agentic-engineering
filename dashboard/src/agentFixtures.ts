@@ -2,25 +2,11 @@ import type {
   Evaluation,
   EvaluationClaim,
   Insights,
-  ModelChoice,
   Run,
   RunClaim,
 } from "./api";
 
-/* Test fixtures for the agent: its models, dispatches and insights. */
-
-export const MODELS: ModelChoice[] = [
-  {
-    spec: "openrouter:openai/gpt-6-luna",
-    label: "GPT-6 Luna",
-    default: true,
-  },
-  {
-    spec: "anthropic:claude-haiku-5-5",
-    label: "Claude Haiku 5.5",
-    default: false,
-  },
-];
+/* Test fixtures for the agent: its dispatches and insights. */
 
 /** A claim in a dispatch: CLM-1001, decided and paid $420.00, by default. */
 export function runClaim(overrides: Partial<RunClaim> = {}): RunClaim {
@@ -48,7 +34,8 @@ export function run(overrides: Partial<Run> = {}): Run {
     run_id: 7,
     kind: "dispatch",
     agents: 3,
-    model: "openrouter:openai/gpt-6-luna",
+    version: 1,
+    model: "openai/gpt-6-luna",
     reasoning_effort: "low",
     evaluation_set: null,
     tiny: null,

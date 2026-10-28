@@ -4,10 +4,11 @@ import { useRoute } from "./hooks";
 import { ClaimPage } from "./pages/ClaimPage";
 import { EvaluationPage } from "./pages/EvaluationPage";
 import { InsightsPage } from "./pages/Insights";
-import { InstructionsPage } from "./pages/Instructions";
+import { ConfigurationPage } from "./pages/ConfigurationPage";
 import { QueuePage } from "./pages/Queue";
 import { ScoreboardPage } from "./pages/Scoreboard";
 import { SignInPage } from "./pages/SignInPage";
+import { VersionPage } from "./pages/VersionPage";
 import type { Route } from "./paths";
 
 type HandlerRoute = Exclude<Route, { page: "sign-in" }>;
@@ -16,8 +17,10 @@ function Page({ route }: Readonly<{ route: HandlerRoute }>) {
   switch (route.page) {
     case "claim":
       return <ClaimPage key={route.claimId} claimId={route.claimId} />;
-    case "instructions":
-      return <InstructionsPage />;
+    case "configuration":
+      return <ConfigurationPage />;
+    case "version":
+      return <VersionPage key={route.number} number={route.number} />;
     case "insights":
       return <InsightsPage />;
     case "queue":

@@ -131,7 +131,7 @@ def test_a_dispatchs_claims_are_traces_of_their_own_tagged_with_it(
     backend, memory_saver, traces
 ):
     set_status("decided", *DECIDED_ELSEWHERE)
-    run = api.create_dispatch(2, FREE.spec, FREE.reasoning_effort)
+    run = api.create_dispatch(2)
     llm = ByClaim(
         messages=iter([]),
         scripts={
@@ -140,7 +140,7 @@ def test_a_dispatchs_claims_are_traces_of_their_own_tagged_with_it(
         },
     )
     work = partial(
-        harness.work_in_run, model=FREE, new_saver=lambda: memory_saver, llm=llm
+        harness.work_in_run, version=FREE, new_saver=lambda: memory_saver, llm=llm
     )
     dispatcher.work_run(run, work, (), threading.Event())
     spans = traces()

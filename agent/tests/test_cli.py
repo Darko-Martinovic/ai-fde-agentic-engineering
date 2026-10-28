@@ -5,6 +5,7 @@ import agent.__main__ as cli
 from agent import harness
 from agent.tests.stub import StubModel, decide, stub, tool_call
 from backend.tests.direct_changes import set_status
+from backend.tests.new_versions import GEMINI, add_version
 from backend.tests.usage_rows import model_calls, work_times
 
 
@@ -14,7 +15,7 @@ def models(monkeypatch, *replies):
     built = []
 
     def model(chosen):
-        built.append(chosen.spec)
+        built.append((chosen.name, chosen.reasoning_effort))
         return stub(*replies)
 
     monkeypatch.setattr(harness, "chat_model", model)
@@ -32,16 +33,14 @@ def test_one_claim_is_worked_outside_any_run(backend, monkeypatch, capsys):
     assert backend.get("/api/dispatches/latest").json() is None
 
 
-def test_a_model_from_models_toml(backend, monkeypatch):
-    built = models(monkeypatch, decide("decline", 0))
-    cli.main(["CLM-1005", "--model", "ollama:qwen3.5:9b"])
-    assert built == ["ollama:qwen3.5:9b"]
-
-
-def test_the_default_model_is_model_name(backend, monkeypatch):
+def test_the_claim_is_worked_as_the_current_version(backend, monkeypatch):
     built = models(monkeypatch, decide("decline", 0))
     cli.main(["CLM-1005"])
-    assert built == ["openrouter:openai/gpt-6-luna"]
+    add_version("# Version two")
+    models(monkeypatch, decide("decline", 0))
+    cli.main(["CLM-1006"])
+    assert built == [("openai/gpt-6-luna", "low")]
+    assert [c["model"] for c in model_calls("CLM-1006")] == [GEMINI]
 
 
 def test_a_claim_in_progress_is_carried_on(backend, monkeypatch, capsys):

@@ -1,7 +1,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { DispatchPanel } from "./DispatchPanel";
-import { MODELS, mockFetch, run, runClaim } from "../testing";
+import { CONFIGURATION, mockFetch, run, runClaim } from "../testing";
 
 afterEach(() => {
   cleanup();
@@ -13,13 +13,19 @@ function panel() {
 }
 
 it("says when there has been no dispatch", async () => {
-  mockFetch({ "GET /api/dispatches/latest": null, "GET /api/models": MODELS });
+  mockFetch({
+    "GET /api/dispatches/latest": null,
+    "GET /api/configuration": CONFIGURATION,
+  });
   render(<DispatchPanel />);
   expect(await screen.findByText("No dispatch yet.")).toBeDefined();
 });
 
 it("follows a running dispatch, claim by claim", async () => {
-  mockFetch({ "GET /api/dispatches/latest": run(), "GET /api/models": MODELS });
+  mockFetch({
+    "GET /api/dispatches/latest": run(),
+    "GET /api/configuration": CONFIGURATION,
+  });
   render(<DispatchPanel />);
   expect(await screen.findByText("Running")).toBeDefined();
   expect(await within(panel()).findByText("GPT-6 Luna")).toBeDefined();
@@ -54,7 +60,7 @@ it("shows a finished dispatch's time and what it left", async () => {
   });
   mockFetch({
     "GET /api/dispatches/latest": finished,
-    "GET /api/models": MODELS,
+    "GET /api/configuration": CONFIGURATION,
   });
   render(<DispatchPanel />);
   expect(await screen.findByText("Finished")).toBeDefined();
@@ -75,7 +81,7 @@ it("shows a finished dispatch's time and what it left", async () => {
 it("shows a stopped dispatch", async () => {
   mockFetch({
     "GET /api/dispatches/latest": run({ status: "stopped", claims: [] }),
-    "GET /api/models": MODELS,
+    "GET /api/configuration": CONFIGURATION,
   });
   render(<DispatchPanel />);
   expect(await screen.findByText("Stopped")).toBeDefined();

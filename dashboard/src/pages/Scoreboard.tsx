@@ -2,7 +2,7 @@ import { useState } from "react";
 import { api, type Evaluation, type EvaluationSet } from "../api";
 import { ErrorNote, Loading, Panel } from "../components/elements";
 import { when } from "../format";
-import { useAction, useModelChoice, useModelLabels, usePoll } from "../hooks";
+import { useAction, useModelLabels, usePoll } from "../hooks";
 import {
   measureCells,
   modelWithEffort,
@@ -10,20 +10,19 @@ import {
   whichClaims,
 } from "../evaluations";
 import { paths } from "../paths";
-import { AgentsChoice, ModelChoiceField } from "../components/RunChoices";
+import { AgentsChoice } from "../components/RunChoices";
 import { RunBadge } from "../components/RunBadge";
 import { FIRST_AGENTS } from "../runs";
 
 const SETS = Object.keys(SET_LABELS) as EvaluationSet[];
 
 /** Start an evaluation of a labelled set, whole or its five tiny claims, with
- *  N claim agents at once on a model. */
+ *  N claim agents at once, on the current version of the configuration. */
 function EvaluationForm({ onChange }: Readonly<{ onChange: () => void }>) {
   const [evaluationSet, setEvaluationSet] =
     useState<EvaluationSet>("evaluation");
   const [tiny, setTiny] = useState(false);
   const [agents, setAgents] = useState(FIRST_AGENTS);
-  const { models, model, error: modelsError, pick } = useModelChoice();
   const { busy, error, run } = useAction(onChange);
 
   return (
@@ -37,7 +36,6 @@ function EvaluationForm({ onChange }: Readonly<{ onChange: () => void }>) {
             evaluation_set: evaluationSet,
             tiny,
             agents,
-            model,
           }),
         );
       }}
@@ -70,17 +68,11 @@ function EvaluationForm({ onChange }: Readonly<{ onChange: () => void }>) {
         </select>
       </label>
       <AgentsChoice value={agents} onChange={setAgents} />
-      <ModelChoiceField
-        models={models}
-        value={model}
-        error={modelsError}
-        onChange={pick}
-      />
       <div className="run-form__actions">
         <button
           type="submit"
           className="button button--primary"
-          disabled={busy || model === ""}
+          disabled={busy}
         >
           Start an evaluation
         </button>

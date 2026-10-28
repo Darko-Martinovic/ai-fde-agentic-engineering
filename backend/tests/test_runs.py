@@ -22,12 +22,13 @@ def test_no_dispatch_yet(client):
     assert client.get("/api/dispatches/latest").json() is None
 
 
-def test_a_dispatch_starts_running_with_its_n_and_model(client):
-    run = create(client, agents=7, model="openrouter:openai/gpt-6-luna").json()
+def test_a_dispatch_starts_running_on_the_current_version(client):
+    run = create(client, agents=7).json()
     assert (run["kind"], run["status"], run["agents"]) == ("dispatch", "running", 7)
-    assert (run["model"], run["reasoning_effort"]) == (
-        "openrouter:openai/gpt-6-luna",
-        "none",
+    assert (run["version"], run["model"], run["reasoning_effort"]) == (
+        1,
+        "openai/gpt-6-luna",
+        "low",
     )
     assert (run["claims"], run["summary"], run["seconds"]) == ([], None, None)
     assert run["usage"] == {

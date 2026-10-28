@@ -1551,3 +1551,157 @@ main {
   background: var(--panel-soft);
   color: var(--ink-soft);
 }
+
+/* Page headers */
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.page-header p {
+  margin: 4px 0 0;
+  max-width: 72ch;
+  color: var(--ink-soft);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.facts > div {
+  display: contents;
+}
+
+.facts--row {
+  grid-template-columns: repeat(3, max-content 1fr);
+}
+
+/* The configuration's versions */
+
+.badge--version-current {
+  --tone: var(--sea-green);
+  --tone-ink: var(--green-ink);
+}
+
+.badge--version-kept {
+  --tone: var(--cerulean);
+  --tone-ink: var(--cerulean-ink);
+}
+
+.badge--version-under_test {
+  --tone: var(--marigold);
+  --tone-ink: var(--marigold-ink);
+}
+
+.badge--version-rolled_back {
+  --tone: var(--coral);
+  --tone-ink: var(--coral-ink);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.data-table th {
+  padding: 8px 12px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.data-table td {
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.data-table .numeric {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.added {
+  color: var(--green-ink);
+}
+
+.removed {
+  color: var(--raspberry-ink);
+}
+
+.instructions summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* A diff of a version or a recipe */
+
+.diff {
+  display: grid;
+  gap: 12px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.diff__hunk {
+  overflow-x: auto;
+  border-radius: var(--radius-small);
+  background: var(--panel-soft);
+}
+
+.diff__line {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  padding: 0 12px 0 0;
+}
+
+.diff__mark {
+  text-align: center;
+  color: var(--ink-soft);
+  user-select: none;
+}
+
+.diff__text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diff__line--added {
+  background: color-mix(in srgb, var(--sea-green) 18%, var(--panel));
+  color: var(--green-ink);
+}
+
+.diff__line--removed {
+  background: color-mix(in srgb, var(--raspberry) 14%, var(--panel));
+  color: var(--raspberry-ink);
+}
+
+.diff__line--added .diff__mark,
+.diff__line--removed .diff__mark {
+  color: inherit;
+  font-weight: 700;
+}
+
+.data-table th.numeric {
+  font-family: var(--sans);
+}

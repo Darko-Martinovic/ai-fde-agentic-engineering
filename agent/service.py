@@ -14,10 +14,10 @@ from typing import Annotated, Any, Literal
 import uvicorn
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
-from agent import api, checkpoints, dispatcher, harness
-from agent.config import Model, current_model, model
+from agent import api, checkpoints, dispatcher, harness, versions
+from agent.connection import Refused
 from agent.reports import IN_PROGRESS
 from settings import setting
 
@@ -63,10 +63,10 @@ def in_background(work: Callable[..., None], *args: Any) -> None:
 
 
 def carrier(new_saver: Annotated[Savers, Depends(savers)]) -> Carrier:
-    """Carry claims on on the default model, outside any run, so a run's costs
+    """Carry claims on as the current version, outside any run, so a run's costs
     are its own. A signed-off claim is only paid, so its model makes no call."""
     return lambda claim_id: harness.carry_on(
-        claim_id, None, current_model(), new_saver()
+        claim_id, None, harness.current_version(), new_saver()
     )
 
 
@@ -76,13 +76,6 @@ class Accepted(BaseModel):
 
 class DispatchIn(BaseModel):
     agents: int = Field(ge=1, le=MAX_AGENTS)
-    model: str
-
-    @field_validator("model")
-    @classmethod
-    def model_is_allowed(cls, spec: str) -> str:
-        """Only a model in models.toml runs."""
-        return model(spec).spec
 
 
 class EvaluationIn(DispatchIn):
@@ -92,7 +85,6 @@ class EvaluationIn(DispatchIn):
 
 class Started(BaseModel):
     agents: int
-    model: str
 
 
 class Stopping(BaseModel):
@@ -112,7 +104,7 @@ def start_dispatch(
 ) -> Started:
     """Start a dispatch of the queue with up to N claim agents at once."""
     begin(dispatch, new_saver)
-    return Started(agents=dispatch.agents, model=dispatch.model)
+    return Started(agents=dispatch.agents)
 
 
 @router.post("/evaluations", operation_id="start_evaluation", status_code=202)
@@ -122,7 +114,7 @@ def start_evaluation(
 ) -> Started:
     """Start an evaluation of a labelled set with up to N claim agents at once."""
     begin(evaluation, new_saver)
-    return Started(agents=evaluation.agents, model=evaluation.model)
+    return Started(agents=evaluation.agents)
 
 
 def begin(start: DispatchIn, new_saver: Savers) -> None:
@@ -133,28 +125,24 @@ def begin(start: DispatchIn, new_saver: Savers) -> None:
     in_background(work_a_run, start, new_saver)
 
 
-def create(start: DispatchIn, chosen: Model) -> dict[str, Any]:
-    """Record the run through the backend: an evaluation, with its copies, or a
-    dispatch."""
+def create(start: DispatchIn) -> dict[str, Any]:
+    """Record the run through the backend, on the current version: an
+    evaluation, with its copies, or a dispatch."""
     if isinstance(start, EvaluationIn):
-        return api.create_evaluation(
-            start.evaluation_set,
-            start.tiny,
-            start.agents,
-            chosen.spec,
-            chosen.reasoning_effort,
-        )
-    return api.create_dispatch(start.agents, chosen.spec, chosen.reasoning_effort)
+        return api.create_evaluation(start.evaluation_set, start.tiny, start.agents)
+    return api.create_dispatch(start.agents)
 
 
 def work_a_run(start: DispatchIn, new_saver: Savers) -> None:
-    """Create the run through the backend and work it; the dispatcher prints
-    each claim's report as it comes. A dispatcher that fails marks the run
-    stopped; either way the next start is free to go."""
+    """Create the run through the backend and work it with claim agents built
+    from the version it records; the dispatcher prints each claim's report as
+    it comes. A dispatcher that fails marks the run stopped; either way the
+    next start is free to go."""
     try:
-        chosen = model(start.model)
-        work = partial(harness.work_in_run, model=chosen, new_saver=new_saver)
-        dispatcher.work_run(create(start, chosen), work, RESUMING, STOP)
+        run = create(start)
+        version = versions.version(api.get_version(run["version"]))
+        work = partial(harness.work_in_run, version=version, new_saver=new_saver)
+        dispatcher.work_run(run, work, RESUMING, STOP)
     except Exception:
         log.exception("The run stopped")
         api.stop_runs()
@@ -179,7 +167,7 @@ def resume_claim(
     """Pick a claim back up after a handler's review."""
     try:
         claim = api.get_claim(claim_id)
-    except api.Refused as refused:
+    except Refused as refused:
         raise HTTPException(refused.status, refused.detail) from refused
     if claim["status"] != IN_PROGRESS:
         raise HTTPException(

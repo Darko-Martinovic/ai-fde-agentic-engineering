@@ -1,0 +1,30 @@
+{
+  "provider": "openrouter",
+  "first_version": { "model": "openai/gpt-6-luna", "reasoning_effort": "low" },
+  "models": [
+    {
+      "model": "openai/gpt-6-luna",
+      "label": "GPT-6 Luna",
+      "reasoning_efforts": ["none", "low", "medium"],
+      "input_price": 0.1,
+      "output_price": 0.5,
+      "options": { "max_tokens": 16000 }
+    },
+    {
+      "model": "google/gemini-3.5-flash-lite",
+      "label": "Gemini 3.5 Flash Lite",
+      "reasoning_efforts": ["minimal", "low"],
+      "input_price": 0.3,
+      "output_price": 2.5,
+      "options": {}
+    },
+    {
+      "model": "deepseek/deepseek-v4.1-flash",
+      "label": "DeepSeek V4.1 Flash",
+      "reasoning_efforts": ["low"],
+      "input_price": 0.3,
+      "output_price": 1.2,
+      "options": {}
+    }
+  ]
+}

@@ -50,11 +50,7 @@ test("the queue page follows a dispatch as it happens", async ({
     request,
     "post",
     "/api/runs/dispatches",
-    {
-      agents: 3,
-      model: "e2e",
-      reasoning_effort: "none",
-    },
+    { agents: 3 },
   );
   await send(request, "put", `/api/runs/${String(runId)}/claims`, {
     claim_ids: ["CLM-1013", "CLM-1014"],
@@ -102,25 +98,17 @@ test("the queue page starts a dispatch and stops one", async ({
   await page.goto("/");
   const form = page.getByRole("form", { name: "Start a dispatch" });
   await form.getByLabel("Claim agents at once").selectOption("7");
-  await expect(form.getByLabel("Model")).toHaveValue(
-    "openrouter:openai/gpt-6-luna",
-  );
+  await expect(form.getByLabel("Model")).toHaveCount(0);
   await form.getByRole("button", { name: "Start a dispatch" }).click();
   await expect
     .poll(() => started(request))
-    .toContainEqual({
-      dispatch: { agents: 7, model: "openrouter:openai/gpt-6-luna" },
-    });
+    .toContainEqual({ dispatch: { agents: 7 } });
 
   const { run_id: runId } = await send(
     request,
     "post",
     "/api/runs/dispatches",
-    {
-      agents: 7,
-      model: "e2e",
-      reasoning_effort: "none",
-    },
+    { agents: 7 },
   );
   await form.getByRole("button", { name: "Stop" }).click();
   await expect.poll(() => started(request)).toContainEqual({ stop: {} });

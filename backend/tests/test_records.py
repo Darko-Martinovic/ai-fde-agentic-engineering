@@ -66,10 +66,6 @@ def test_get_policy_wording(client):
     assert response.text.startswith("# UnderCover Travel Insurance: Policy Wording")
 
 
-def test_get_instructions(client):
-    assert client.get("/api/instructions").text.startswith("# UnderCover claim agent")
-
-
 def test_list_handlers(client):
     handlers = client.get("/api/handlers").json()
     assert [h["handler_id"] for h in handlers] == ["HND-01", "HND-02", "HND-03"]
@@ -88,7 +84,10 @@ def test_operations_are_documented(client):
         "get_customer",
         "get_signed_in_handler",
         "get_policy_wording",
-        "get_instructions",
+        "get_current_version",
+        "get_version",
+        "get_configuration",
+        "get_version_details",
         "list_sections",
         "search_documents",
         "read_section",
@@ -114,7 +113,6 @@ def test_operations_are_documented(client):
         "finish_run",
         "stop_runs",
         "get_latest_dispatch",
-        "list_models",
         "get_insights",
     }
     assert all(op["summary"] and op["description"] for op in operations)

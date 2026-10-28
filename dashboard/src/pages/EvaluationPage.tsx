@@ -83,6 +83,14 @@ function EvaluationFacts({ evaluation }: Readonly<{ evaluation: Evaluation }>) {
         <dd>{evaluation.agents}</dd>
       </div>
       <div>
+        <dt>Version</dt>
+        <dd>
+          <a href={paths.version(evaluation.version)}>
+            {String(evaluation.version)}
+          </a>
+        </dd>
+      </div>
+      <div>
         <dt>Model</dt>
         <dd>{modelWithEffort(label, evaluation.reasoning_effort)}</dd>
       </div>

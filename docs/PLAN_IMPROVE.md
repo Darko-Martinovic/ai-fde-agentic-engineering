@@ -252,20 +252,22 @@ Built on 2026-10-28. `NotAllowed` starts here and `PageHeader` with the Configur
 
 `versions` and version 1, `data/models.json` and `models_allowed`, `free_model.py`, the four configuration operations, `diffs.py`, the version on every run, the claim agents built from the run's version, `connection.py`. `get_instructions`, `list_models`, `settings/models.toml`, `agent/config.py`, the model picker and `bench/` go. On the dashboard, the Configuration and version pages replace Instructions, with `DiffView`.
 
-- [ ] Seeding reports "and version 1 of the configuration"; version 1 is `claim.md`, `openai/gpt-6-luna`, `low`; with `MODEL_NAME=openrouter:openrouter/free` it is that model at `default`, the only model allowed, priced 0
-- [ ] pytest: `get_current_version` and `get_version` return exactly number, instructions, model and reasoning effort; an unknown version 404
-- [ ] pytest, `diffs.py`: one line changed gives one removed and one added line with two of context; two far apart give two hunks; the same text none
-- [ ] pytest: with version 2 kept and 3 under test (made by a test helper), the current version is 2, `get_configuration` lists 3, 2, 1 with their statuses and lines added and removed, and `get_version_details` for 3 has its diff from 2
-- [ ] pytest: `create_dispatch` and `create_evaluation` record the current version, shown by `get_latest_dispatch`, `list_evaluations` and `get_evaluation`
-- [ ] Stub model test, through the service: with version 2 current on another model, a dispatch's claim agents get version 2's instructions and model; the one-claim command and a resume after a sign-off use the current version
-- [ ] pytest: `default` builds a model with no reasoning effort, `medium` with medium; Luna gets `max_tokens` 16000 from `data/models.json`
-- [ ] `MODEL_NAME` is read only in `backend/free_model.py` and tests; `UNDERCOVER_API` only in `agent/connection.py`; nothing finds `get_instructions`, `list_models`, `models.toml` or `bench`
-- [ ] The test that `agent/api.py` can't read the scoreboard also covers the configuration's dashboard reads
-- [ ] vitest: the Configuration page shows the current version and the versions with status chips; a version's page shows a diff with added and removed lines marked; `#/instructions` lands on `#/configuration`; the forms no longer offer a model
-- [ ] e2e: the header's Configuration link shows version 1 as Current with its instructions
-- [ ] Postman, Supabase MCP: `versions` has one row, `models_allowed` three, `runs` has `version` and `round_id`
-- [ ] Browser: the Configuration page and version 1 in light and dark; a dispatch played out through the API shows version 1 on the dispatch panel
-- [ ] `npm run check` passes
+Built on 2026-10-28. `get_version` and `get_current_version` also give the model's provider and its build options (Luna's `max_tokens`), which the claim agent needs to build its model and which aren't scores; version 1's model is named in `data/models.json` (`first_version`), since no model id is written in code. `bench/` went in phase 1. The schema's shared parts moved to `backend/schema.py`, and a database missing any table is seeded afresh. Anthropic leaves the product: a model call's cost is what OpenRouter reports, or nothing for a local model. The student's `.env` line `MODEL_NAME=anthropic:claude-haiku-5-5` was commented out, as the decisions above said.
+
+- [x] Seeding reports "and version 1 of the configuration"; version 1 is `claim.md`, `openai/gpt-6-luna`, `low`; with `MODEL_NAME=openrouter:openrouter/free` it is that model at `default`, the only model allowed, priced 0
+- [x] pytest: `get_current_version` and `get_version` return exactly number, instructions, model and reasoning effort, with the model's provider and build options; an unknown version 404
+- [x] pytest, `diffs.py`: one line changed gives one removed and one added line with two of context; two far apart give two hunks; the same text none
+- [x] pytest: with version 2 kept and 3 under test (made by a test helper), the current version is 2, `get_configuration` lists 3, 2, 1 with their statuses and lines added and removed, and `get_version_details` for 3 has its diff from 2
+- [x] pytest: `create_dispatch` and `create_evaluation` record the current version, shown by `get_latest_dispatch`, `list_evaluations` and `get_evaluation`
+- [x] Stub model test, through the service: with version 2 current on another model, a dispatch's claim agents get version 2's instructions and model; the one-claim command and a resume after a sign-off use the current version
+- [x] pytest: `default` builds a model with no reasoning effort, `medium` with medium; Luna gets `max_tokens` 16000 from `data/models.json`
+- [x] `MODEL_NAME` is read only in `backend/free_model.py` and tests; `UNDERCOVER_API` only in `agent/connection.py`; nothing finds `get_instructions`, `list_models`, `models.toml` or `bench`
+- [x] The test that `agent/api.py` can't read the scoreboard also covers the configuration's dashboard reads
+- [x] vitest: the Configuration page shows the current version and the versions with status chips; a version's page shows a diff with added and removed lines marked; `#/instructions` lands on `#/configuration`; the forms no longer offer a model
+- [x] e2e: the header's Configuration link shows version 1 as Current with its instructions
+- [x] Postman, Supabase MCP: `versions` has one row, `models_allowed` three, `runs` has `version` and `round_id`
+- [x] Browser: the Configuration page and version 1 in light and dark; a dispatch played out through the API shows version 1 on the dispatch panel
+- [x] `npm run check` passes
 
 ## Phase 3: Settings
 

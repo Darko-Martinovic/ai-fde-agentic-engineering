@@ -12,7 +12,7 @@ from langchain_core.messages import AIMessage
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send
 
-from agent import api, dispatcher, harness
+from agent import api, connection, dispatcher, harness
 from agent.dispatcher import RETRY as REAL_RETRY  # before the tests' own
 from agent.tests.stub import FREE, ByClaim, decide, tool_call
 from backend.tests.direct_changes import set_status
@@ -41,9 +41,9 @@ def scripted(scripts, model=ByClaim):
 
 def dispatch(llm, memory_saver, agents=3, resuming=(), stop=None):
     """A new dispatch, worked with claim agents on `llm`; its report lines."""
-    run = api.create_dispatch(agents, FREE.spec, FREE.reasoning_effort)
+    run = api.create_dispatch(agents)
     work = partial(
-        harness.work_in_run, model=FREE, new_saver=lambda: memory_saver, llm=llm
+        harness.work_in_run, version=FREE, new_saver=lambda: memory_saver, llm=llm
     )
     return dispatcher.work_run(run, work, resuming, stop or threading.Event())
 
@@ -232,7 +232,7 @@ def test_a_claim_another_process_started_is_reported_and_the_rest_worked(
 
     def taken(claim_id, run_id, thread_id):
         if claim_id == "CLM-1004":
-            raise api.Refused(409, "Claim CLM-1004 has just been started")
+            raise connection.Refused(409, "Claim CLM-1004 has just been started")
         return start(claim_id, run_id, thread_id)
 
     monkeypatch.setattr(api, "start_claim", taken)
@@ -314,7 +314,7 @@ def test_the_dispatch_runs_with_its_n_as_max_concurrency(backend, monkeypatch):
 
     monkeypatch.setattr(graph, "invoke", recorded)
     settle_all_but(backend)
-    run = api.create_dispatch(7, FREE.spec, FREE.reasoning_effort)
+    run = api.create_dispatch(7)
     dispatcher.work_run(run, lambda claim_id, run_id: "", (), threading.Event())
     assert seen == [7]
 

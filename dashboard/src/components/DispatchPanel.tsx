@@ -29,6 +29,12 @@ function RunFacts({ run }: Readonly<{ run: Run }>) {
         <dd>{run.agents}</dd>
       </div>
       <div>
+        <dt>Version</dt>
+        <dd>
+          <a href={paths.version(run.version)}>{String(run.version)}</a>
+        </dd>
+      </div>
+      <div>
         <dt>Model</dt>
         <dd>{label}</dd>
       </div>
