@@ -35,8 +35,9 @@ export default defineConfig({
       env: {
         UNDERCOVER_ENV_FILES: DEFAULTS_ONLY,
         UNDERCOVER_DB: setting("E2E_DB"),
-        // Never a developer's Supabase, even if DATABASE_URL is in the shell
+        // Never a developer's Supabase or free model, even if the shell has them
         DATABASE_URL: "",
+        MODEL_NAME: "",
         BACKEND_PORT: setting("E2E_API_PORT"),
         BACKEND_RELOAD: "false",
         UNDERCOVER_API: setting("E2E_API_URL"),

@@ -3,7 +3,7 @@
 import json
 from typing import Any
 
-from sqlalchemy import Connection, insert, select
+from sqlalchemy import Connection, RowMapping, insert, select
 
 from backend.db_improvement import models_allowed
 
@@ -23,10 +23,18 @@ def add_models(conn: Connection, models: list[dict[str, Any]]) -> None:
     )
 
 
+def model(conn: Connection, name: str) -> dict[str, Any] | None:
+    """One model allowed, by its name, or None when it isn't one."""
+    found = select(models_allowed).where(models_allowed.c.model == name)
+    row = conn.execute(found).mappings().first()
+    return parsed(row) if row else None
+
+
+def parsed(row: RowMapping) -> dict[str, Any]:
+    return dict(row) | {name: json.loads(row[name]) for name in JSON_COLUMNS}
+
+
 def models(conn: Connection) -> list[dict[str, Any]]:
     """The models allowed, in order, with their efforts and options parsed."""
     found = select(models_allowed).order_by(models_allowed.c.position)
-    return [
-        dict(row) | {name: json.loads(row[name]) for name in JSON_COLUMNS}
-        for row in conn.execute(found).mappings()
-    ]
+    return [parsed(row) for row in conn.execute(found).mappings()]

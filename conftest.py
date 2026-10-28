@@ -5,6 +5,7 @@ import os
 # imports a config module.
 os.environ["UNDERCOVER_ENV_FILES"] = "settings/.env.defaults"
 os.environ.pop("DATABASE_URL", None)
+os.environ.pop("MODEL_NAME", None)
 os.environ["LANGFUSE_TRACING_ENABLED"] = "false"
 
 from contextlib import contextmanager  # noqa: E402 - after the settings above

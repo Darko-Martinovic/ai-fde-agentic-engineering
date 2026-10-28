@@ -188,16 +188,16 @@ def test_sections_read_are_recorded(backend, run, memory_saver):
     assert refused == ["Refused (404): There is no section 99 in the manual"]
 
 
-DEEPSEEK = Model("deepseek/deepseek-v4.1-flash", "openrouter", "low", {})
-QWEN = Model("qwen3.5:4b", "ollama", versions.NO_EFFORT, {})
+DEEPSEEK = Model("deepseek/deepseek-v4.1-flash", "openrouter", {})
+QWEN = Model("qwen3.5:4b", "ollama", {})
 
 
 def test_the_current_version_is_the_newest_kept(backend):
     first = harness.current_version()
-    assert (first.number, first.model.name, first.model.reasoning_effort) == (
+    assert (first.number, first.model.name, first.model.options) == (
         1,
         "openai/gpt-6-luna",
-        "low",
+        {"max_tokens": 16000, "reasoning_effort": "low"},
     )
     add_version("# Version two")
     add_version("# Version three", verdict=None, based_on=2)
@@ -223,11 +223,11 @@ def test_a_version_builds_its_model_with_its_options(backend, monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("effort", "built"), [(versions.NO_EFFORT, None), ("medium", "medium")]
+    ("options", "built"), [({}, None), ({"reasoning_effort": "medium"}, "medium")]
 )
-def test_default_builds_a_model_with_no_reasoning_effort(effort, built, monkeypatch):
+def test_a_model_is_built_with_the_versions_options(options, built, monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    llm = harness.chat_model(Model("openai/gpt-6-luna", "openrouter", effort, {}))
+    llm = harness.chat_model(Model("openai/gpt-6-luna", "openrouter", options))
     assert isinstance(llm, ChatOpenAI)
     assert llm.reasoning_effort == built
 

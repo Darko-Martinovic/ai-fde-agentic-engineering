@@ -62,7 +62,7 @@ def chat_model(model: Model) -> BaseChatModel:
         model.name,
         model_provider=INTEGRATIONS[model.provider],
         **CONNECTIONS[model.provider](),
-        **model.build_options,
+        **model.options,
     )
 
 

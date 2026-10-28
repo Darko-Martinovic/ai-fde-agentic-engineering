@@ -3,12 +3,26 @@ finds them with difflib, for the dashboard's diff of a version or a recipe:
 each changed stretch with two lines around it."""
 
 import difflib
+from itertools import islice
+from typing import Literal
 
-from backend.version_models import DiffKind, DiffLine, Hunk
+from pydantic import BaseModel
 
 CONTEXT_LINES = 2
-HEADERS = ("---", "+++")
+# unified_diff starts with the two files' names, which a diff of texts has no use for
+FILE_HEADERS = 2
+DiffKind = Literal["added", "removed", "context"]
 KINDS: dict[str, DiffKind] = {"+": "added", "-": "removed", " ": "context"}
+
+
+class DiffLine(BaseModel):
+    kind: DiffKind
+    text: str
+
+
+class Hunk(BaseModel):
+    heading: str
+    lines: list[DiffLine]
 
 
 def changes(old: str, new: str) -> list[Hunk]:
@@ -18,9 +32,7 @@ def changes(old: str, new: str) -> list[Hunk]:
     lines = difflib.unified_diff(
         old.splitlines(), new.splitlines(), lineterm="", n=CONTEXT_LINES
     )
-    for line in lines:
-        if line.startswith(HEADERS):
-            continue
+    for line in islice(lines, FILE_HEADERS, None):
         if line.startswith("@@"):
             hunks.append(Hunk(heading=line, lines=[]))
         else:

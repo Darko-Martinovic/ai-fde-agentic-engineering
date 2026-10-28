@@ -29,5 +29,13 @@ def test_two_changes_far_apart_are_two_stretches():
     assert diffs.counted([first, second], "removed") == 2
 
 
+def test_lines_that_look_like_a_diffs_headers_are_changes_too():
+    """A Markdown rule removed, and a line starting with ++ added."""
+    old = "Intro.\n---\nRules.\nEnd."
+    [hunk] = diffs.changes(old, "Intro.\nRules.\n++ Refer it.\nEnd.")
+    assert ("removed", "---") in lines(hunk)
+    assert ("added", "++ Refer it.") in lines(hunk)
+
+
 def test_the_same_text_has_no_changes():
     assert diffs.changes(TEXT, TEXT) == []

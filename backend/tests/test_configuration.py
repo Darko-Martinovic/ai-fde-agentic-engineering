@@ -14,7 +14,7 @@ def test_the_claim_agent_runs_as_the_current_version(client):
         "model": LUNA,
         "reasoning_effort": "low",
         "provider": "openrouter",
-        "options": {"max_tokens": 16000},
+        "options": {"max_tokens": 16000, "reasoning_effort": "low"},
     }
     assert client.get("/api/versions/1").json() == current
 
@@ -99,3 +99,21 @@ def test_version_one_was_proposed_by_the_claims_team(client):
         [],
     )
     assert details["status"] == "current"
+
+
+def test_a_version_runs_with_its_reasoning_effort_among_its_options(client):
+    client.get("/api/claims")
+    add_version("# Version two")
+    assert client.get("/api/versions/2").json()["options"] == {
+        "reasoning_effort": "minimal"
+    }
+
+
+def test_a_version_on_a_model_no_longer_allowed_says_so(client):
+    client.get("/api/claims")
+    add_version("# Version two", model="openai/gpt-7")
+    refused = client.get("/api/versions/current")
+    assert (refused.status_code, refused.json()["detail"]) == (
+        409,
+        "Version 2's model, openai/gpt-7, isn't one allowed",
+    )

@@ -1,5 +1,6 @@
 import shutil
 
+import pytest
 from sqlalchemy import Column, Integer, MetaData, Table, delete, func, inspect, select
 
 from backend import db, seed
@@ -79,6 +80,13 @@ def test_seeding_makes_version_1_and_the_models_allowed(client):
     assert len(others) == 2
 
 
+@pytest.mark.parametrize("spec", ["anthropic:claude-haiku-5-5", "openrouter"])
+def test_a_model_name_that_isnt_a_free_model_is_refused(monkeypatch, spec):
+    monkeypatch.setenv("MODEL_NAME", spec)
+    with pytest.raises(ValueError, match="a free model is openrouter:model"):
+        seed.reset()
+
+
 def test_on_a_free_model_it_is_version_1_and_the_only_model_allowed(
     client, monkeypatch
 ):
@@ -90,6 +98,7 @@ def test_on_a_free_model_it_is_version_1_and_the_only_model_allowed(
         "default",
         "openrouter",
     )
+    assert current["options"] == {}
     [free] = client.get("/api/configuration").json()["models_allowed"]
     assert (free["model"], free["input_price"], free["output_price"]) == (
         "openrouter/free",

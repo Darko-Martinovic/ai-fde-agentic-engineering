@@ -2,13 +2,14 @@
 runs as, which holds no scores, and for the Configuration page every version
 with what it changed from the one it was based on."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from sqlalchemy import Connection, RowMapping
 
 from backend import diffs
 from backend.api import Db, found
 from backend.store import platform_settings, versions
 from backend.version_models import (
+    NO_EFFORT,
     Configuration,
     ModelAllowed,
     Verdict,
@@ -42,8 +43,16 @@ def instructions_before(conn: Connection, row: RowMapping) -> str:
     return load(conn, row["based_on"])["instructions"]
 
 
-def summary(conn: Connection, row: RowMapping, current: int) -> Version:
-    changes = diffs.changes(instructions_before(conn, row), row["instructions"])
+def summary(
+    conn: Connection,
+    row: RowMapping,
+    current: int,
+    changes: list[diffs.Hunk] | None = None,
+) -> Version:
+    """A version with its status and the lines it changed, which are worked out
+    here unless given."""
+    if changes is None:
+        changes = diffs.changes(instructions_before(conn, row), row["instructions"])
     return Version.model_validate(
         dict(row)
         | {
@@ -59,16 +68,25 @@ def models_allowed(conn: Connection) -> list[ModelAllowed]:
 
 
 def runs_as(conn: Connection, number: int) -> VersionConfig:
-    """A version as the claim agent runs it, with how to build its model."""
+    """A version as the claim agent runs it, with how to build its model: its
+    options, with its reasoning effort unless it runs with none of its own."""
     row = load(conn, number)
-    model = next(m for m in models_allowed(conn) if m.model == row["model"])
+    model = platform_settings.model(conn, row["model"])
+    if model is None:
+        raise HTTPException(
+            409, f"Version {number}'s model, {row['model']}, isn't one allowed"
+        )
+    effort = row["reasoning_effort"]
+    options = model["options"] | (
+        {} if effort == NO_EFFORT else {"reasoning_effort": effort}
+    )
     return VersionConfig(
         number=number,
         instructions=row["instructions"],
         model=row["model"],
-        reasoning_effort=row["reasoning_effort"],
-        provider=model.provider,
-        options=model.options,
+        reasoning_effort=effort,
+        provider=model["provider"],
+        options=options,
     )
 
 
@@ -100,14 +118,14 @@ def get_version_details(number: int, conn: Db) -> VersionDetails:
     """Get one version with what it changed from the version it was based on."""
     row = load(conn, number)
     before = load(conn, row["based_on"]) if row["based_on"] else None
+    old = before["instructions"] if before else row["instructions"]
+    changes = diffs.changes(old, row["instructions"])
     return VersionDetails.model_validate(
-        summary(conn, row, versions.current(conn)).model_dump()
+        summary(conn, row, versions.current(conn), changes).model_dump()
         | {
             "instructions": row["instructions"],
             "based_on_model": before["model"] if before else None,
             "based_on_reasoning_effort": before["reasoning_effort"] if before else None,
-            "changes": diffs.changes(
-                instructions_before(conn, row), row["instructions"]
-            ),
+            "changes": changes,
         }
     )

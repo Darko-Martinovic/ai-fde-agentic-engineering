@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from sqlalchemy import Connection, RowMapping, func, insert, select, update
+from sqlalchemy import Connection, RowMapping, func, insert, select
 
 from backend.db_improvement import versions
 from backend.version_models import Verdict
@@ -28,14 +28,13 @@ def every(conn: Connection) -> list[RowMapping]:
 
 
 def current(conn: Connection) -> int:
-    """The current version: the newest kept one."""
+    """The current version: the newest kept one. Seeding keeps version 1, so
+    there always is one."""
     kept = select(func.max(versions.c.number)).where(versions.c.verdict == Verdict.KEPT)
-    return conn.execute(kept).scalar_one()
-
-
-def decide(conn: Connection, number: int, verdict: dict[str, Any]) -> None:
-    """Record a version's verdict, why and when."""
-    conn.execute(update(versions).where(versions.c.number == number).values(verdict))
+    number = conn.execute(kept).scalar_one()
+    if number is None:
+        raise RuntimeError("No version is kept: reseed with uv run -m backend.seed")
+    return number
 
 
 def run_on(conn: Connection, number: int) -> dict[str, Any]:

@@ -15,7 +15,7 @@ def models(monkeypatch, *replies):
     built = []
 
     def model(chosen):
-        built.append((chosen.name, chosen.reasoning_effort))
+        built.append((chosen.name, chosen.options.get("reasoning_effort")))
         return stub(*replies)
 
     monkeypatch.setattr(harness, "chat_model", model)
@@ -37,9 +37,10 @@ def test_the_claim_is_worked_as_the_current_version(backend, monkeypatch):
     built = models(monkeypatch, decide("decline", 0))
     cli.main(["CLM-1005"])
     add_version("# Version two")
-    models(monkeypatch, decide("decline", 0))
+    then = models(monkeypatch, decide("decline", 0))
     cli.main(["CLM-1006"])
     assert built == [("openai/gpt-6-luna", "low")]
+    assert then == [(GEMINI, "minimal")]
     assert [c["model"] for c in model_calls("CLM-1006")] == [GEMINI]
 
 

@@ -1,6 +1,5 @@
-"""The agent's connection to the backend at UNDERCOVER_API, which its two
-clients share: `api.py`, the claim agent's, and `improver_api.py`, the
-improver's. A refusal raises Refused; any other error raises httpx's."""
+"""The agent's connection to the backend at UNDERCOVER_API, which its clients
+share. A refusal raises Refused; any other error raises httpx's."""
 
 import json
 from typing import Any

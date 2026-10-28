@@ -29,7 +29,7 @@ from langgraph.prebuilt.tool_node import ToolCallRequest, ToolInvocationError
 from langgraph.runtime import Runtime
 from langgraph.types import Command, interrupt
 
-from agent import api, recording, versions
+from agent import api, recording
 from agent.connection import Refused
 from agent.reports import IN_PROGRESS
 from agent.tools import CLAIM_TOOLS, ClaimContext, read_section
@@ -37,6 +37,10 @@ from agent.versions import Model
 
 # A claim agent's model calls before it's stopped, across restarts
 MAX_MODEL_CALLS = 30
+# The retries of a model call that fails at the provider, the first after this
+# many seconds
+MODEL_RETRIES = 2
+RETRY_DELAY = 1.0
 
 
 def latest(_: Any, new: Any) -> Any:
@@ -169,8 +173,8 @@ def claim_graph(
     """Build the claim graph on a model, saving its progress with `saver`."""
     builder = StateGraph(ClaimState, context_schema=ClaimContext)
     replies = llm.bind_tools(CLAIM_TOOLS).with_retry(
-        stop_after_attempt=versions.MODEL_RETRIES + 1,
-        exponential_jitter_params={"initial": versions.RETRY_DELAY, "jitter": 0},
+        stop_after_attempt=MODEL_RETRIES + 1,
+        exponential_jitter_params={"initial": RETRY_DELAY, "jitter": 0},
     )
     builder.add_node(
         "agent",

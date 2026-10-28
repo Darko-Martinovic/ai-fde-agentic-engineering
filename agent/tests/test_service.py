@@ -201,8 +201,17 @@ def test_a_dispatch_builds_its_claim_agents_from_the_current_version(
         prompts.append(real(version))
         return prompts[-1]
 
+    create_dispatch = api.create_dispatch
+
+    def then_version_three(agents):
+        """Version 3 is kept once the dispatch has recorded version 2."""
+        run = create_dispatch(agents)
+        add_version("# Version three", "deepseek/deepseek-v4.1-flash", "low")
+        return run
+
     monkeypatch.setattr(harness, "chat_model", chat_model)
     monkeypatch.setattr(harness, "instructions", instructions)
+    monkeypatch.setattr(api, "create_dispatch", then_version_three)
     client.post("/api/dispatches", json={"agents": 1})
     run = backend.get("/api/dispatches/latest").json()
     assert (run["version"], run["model"], run["reasoning_effort"]) == (
@@ -210,7 +219,9 @@ def test_a_dispatch_builds_its_claim_agents_from_the_current_version(
         GEMINI,
         "minimal",
     )
-    assert [(m.name, m.reasoning_effort) for m in built] == [(GEMINI, "minimal")]
+    assert [(m.name, m.options) for m in built] == [
+        (GEMINI, {"reasoning_effort": "minimal"})
+    ]
     assert prompts[0].startswith("# Version two")
 
 

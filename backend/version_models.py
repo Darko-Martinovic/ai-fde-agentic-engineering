@@ -3,9 +3,11 @@ models it may use, and what a version changed from the one before."""
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel
+
+from backend.diffs import Hunk
 
 # A model run with no reasoning effort of its own, as a free model is
 NO_EFFORT = "default"
@@ -39,7 +41,8 @@ class ModelAllowed(BaseModel):
 
 class VersionConfig(BaseModel):
     """What the claim agent runs as: its instructions, its model and reasoning
-    effort, and how to build the model. No scores."""
+    effort, and how to build the model, its reasoning effort among its options
+    unless it runs with none of its own. No scores."""
 
     number: int
     instructions: str
@@ -64,19 +67,6 @@ class Version(BaseModel):
     status: VersionStatus
     lines_added: int
     lines_removed: int
-
-
-DiffKind = Literal["added", "removed", "context"]
-
-
-class DiffLine(BaseModel):
-    kind: DiffKind
-    text: str
-
-
-class Hunk(BaseModel):
-    heading: str
-    lines: list[DiffLine]
 
 
 class VersionDetails(Version):

@@ -8,13 +8,21 @@ from typing import Any
 from backend.version_models import NO_EFFORT
 from settings import optional_setting
 
+# Where a free model can run: OpenRouter's free models, or a local Ollama
+PROVIDERS = ("openrouter", "ollama")
+
 
 def free_model() -> dict[str, Any] | None:
     """The free model as a model allowed, or None when MODEL_NAME isn't set."""
     spec = optional_setting("MODEL_NAME")
     if spec is None:
         return None
-    provider, model = spec.split(":", 1)
+    provider, _, model = spec.partition(":")
+    if provider not in PROVIDERS or not model:
+        raise ValueError(
+            f"MODEL_NAME is {spec}: a free model is openrouter:model or"
+            " ollama:model, such as openrouter:openrouter/free"
+        )
     return {
         "model": model,
         "label": model,

@@ -11,12 +11,7 @@ from agent.versions import Model, Version
 FREE = Version(
     number=1,
     instructions="# UnderCover claim agent\n\nDecide the claim.",
-    model=Model(
-        name="openrouter/free",
-        provider="openrouter",
-        reasoning_effort="default",
-        options={},
-    ),
+    model=Model(name="openrouter/free", provider="openrouter", options={}),
 )
 
 
