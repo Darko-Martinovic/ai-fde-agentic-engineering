@@ -5,11 +5,9 @@ finish, when the backend builds its summary from its records. The dashboard
 reads the latest under /api/dispatches."""
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import Connection
 
 from backend import agent_service, grading
 from backend.api import Db, found, now, transaction
-from backend.free_model import free_model
 from backend.run_models import (
     DISPATCH,
     DispatchIn,
@@ -73,28 +71,21 @@ def record_run_claims(run_id: int, listed: RunClaimsIn, conn: Db) -> Run:
     return load_run(conn, run_id)
 
 
-def to_grade(conn: Connection, run_id: int, stopped: bool) -> list[grading.Case]:
-    """What a finishing run has to grade: an evaluation's copies, unless it
-    stopped or a free model runs everything, which has no judge."""
-    run = require_running(conn, run_id)
-    if stopped or run.evaluation_set is None or free_model():
-        return []
-    return grading.cases(conn, run_id, run.evaluation_set)
-
-
 @router.post("/runs/{run_id}/finish", operation_id="finish_run")
 def finish_run(run_id: int, finish: FinishIn) -> Run:
     """Finish a running run, grading an evaluation, or mark it stopped."""
     with transaction() as conn:
-        cases = to_grade(conn, run_id, finish.stopped)
+        cases = grading.cases(conn, require_running(conn, run_id), finish.stopped)
     # The judge answers on threads of its own while no connection is held
     graded = grading.grade_all(cases)
     with transaction() as conn:
-        require_running(conn, run_id)
-        grades.add(conn, run_id, graded)
         left = summary(run_claims(conn, run_id)).model_dump_json()
         status = "stopped" if finish.stopped else "finished"
-        runs.finish(conn, run_id, status, left, now())
+        # Only a run still running finishes, once, whatever else happened
+        # while the judge answered
+        if not runs.finish(conn, run_id, status, left, now()):
+            raise HTTPException(409, f"Run {run_id} has just finished or stopped")
+        grades.add(conn, run_id, graded)
         return load_run(conn, run_id)
 
 

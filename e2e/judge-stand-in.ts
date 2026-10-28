@@ -14,7 +14,7 @@ const ANSWER = {
     same_grounds: { type: "noul", noul: 0.8 },
     same_section: { type: "noul", noul: 0.3 },
   },
-  model: "typesafe/jev-1.13",
+  model: "e2e-judge",
   usage: { input_tokens: 400, output_tokens: 3, cost: 0.00002 },
 };
 

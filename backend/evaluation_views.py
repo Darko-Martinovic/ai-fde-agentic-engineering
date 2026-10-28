@@ -10,24 +10,21 @@ from backend.run_models import Evaluation, EvaluationClaim, Measures, RunClaim
 from backend.run_views import load_run
 from backend.store import evaluations, grades
 
+# A copy the judge didn't grade
+NOT_GRADED = {
+    "grade": None,
+    "letter": None,
+    "same_grounds": None,
+    "same_section": None,
+    "judge_cost": 0.0,
+}
 
-def graded(row: RowMapping | None) -> dict[str, object]:
+
+def judged(row: RowMapping | None) -> dict[str, object]:
     """A copy's grade as the API shows it, or no grade."""
     if row is None:
-        return {
-            "grade": None,
-            "letter": None,
-            "same_grounds": None,
-            "same_section": None,
-            "judge_cost": 0.0,
-        }
-    return {
-        "grade": row["score"],
-        "letter": row["letter"],
-        "same_grounds": row["same_grounds"],
-        "same_section": row["same_section"],
-        "judge_cost": row["cost"],
-    }
+        return NOT_GRADED
+    return {name: row[name] for name in NOT_GRADED}
 
 
 def scored(
@@ -52,7 +49,7 @@ def scored(
             "right": scoring.is_right(answer, expected),
             "mistake_cost": scoring.mistake_cost(answer, expected),
         }
-        | graded(grade)
+        | judged(grade)
     )
 
 

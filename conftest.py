@@ -51,4 +51,5 @@ def judged(monkeypatch):
         return B
 
     monkeypatch.setattr(judge, "ask", ask)
+    monkeypatch.setattr(judge, "client", object)
     return asked

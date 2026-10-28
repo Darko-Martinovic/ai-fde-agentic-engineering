@@ -5,7 +5,9 @@ import pytest
 from openrouter import OpenRouter
 
 from backend import judge
+from backend.run_models import Grade
 from backend.tests.judge_answers import ANSWER, REAL_ASK
+from settings import setting
 
 HANDLER = {
     "decision": "approve",
@@ -45,11 +47,11 @@ def test_the_judge_is_asked_the_three_questions_about_the_state(judge_answers):
     sent, answers = judge_answers
     answers.append(httpx.Response(200, json=ANSWER))
     grade = judge.grade(HANDLER, AGENT)
-    assert grade == judge.Grade(2.2, "B", 0.8, 0.3, 0.00002)
+    assert grade == Grade(2.2, "B", 0.8, 0.3, 0.00002)
     [request] = sent
-    assert str(request.url) == "https://openrouter.ai/api/alpha/decisions"
+    assert str(request.url) == f"{setting('JUDGE_URL')}/api/alpha/decisions"
     body = json.loads(request.content)
-    assert body["model"] == "typesafe/jev-1.13"
+    assert body["model"] == setting("JUDGE_MODEL")
     assert body["state"] == {"handler": HANDLER, "agent": AGENT}
     assert set(body["questions"]) == {"grade", "same_grounds", "same_section"}
     assert "`agent.section`" in body["questions"]["same_section"]["instructions"]
@@ -66,7 +68,7 @@ def test_the_letter_is_the_most_likely_level_never_the_score_rounded(judge_answe
     answers.append(httpx.Response(200, json=unsure))
     grade = judge.grade(HANDLER, AGENT)
     assert grade is not None
-    assert (grade.score, grade.letter) == (1.5, "F")
+    assert (grade.grade, grade.letter) == (1.5, "F")
 
 
 @pytest.mark.parametrize(

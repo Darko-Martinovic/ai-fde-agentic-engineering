@@ -5,7 +5,7 @@ from dataclasses import asdict
 from sqlalchemy import Connection, RowMapping, insert, select
 
 from backend.db_improvement import grades
-from backend.judge import Grade
+from backend.run_models import Grade
 
 
 def add(conn: Connection, run_id: int, graded: dict[str, Grade]) -> None:

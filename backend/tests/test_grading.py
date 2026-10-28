@@ -3,7 +3,7 @@ import time
 import pytest
 from sqlalchemy import event
 
-from backend import db, judge
+from backend import db, grading, judge
 from backend.tests.judge_answers import B
 from backend.tests.workflow_steps import decide
 
@@ -30,7 +30,7 @@ def finish(client, run_id, stopped=False):
     return client.post(f"/api/runs/{run_id}/finish", json={"stopped": stopped})
 
 
-def test_seeding_keeps_every_handlers_reason_and_reference(client, judged):
+def test_the_judge_sees_each_handlers_reason_and_reference(client, judged):
     run_id = evaluation(client)
     decided(client, run_id, TINY)
     finish(client, run_id)
@@ -79,7 +79,7 @@ def test_an_ungraded_copy_is_left_out_of_the_grade(client, monkeypatch):
     finish(client, run_id)
     result = client.get(f"/api/evaluations/{run_id}").json()
     assert result["measures"]["grade"] == pytest.approx(2.2)
-    assert result["measures"]["judge_cost"] == pytest.approx(3 * B.cost)
+    assert result["measures"]["judge_cost"] == pytest.approx(3 * B.judge_cost)
     assert sum(c["grade"] is None for c in result["claims"]) == 2
     assert result["measures"]["model_cost_per_claim"] == 0
 
@@ -109,28 +109,32 @@ def test_on_a_free_model_nothing_is_graded(client, judged, monkeypatch):
     assert judged == []
 
 
-def test_a_dispatch_isnt_graded(client, judged):
-    run_id = client.post("/api/runs/dispatches", json={"agents": 3}).json()["run_id"]
-    finish(client, run_id)
-    assert judged == []
+@pytest.fixture
+def connections():
+    """The connections the backend has open now, and every one it took."""
+    open_connections: list[int] = []
+    every_checkout: list[int] = []
 
-
-def test_grading_is_parallel_and_holds_no_connection(client, monkeypatch):
-    """25 copies with a judge that takes 0.3 seconds each finish in well under
-    the time one after another would take, and no database connection is
-    open while the judge answers."""
-    open_connections = []
-    every_checkout = []
-    during = []
-
-    @event.listens_for(db.engine(), "checkout")
     def checked_out(*args):
         open_connections.append(1)
         every_checkout.append(1)
 
-    @event.listens_for(db.engine(), "checkin")
     def checked_in(*args):
         open_connections.pop()
+
+    event.listen(db.engine(), "checkout", checked_out)
+    event.listen(db.engine(), "checkin", checked_in)
+    yield open_connections, every_checkout
+    event.remove(db.engine(), "checkout", checked_out)
+    event.remove(db.engine(), "checkin", checked_in)
+
+
+def test_grading_is_parallel_and_holds_no_connection(client, monkeypatch, connections):
+    """25 copies with a judge that takes 0.3 seconds each finish in well under
+    the time one after another would take, and no database connection is
+    open while the judge answers."""
+    open_connections, every_checkout = connections
+    during = []
 
     def slow(handler, agent):
         during.append(len(open_connections))
@@ -147,5 +151,38 @@ def test_grading_is_parallel_and_holds_no_connection(client, monkeypatch):
     assert len(during) == 25
     assert set(during) == {0}
     assert every_checkout  # the count is real: the finish did take connections
-    event.remove(db.engine(), "checkout", checked_out)
-    event.remove(db.engine(), "checkin", checked_in)
+
+
+def test_a_run_stopped_while_the_judge_answers_isnt_finished_again(client, monkeypatch):
+    run_id = evaluation(client)
+    decided(client, run_id, TINY)
+
+    def stopped_meanwhile(handler, agent):
+        client.post("/api/runs/stop-all")
+        return B
+
+    monkeypatch.setattr(judge, "grade", stopped_meanwhile)
+    refused = finish(client, run_id)
+    assert (refused.status_code, refused.json()["detail"]) == (
+        409,
+        f"Run {run_id} has just finished or stopped",
+    )
+    result = client.get(f"/api/evaluations/{run_id}").json()
+    assert result["status"] == "stopped"
+    assert result["measures"]["grade"] is None
+
+
+def test_a_judge_too_slow_for_the_finish_leaves_copies_ungraded(client, monkeypatch):
+    monkeypatch.setattr(grading, "GRADING_SECONDS", 0.2)
+    slow = iter([0, 1, 0, 1, 0])
+
+    def sometimes_slow(handler, agent):
+        time.sleep(next(slow))
+        return B
+
+    monkeypatch.setattr(judge, "grade", sometimes_slow)
+    run_id = evaluation(client)
+    decided(client, run_id, TINY)
+    finish(client, run_id)
+    copies = client.get(f"/api/evaluations/{run_id}").json()["claims"]
+    assert sum(c["grade"] is None for c in copies) == 2

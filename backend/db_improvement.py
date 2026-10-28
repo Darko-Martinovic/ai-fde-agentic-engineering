@@ -26,11 +26,11 @@ grades = Table(
     metadata,
     Column("run_id", Integer, primary_key=True),
     text_column("claim_id", primary_key=True),
-    Column("score", Float, nullable=False),
+    Column("grade", Float, nullable=False),
     text_column("letter"),
     Column("same_grounds", Float, nullable=False),
     Column("same_section", Float, nullable=False),
-    Column("cost", Float, nullable=False),
+    Column("judge_cost", Float, nullable=False),
 )
 # The models the claim agent may use, from data/models.json, or the free model
 # in MODEL_NAME alone. The reasoning efforts and the build options are JSON.

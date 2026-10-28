@@ -1,6 +1,7 @@
 """The shapes of the agent's runs in the API: a dispatch, its claims, what its
 model calls used, and its summary once it finishes."""
 
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
@@ -149,6 +150,19 @@ class Evaluation(RunFacts):
 
     measures: Measures
     claims: list[EvaluationClaim]
+
+
+@dataclass(frozen=True)
+class Grade:
+    """The judge's grade on a copy: its score from 0 (F) to 3 (A), its most
+    likely level as a letter, never the score rounded, the probability of each
+    check, and what the call cost."""
+
+    grade: float
+    letter: str
+    same_grounds: float
+    same_section: float
+    judge_cost: float
 
 
 class Stopped(BaseModel):

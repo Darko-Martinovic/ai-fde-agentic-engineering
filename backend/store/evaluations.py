@@ -46,14 +46,28 @@ def handler_decisions(conn: Connection, evaluation_set: str) -> dict[str, RowMap
     """The handlers' decisions on a set, by the claim they decided."""
     decision = db.handler_decisions.c
     found = select(
-        decision.claim_id,
-        decision.decision,
-        decision.payout,
-        decision.tiny,
-        decision.reason,
-        decision.reference,
+        decision.claim_id, decision.decision, decision.payout, decision.tiny
     ).where(decision.evaluation_set == evaluation_set)
     return {row["claim_id"]: row for row in conn.execute(found).mappings()}
+
+
+def handlers_reasons(
+    conn: Connection, evaluation_set: str
+) -> dict[str, dict[str, Any]]:
+    """The handlers' decisions on a set with their reasons and references, by
+    the claim they decided, for the judge."""
+    decision = db.handler_decisions.c
+    found = select(
+        decision.claim_id, decision.decision, decision.reason, decision.reference
+    ).where(decision.evaluation_set == evaluation_set)
+    return {
+        row["claim_id"]: {
+            "decision": row["decision"],
+            "reason": row["reason"],
+            "reference": row["reference"],
+        }
+        for row in conn.execute(found).mappings()
+    }
 
 
 def originals(conn: Connection, evaluation_set: str) -> list[dict[str, Any]]:

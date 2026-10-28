@@ -20,7 +20,7 @@ MAX_LINES = 300
 MAX_FUNCTION_LINES = 40
 
 ADDRESS = re.compile(r"https?://|localhost|127\.0\.0\.1")
-MODEL_ID = re.compile(r"deepseek|claude-|qwen|gemma|gpt-\d")
+MODEL_ID = re.compile(r"deepseek|claude-|qwen|gemma|gpt-\d|jev-")
 ANSWER_KEY = re.compile(r"[\"'][^\"']*evals")
 API_PATH = re.compile(r"[\"']/api/")
 RUNS_SQL = re.compile(r"\.execute(many|script)?\(")
