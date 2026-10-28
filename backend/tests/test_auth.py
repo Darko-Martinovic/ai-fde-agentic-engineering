@@ -41,6 +41,10 @@ HANDLER_ACTIONS = [
         "/api/evaluations",
         {"evaluation_set": "evaluation", "tiny": True, "agents": 3, "model": LUNA},
     ),
+    ("/api/improvement/rounds", None),
+    ("/api/improvement/rounds/1/stop", None),
+    ("/api/improvement/rounds/1/proposals/1/approval", None),
+    ("/api/improvement/rounds/1/proposals/1/rejection", {"note": "No."}),
 ]
 
 

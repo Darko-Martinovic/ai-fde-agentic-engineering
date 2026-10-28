@@ -227,10 +227,10 @@ def test_a_dispatch_builds_its_claim_agents_from_the_current_version(
 
 def test_a_second_start_is_refused_while_one_runs(backend, agent_service):
     client, _ = agent_service
-    with service.RUNNING:
+    with service.RUNNING.held("An evaluation is running"):
         refused = client.post("/api/dispatches", json={"agents": 3})
     assert refused.status_code == 409
-    assert refused.json()["detail"] == "A dispatch or an evaluation is already running"
+    assert refused.json()["detail"] == "An evaluation is running"
     assert backend.get("/api/dispatches/latest").json() is None
 
 
@@ -263,7 +263,7 @@ def test_a_dispatcher_that_fails_stops_its_run_and_frees_the_next_start(
 def test_stop_asks_the_running_dispatch_to_stop(agent_service):
     client, _ = agent_service
     assert client.post("/api/runs/stop").status_code == 409
-    with service.RUNNING:
+    with service.RUNNING.held("A dispatch is running"):
         stopping = client.post("/api/runs/stop")
     assert stopping.status_code == 202
     assert service.STOP.is_set()
@@ -403,7 +403,7 @@ def test_one_run_at_a_time_whichever_kind(agent_service):
         "tiny": True,
         "agents": 5,
     }
-    with service.RUNNING:
+    with service.RUNNING.held("A dispatch is running"):
         assert client.post("/api/evaluations", json=evaluation).status_code == 409
         dispatch = {"agents": 3}
         assert client.post("/api/dispatches", json=dispatch).status_code == 409

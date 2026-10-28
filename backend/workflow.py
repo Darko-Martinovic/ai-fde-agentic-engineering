@@ -2,6 +2,7 @@
 decision and its payment, and a failure."""
 
 from fastapi import APIRouter, HTTPException
+from sqlalchemy import Connection
 
 from backend.api import Db, found, load_claim, now
 from backend.claim_rules import (
@@ -21,6 +22,7 @@ from backend.models import (
     Step,
     StepIn,
 )
+from backend.round_views import cut_short
 from backend.run_views import require_running
 from backend.store import claims, runs, steps
 
@@ -33,13 +35,27 @@ MAX_FAILURES = 2
 @router.post("/start", operation_id="start_claim")
 def start_claim(claim_id: str, start: StartIn, conn: Db) -> Claim:
     """Start work on a waiting claim, in a running run or on its own."""
-    require_status(load_claim(conn, claim_id), "waiting")
+    claim = load_claim(conn, claim_id)
+    require_status(claim, "waiting")
     if start.run_id is not None:
         require_running(conn, start.run_id)
+    refuse_cut_short(conn, claim)
     if not claims.start(conn, claim_id):
         raise HTTPException(409, f"Claim {claim_id} has just been started")
     runs.add_attempt(conn, start.run_id, claim_id, start.thread_id, now())
     return load_claim(conn, claim_id)
+
+
+def refuse_cut_short(conn: Connection, claim: Claim) -> None:
+    """Refuse a copy in a round's evaluation once the round has ended or spent
+    its limit."""
+    if claim.evaluation_id is None:
+        return
+    run = found(runs.run(conn, claim.evaluation_id), "Run", str(claim.evaluation_id))
+    round_id = run["round_id"]
+    why = cut_short(conn, round_id) if round_id is not None else None
+    if why:
+        raise HTTPException(409, why)
 
 
 @router.post("/failure", operation_id="fail_claim")

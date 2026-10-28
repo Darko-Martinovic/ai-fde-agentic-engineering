@@ -2936,6 +2936,1077 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Improvement",
+      "item": [
+        {
+          "name": "Record a new round",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/rounds",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rounds"
+              ]
+            },
+            "description": "`create_round`: the agent's service records a round, open, on the current settings, recipe and version, with the first evaluations the version needs.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"handler_id\": \"HND-01\",\n  \"thread_id\": \"postman-round\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const round = pm.response.json();",
+                  "pm.collectionVariables.set(\"roundId\", round.round_id);",
+                  "pm.test(\"starts at its first evaluations\", () => {",
+                  "  pm.expect(round.stage).to.eql(\"first_evaluations\");",
+                  "  pm.expect(round.instructions).to.include(\"# Your recipe\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record a second round while one is open",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/rounds",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rounds"
+              ]
+            },
+            "description": "`create_round`: 409 while a round is open.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"handler_id\": \"HND-01\",\n  \"thread_id\": \"postman-round-2\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"says why\", () => pm.expect(pm.response.json().detail).to.include(\"is still open\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get the round",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/rounds/{{roundId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rounds",
+                "{{roundId}}"
+              ]
+            },
+            "description": "`get_round`: a round as the improver works it, with its instructions and recipe, its model and the models allowed."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has the improver's model\", () => pm.expect(pm.response.json().improver.model).to.be.a(\"string\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get the improver's view",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/rounds/{{roundId}}/view",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rounds",
+                "{{roundId}}",
+                "view"
+              ]
+            },
+            "description": "`get_improver_view`: the current version and its scores, its mistakes on the evaluation set, the earlier rounds, the objectives, the spending left and the models allowed."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const view = pm.response.json();",
+                  "pm.test(\"has the rule and the models allowed\", () => {",
+                  "  pm.expect(view.rule).to.include(\"A new version is kept\");",
+                  "  pm.expect(view.models_allowed).to.have.lengthOf(3);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record the round's first evaluation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/runs/rounds/{{roundId}}/evaluations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "runs",
+                "rounds",
+                "{{roundId}}",
+                "evaluations"
+              ]
+            },
+            "description": "`create_round_evaluation`: the round's next evaluation of a whole set, of the version it judges, at the round's agents at once.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"evaluation_set\": \"evaluation\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const run = pm.response.json();",
+                  "pm.collectionVariables.set(\"roundRunId\", run.run_id);",
+                  "pm.test(\"is the round's\", () => pm.expect(run.round_id).to.eql(Number(pm.collectionVariables.get(\"roundId\"))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Finish the round's first evaluation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/runs/{{roundRunId}}/finish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "runs",
+                "{{roundRunId}}",
+                "finish"
+              ]
+            },
+            "description": "`finish_run`: the round's evaluation finished with its copies as they are.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stopped\": false\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record a change to a model not allowed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/rounds/{{roundId}}/proposals/changes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rounds",
+                "{{roundId}}",
+                "proposals",
+                "changes"
+              ]
+            },
+            "description": "`record_change_proposal`: 422 for a model the claim agent may not use.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"instructions\": \"# UnderCover claim agent\\n\\nDecide the claim as a careful handler would.\",\n  \"model\": \"openai/gpt-7\",\n  \"reasoning_effort\": \"low\",\n  \"reason\": \"Fewer needless referrals.\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"says why\", () => pm.expect(pm.response.json().detail).to.include(\"isn't allowed\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record a change the improver proposed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/rounds/{{roundId}}/proposals/changes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rounds",
+                "{{roundId}}",
+                "proposals",
+                "changes"
+              ]
+            },
+            "description": "`record_change_proposal`: a change waiting for a handler's review, which changes nothing yet.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"instructions\": \"# UnderCover claim agent\\n\\nDecide the claim as a careful handler would.\",\n  \"model\": \"openai/gpt-6-luna\",\n  \"reasoning_effort\": \"low\",\n  \"reason\": \"Fewer needless referrals.\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"proposalId\", pm.response.json().proposal_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record Marcus Oyelaran's review",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/rounds/{{roundId}}/proposals/{{proposalId}}/review",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rounds",
+                "{{roundId}}",
+                "proposals",
+                "{{proposalId}}",
+                "review"
+              ]
+            },
+            "description": "`record_review`: 403 for a handler who can't sign off payouts over the limit.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"handler_id\": \"HND-02\",\n  \"approved\": true,\n  \"note\": \"\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"says why\", () => pm.expect(pm.response.json().detail).to.include(\"Marcus Oyelaran can't\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve a proposal that isn't there",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{danaToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/improvement/rounds/{{roundId}}/proposals/999/approval",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "improvement",
+                "rounds",
+                "{{roundId}}",
+                "proposals",
+                "999",
+                "approval"
+              ]
+            },
+            "description": "`approve_proposal`: 404 for a proposal not in the round, asking nothing of the agent's service."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a proposal that isn't there",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{danaToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/improvement/rounds/{{roundId}}/proposals/999/rejection",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "improvement",
+                "rounds",
+                "{{roundId}}",
+                "proposals",
+                "999",
+                "rejection"
+              ]
+            },
+            "description": "`reject_proposal`: 404 for a proposal not in the round, asking nothing of the agent's service.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Too vague.\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record Dana Whitfield's approval",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/rounds/{{roundId}}/proposals/{{proposalId}}/review",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rounds",
+                "{{roundId}}",
+                "proposals",
+                "{{proposalId}}",
+                "review"
+              ]
+            },
+            "description": "`record_review`: a senior handler's approval of the proposal waiting.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"handler_id\": \"HND-01\",\n  \"approved\": true,\n  \"note\": \"\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"approved by Dana\", () => pm.expect(pm.response.json().reviewed_by).to.eql(\"HND-01\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Make the version under test",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/rounds/{{roundId}}/versions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rounds",
+                "{{roundId}}",
+                "versions"
+              ]
+            },
+            "description": "`create_version`: the approved change as a new version under test, proposed by the round; a repeat returns it."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const round = pm.response.json();",
+                  "pm.test(\"tries a new version\", () => pm.expect(round.version_tried).to.be.above(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record the verdict",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/rounds/{{roundId}}/verdict",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rounds",
+                "{{roundId}}",
+                "verdict"
+              ]
+            },
+            "description": "`record_verdict`: the version tried kept or rolled back by the rule, with why; one never evaluated is rolled back."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const verdict = pm.response.json();",
+                  "pm.test(\"rolled back, with why\", () => {",
+                  "  pm.expect(verdict.kept).to.eql(false);",
+                  "  pm.expect(verdict.why).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record a recipe the improver proposed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/rounds/{{roundId}}/proposals/recipes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rounds",
+                "{{roundId}}",
+                "proposals",
+                "recipes"
+              ]
+            },
+            "description": "`record_recipe_proposal`: a new recipe waiting for a handler's review.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipe\": \"1. Call read_results.\\n2. Propose one change.\",\n  \"reason\": \"Shorter.\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"recipeProposalId\", pm.response.json().proposal_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record Dana Whitfield's approval of the recipe",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/rounds/{{roundId}}/proposals/{{recipeProposalId}}/review",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rounds",
+                "{{roundId}}",
+                "proposals",
+                "{{recipeProposalId}}",
+                "review"
+              ]
+            },
+            "description": "`record_review`: a senior handler's approval of the recipe waiting.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"handler_id\": \"HND-01\",\n  \"approved\": true,\n  \"note\": \"\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Make the new recipe",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/rounds/{{roundId}}/recipes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rounds",
+                "{{roundId}}",
+                "recipes"
+              ]
+            },
+            "description": "`create_recipe`: the approved recipe as the current one; a repeat returns it."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"recipeNumber\", pm.response.json().number);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record one of the improver's model calls",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/rounds/{{roundId}}/improver-calls",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rounds",
+                "{{roundId}}",
+                "improver-calls"
+              ]
+            },
+            "description": "`record_improver_call`: the tokens, cost and time of one of the improver's model calls, which count on the round.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"openai/gpt-6-luna\",\n  \"input_tokens\": 1000,\n  \"output_tokens\": 100,\n  \"cost\": 0.0002,\n  \"seconds\": 2.5\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get the rounds and the recipes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/improvement",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "improvement"
+              ]
+            },
+            "description": "`get_improvement`: every round, newest first, with where it has got to and what it has spent, and every version of the recipe."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const improvement = pm.response.json();",
+                  "pm.test(\"shows the round and the new recipe\", () => {",
+                  "  pm.expect(improvement.rounds[0].round_id).to.eql(Number(pm.collectionVariables.get(\"roundId\")));",
+                  "  pm.expect(improvement.current_recipe).to.eql(Number(pm.collectionVariables.get(\"recipeNumber\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get the new recipe",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/improvement/recipes/{{recipeNumber}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "improvement",
+                "recipes",
+                "{{recipeNumber}}"
+              ]
+            },
+            "description": "`get_recipe`: one version of the recipe with the lines it changed."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has its changes\", () => pm.expect(pm.response.json().changes).to.not.be.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get a recipe that isn't there",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/improvement/recipes/999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "improvement",
+                "recipes",
+                "999"
+              ]
+            },
+            "description": "`get_recipe`: 404 for a recipe that isn't there."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start a round without signing in",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/improvement/rounds",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "improvement",
+                "rounds"
+              ]
+            },
+            "description": "`start_round`: 401 without a signed-in handler."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start a round as Marcus Oyelaran",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{marcusToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/improvement/rounds",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "improvement",
+                "rounds"
+              ]
+            },
+            "description": "`start_round`: only a handler who can sign off payouts over the limit starts a round; Marcus Oyelaran is refused with why."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"says why\", () => pm.expect(pm.response.json().detail).to.include(\"start a round of improvement\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start a round while one is open",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{danaToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/improvement/rounds",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "improvement",
+                "rounds"
+              ]
+            },
+            "description": "`start_round`: 409 while a round is open, asking nothing of the agent's service."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"says why\", () => pm.expect(pm.response.json().detail).to.include(\"is still open\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stop the round as Marcus Oyelaran",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{marcusToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/improvement/rounds/{{roundId}}/stop",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "improvement",
+                "rounds",
+                "{{roundId}}",
+                "stop"
+              ]
+            },
+            "description": "`stop_round`: Marcus Oyelaran is refused with why."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"says why\", () => pm.expect(pm.response.json().detail).to.include(\"stop a round of improvement\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stop the round as Dana Whitfield",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{danaToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/improvement/rounds/{{roundId}}/stop",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "improvement",
+                "rounds",
+                "{{roundId}}",
+                "stop"
+              ]
+            },
+            "description": "`stop_round`: the round stopped by Dana, which refuses anything it records from then on."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const round = pm.response.json();",
+                  "pm.test(\"stopped by Dana\", () => {",
+                  "  pm.expect(round.status).to.eql(\"stopped\");",
+                  "  pm.expect(round.stopped_by).to.eql(\"HND-01\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Finish the stopped round",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/rounds/{{roundId}}/finish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rounds",
+                "{{roundId}}",
+                "finish"
+              ]
+            },
+            "description": "`finish_round`: 409 for a round that has ended.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stopped\": false,\n  \"reason\": \"\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"says why\", () => pm.expect(pm.response.json().detail).to.include(\"is stopped\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stop every round still working",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/rounds/stop-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rounds",
+                "stop-all"
+              ]
+            },
+            "description": "`stop_rounds`: every open round not waiting for a handler stopped, as when the agent's service starts; none here."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"stops none\", () => pm.expect(pm.response.json().round_ids).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "variable": [

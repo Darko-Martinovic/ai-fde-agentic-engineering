@@ -12,10 +12,12 @@ from backend import (
     documents,
     evaluations,
     handlers,
+    improvement,
     insights,
     platform_settings,
     records,
     reviews,
+    rounds,
     runs,
     usage,
     workflow,
@@ -49,6 +51,8 @@ for module in (
     evaluations,
     configuration,
     platform_settings,
+    improvement,
+    rounds,
     insights,
 ):
     app.include_router(module.router)

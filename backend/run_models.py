@@ -94,6 +94,8 @@ class RunFacts(BaseModel):
     version: int
     model: str
     reasoning_effort: str
+    # The round of improvement an evaluation is part of, if any
+    round_id: int | None
     # For an evaluation: its set, and whether it's the five tiny claims
     evaluation_set: EvaluationSet | None
     tiny: bool | None

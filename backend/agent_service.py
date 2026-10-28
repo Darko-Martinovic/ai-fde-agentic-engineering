@@ -1,6 +1,7 @@
 """The backend's calls to the agent's service, at UNDERCOVER_AGENT: starting a
-dispatch or an evaluation, stopping it, and asking the service to pick a claim
-back up after a handler's review. A start or a stop passes the service's
+dispatch, an evaluation or a round of improvement, stopping a run, passing on a
+handler's review of the improver's proposal, and asking the service to pick a
+claim back up after a handler's review. A start or a stop passes the service's
 refusal on, and says so when the service can't be reached; a review stands
 whether or not the service can be reached, and the next dispatch carries the
 claim on."""
@@ -54,6 +55,19 @@ def start_evaluation(evaluation_set: str, tiny: bool, agents: int) -> dict[str, 
 def stop_run() -> dict[str, Any]:
     """Ask the agent's service to stop the run it's working."""
     return ask("/api/runs/stop", {})
+
+
+def start_round(handler_id: str) -> dict[str, Any]:
+    """Ask the agent's service to start a round of improvement."""
+    return ask("/api/rounds", {"handler_id": handler_id})
+
+
+def review_proposal(
+    round_id: int, proposal_id: int, handler_id: str, approved: bool, note: str
+) -> dict[str, Any]:
+    """Pass a handler's review of the improver's proposal to the agent's service."""
+    body = {"handler_id": handler_id, "approved": approved, "note": note}
+    return ask(f"/api/rounds/{round_id}/proposals/{proposal_id}/review", body)
 
 
 def resume_claim(claim_id: str) -> None:
