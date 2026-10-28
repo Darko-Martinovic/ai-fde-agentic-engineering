@@ -4,9 +4,9 @@ agent's routes in workflow.py and the handlers' in reviews.py."""
 from fastapi import HTTPException
 from sqlalchemy import Connection
 
-from backend.api import company, found, now
+from backend.api import company, now
 from backend.models import Claim, ClaimStatus, Decision, DecisionIn, HandlerDecisionIn
-from backend.store import claims, records
+from backend.store import claims
 
 STATUS_AFTER: dict[str, ClaimStatus] = {"decline": "decided", "refer": "referred"}
 # A held payout rejected this many times is referred to a handler
@@ -16,10 +16,6 @@ MAX_REJECTIONS = 2
 def approval_limit(conn: Connection) -> float:
     """Return the payout above which a handler must sign off."""
     return company(conn)["payout_approval_limit"]
-
-
-def check_handler(conn: Connection, handler_id: str) -> None:
-    found(records.handler(conn, handler_id), "Handler", handler_id)
 
 
 def refuse_copy(claim: Claim) -> None:

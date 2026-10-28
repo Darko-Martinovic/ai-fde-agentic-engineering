@@ -16,6 +16,7 @@ from agent import api, dispatcher, harness
 from agent.dispatcher import RETRY as REAL_RETRY  # before the tests' own
 from agent.tests.stub import FREE, ByClaim, decide, tool_call
 from backend.tests.direct_changes import set_status
+from backend.tests.sign_ins import DANA, headers
 
 DECLINE = [decide("decline", 0)]
 
@@ -255,8 +256,8 @@ def test_the_next_dispatch_carries_on_what_a_stopped_one_left(backend, memory_sa
         harness.work_claim("CLM-1001", None, FREE, memory_saver, killed)
     held = scripted({"CLM-1003": [decide("approve", 3750.0)]})
     harness.work_claim("CLM-1003", None, FREE, memory_saver, held)
-    body = {"handler_id": "HND-01", "approved": True, "note": ""}
-    backend.post("/api/claims/CLM-1003/review", json=body)
+    body = {"approved": True, "note": ""}
+    backend.post("/api/claims/CLM-1003/review", json=body, headers=headers(DANA))
     before = claim(backend, "CLM-1001")
     dispatch(scripted({"CLM-1001": DECLINE}), memory_saver)
     carried = claim(backend, "CLM-1001")
@@ -395,8 +396,8 @@ def test_a_claim_with_nothing_saved_to_carry_on_never_stops_a_dispatch(
             "policy_section": "Section 7, Emergency Medical",
         },
     )
-    body = {"handler_id": "HND-01", "approved": True, "note": ""}
-    backend.post("/api/claims/CLM-1003/review", json=body)
+    body = {"approved": True, "note": ""}
+    backend.post("/api/claims/CLM-1003/review", json=body, headers=headers(DANA))
     reports = dispatch(scripted({"CLM-1005": DECLINE}), memory_saver)
     assert any(line.startswith("CLM-1003: not picked up") for line in reports)
     assert claim(backend, "CLM-1005")["status"] == "decided"

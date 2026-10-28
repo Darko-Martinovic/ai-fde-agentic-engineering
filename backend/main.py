@@ -11,6 +11,7 @@ from backend import (
     claims,
     documents,
     evaluations,
+    handlers,
     insights,
     records,
     reviews,
@@ -38,6 +39,7 @@ app = FastAPI(title="UnderCover", lifespan=lifespan)
 for module in (
     claims,
     records,
+    handlers,
     documents,
     workflow,
     usage,

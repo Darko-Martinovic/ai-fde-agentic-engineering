@@ -92,9 +92,9 @@ def worked_every_way(client, run_id):
         fail(client, "CLM-1012")
     start(client, "CLM-1004")
     approved(client, "CLM-1003", 3750.0)
-    review(client, "CLM-1003", "HND-01")
+    review(client, "CLM-1003")
     approved(client, "CLM-1011", 1150.0)
-    review(client, "CLM-1011", "HND-01", approved=False, note="Too much.")
+    review(client, "CLM-1011", approved=False, note="Too much.")
     order = [
         "CLM-1001",
         "CLM-1005",

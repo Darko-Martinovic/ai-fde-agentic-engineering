@@ -13,8 +13,10 @@ const CONFIGS = [
   "settings/settings.config.ts",
 ];
 
+/** The dashboard's modules, in src/ and its folders, leaving out the tests. */
 function product(): string[] {
-  return readdirSync(ROOT + SOURCE)
+  return readdirSync(ROOT + SOURCE, { recursive: true, encoding: "utf-8" })
+    .map((name) => name.replaceAll("\\", "/"))
     .filter((name) => /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name))
     .filter((name) => name !== "testing.ts")
     .map((name) => SOURCE + name);
@@ -41,6 +43,11 @@ describe("the dashboard keeps to the code standards", () => {
     const api = [`${SOURCE}api.ts`];
     expect(offending(product(), /fetch\(/, api)).toEqual([]);
     expect(offending(product(), /["'`]\/api\//, api)).toEqual([]);
+  });
+
+  it("signs in through Supabase only in auth.ts (standards 7, 15)", () => {
+    const auth = [`${SOURCE}auth.ts`];
+    expect(offending(product(), /@supabase\/supabase-js/, auth)).toEqual([]);
   });
 
   it("builds page links only in paths.ts (standard 19)", () => {

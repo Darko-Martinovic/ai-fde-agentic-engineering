@@ -84,7 +84,6 @@ class FailureIn(BaseModel):
 
 
 class HandlerDecisionIn(BaseModel):
-    handler_id: str
     decision: Literal["approve", "decline"]
     payout: float = Field(ge=0)
     reasons: str = Field(min_length=1)
@@ -124,7 +123,6 @@ class ReviewIn(BaseModel):
     """A handler's answer on a held payout: sign it off, or reject it with a note
     that says what's wrong, which goes back to the agent."""
 
-    handler_id: str
     approved: bool
     note: str
 
@@ -254,9 +252,17 @@ class Customer(BaseModel):
     previous_claims: list[PreviousClaim]
 
 
-class Handler(BaseModel):
+class HandlerName(BaseModel):
+    """A handler as the decisions they sign name them."""
+
     handler_id: str
     name: str
     role: str
+
+
+class Handler(HandlerName):
+    """A handler as they sign in: their email, and whether they can sign off
+    payouts over the approval limit."""
+
     email: str
     can_approve_over_limit: bool

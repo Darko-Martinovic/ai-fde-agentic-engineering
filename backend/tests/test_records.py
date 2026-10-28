@@ -86,6 +86,7 @@ def test_operations_are_documented(client):
         "calculate_payout",
         "get_policy",
         "get_customer",
+        "get_signed_in_handler",
         "get_policy_wording",
         "get_instructions",
         "list_sections",

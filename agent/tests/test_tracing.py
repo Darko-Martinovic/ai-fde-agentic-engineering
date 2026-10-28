@@ -7,6 +7,7 @@ import agent.__main__ as cli
 from agent import api, dispatcher, harness
 from agent.tests.stub import FREE, ByClaim, StubModel, decide, stub, tool_call
 from backend.tests.direct_changes import set_status
+from backend.tests.sign_ins import DANA, headers
 
 # Every waiting claim but CLM-1001 and CLM-1004, so a dispatch works those two
 DECIDED_ELSEWHERE = [f"CLM-{n}" for n in range(1002, 1026) if n != 1004]
@@ -110,8 +111,8 @@ def test_a_claim_carried_on_is_traced_in_the_same_session(
     harness.work_claim(
         "CLM-1003", run, FREE, memory_saver, stub(decide("approve", 3750.0))
     )
-    body = {"handler_id": "HND-01", "approved": True, "note": ""}
-    backend.post("/api/claims/CLM-1003/review", json=body)
+    body = {"approved": True, "note": ""}
+    backend.post("/api/claims/CLM-1003/review", json=body, headers=headers(DANA))
     harness.carry_on("CLM-1003", run, FREE, memory_saver, stub())
     first, then = sorted(roots(traces()), key=lambda root: root.start_time or 0)
     assert (first.name, then.name) == ("work-claim", "carry-on")

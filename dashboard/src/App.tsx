@@ -1,21 +1,18 @@
-import { api } from "./api";
-import { ClaimPage } from "./ClaimPage";
-import { Logo } from "./components";
-import { usePoll, useRoute, useTheme, type Theme } from "./hooks";
-import { InsightsPage } from "./Insights";
-import { paths, type Route } from "./paths";
-import { InstructionsPage } from "./Instructions";
-import { QueuePage } from "./Queue";
-import { EvaluationPage } from "./EvaluationPage";
-import { ScoreboardPage } from "./Scoreboard";
+import { Header } from "./components/Header";
+import { RequireHandler } from "./components/RequireHandler";
+import { useRoute } from "./hooks";
+import { ClaimPage } from "./pages/ClaimPage";
+import { EvaluationPage } from "./pages/EvaluationPage";
+import { InsightsPage } from "./pages/Insights";
+import { InstructionsPage } from "./pages/Instructions";
+import { QueuePage } from "./pages/Queue";
+import { ScoreboardPage } from "./pages/Scoreboard";
+import { SignInPage } from "./pages/SignInPage";
+import type { Route } from "./paths";
 
-const THEMES: { value: Theme; label: string }[] = [
-  { value: "system", label: "Auto" },
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
-];
+type HandlerRoute = Exclude<Route, { page: "sign-in" }>;
 
-function Page({ route }: Readonly<{ route: Route }>) {
+function Page({ route }: Readonly<{ route: HandlerRoute }>) {
   switch (route.page) {
     case "claim":
       return <ClaimPage key={route.claimId} claimId={route.claimId} />;
@@ -32,87 +29,21 @@ function Page({ route }: Readonly<{ route: Route }>) {
   }
 }
 
-function healthLabel(data: unknown, error: string | null): string {
-  if (error) return "down";
-  return data === null ? "checking" : "up";
-}
-
-function BackendStatus() {
-  const health = usePoll(api.health, 10000);
-  const label = healthLabel(health.data, health.error);
-  return (
-    <span className={`health health--${label}`}>
-      <span className="health__dot" aria-hidden="true" />
-      Backend: {label}
-    </span>
-  );
-}
-
+/** The dashboard: the sign-in page, or a signed-in handler's page under the
+ *  header. */
 export function App() {
   const route = useRoute();
-  const [theme, setTheme] = useTheme();
-
+  if (route.page === "sign-in") return <SignInPage next={route.next} />;
   return (
-    <>
-      <header className="topbar">
-        <a className="brand" href={paths.queue}>
-          <Logo />
-          <span>
-            <strong>UnderCover</strong>
-            <em>Claims desk</em>
-          </span>
-        </a>
-        <nav className="nav" aria-label="Pages">
-          <a
-            href={paths.queue}
-            aria-current={route.page === "queue" ? "page" : undefined}
-          >
-            Queue
-          </a>
-          <a
-            href={paths.insights}
-            aria-current={route.page === "insights" ? "page" : undefined}
-          >
-            Insights
-          </a>
-          <a
-            href={paths.scoreboard}
-            aria-current={
-              route.page === "scoreboard" || route.page === "evaluation"
-                ? "page"
-                : undefined
-            }
-          >
-            Scoreboard
-          </a>
-          <a
-            href={paths.instructions}
-            aria-current={route.page === "instructions" ? "page" : undefined}
-          >
-            Instructions
-          </a>
-        </nav>
-        <div className="topbar__end">
-          <BackendStatus />
-          <div className="segmented" role="group" aria-label="Theme">
-            {THEMES.map((option) => (
-              <button
-                type="button"
-                key={option.value}
-                aria-pressed={theme === option.value}
-                onClick={() => {
-                  setTheme(option.value);
-                }}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </header>
-      <main>
-        <Page route={route} />
-      </main>
-    </>
+    <RequireHandler>
+      {(handler) => (
+        <>
+          <Header route={route} handler={handler} />
+          <main>
+            <Page route={route} />
+          </main>
+        </>
+      )}
+    </RequireHandler>
   );
 }

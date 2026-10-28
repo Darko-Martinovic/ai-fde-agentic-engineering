@@ -1,6 +1,7 @@
 """The workflow's steps through the API, for the backend's tests."""
 
 from backend.tests.claim_starts import start
+from backend.tests.sign_ins import DANA, headers
 
 
 def decide(client, claim_id, decision, payout):
@@ -19,19 +20,20 @@ def pay(client, claim_id, amount):
     return client.post(f"/api/claims/{claim_id}/payment", json={"amount": amount})
 
 
-def review(client, claim_id, handler_id, approved=True, note=""):
+def review(client, claim_id, approved=True, note="", handler=DANA):
     """A handler's review of a held payout: a sign-off, or a rejection."""
     return client.post(
         f"/api/claims/{claim_id}/review",
-        json={"handler_id": handler_id, "approved": approved, "note": note},
+        json={"approved": approved, "note": note},
+        headers=headers(handler),
     )
 
 
-def resolve(client, claim_id, handler_id, decision, payout):
+def resolve(client, claim_id, decision, payout, handler=DANA):
     return client.post(
         f"/api/claims/{claim_id}/handler-decision",
+        headers=headers(handler),
         json={
-            "handler_id": handler_id,
             "decision": decision,
             "payout": payout,
             "reasons": "The handler's reasons.",

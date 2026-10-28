@@ -4,7 +4,7 @@ records each dispatch under /api/runs: its start, its claims in order, and its
 finish, when the backend builds its summary from its records. The dashboard
 reads the latest under /api/dispatches."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from backend import agent_service
 from backend.api import Db, found, now
@@ -20,12 +20,18 @@ from backend.run_models import (
     Stopping,
 )
 from backend.run_views import load_run, require_running, run_claims, summary
+from backend.signed_in import signed_in
 from backend.store import claims, runs
 
 router = APIRouter(prefix="/api")
 
 
-@router.post("/dispatches", operation_id="start_dispatch", status_code=202)
+@router.post(
+    "/dispatches",
+    operation_id="start_dispatch",
+    status_code=202,
+    dependencies=[Depends(signed_in)],
+)
 def start_dispatch(dispatch: DispatchStart) -> Started:
     """Ask the agent's service to start a dispatch with N claim agents at once."""
     return Started.model_validate(
@@ -33,7 +39,12 @@ def start_dispatch(dispatch: DispatchStart) -> Started:
     )
 
 
-@router.post("/runs/stop-request", operation_id="stop_run", status_code=202)
+@router.post(
+    "/runs/stop-request",
+    operation_id="stop_run",
+    status_code=202,
+    dependencies=[Depends(signed_in)],
+)
 def stop_run() -> Stopping:
     """Ask the agent's service to stop the run it's working, starting no more claims."""
     return Stopping.model_validate(agent_service.stop_run())

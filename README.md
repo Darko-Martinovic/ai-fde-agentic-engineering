@@ -53,9 +53,9 @@ This README describes what I added on top of Ed's builds. Each day's build here 
 
 The plan is [docs/PLAN_HARNESS.md](docs/PLAN_HARNESS.md).
 
-**The model comparison.** `uv run -m bench` runs each trial in `bench/plan.toml` from a fresh database, through the same harness the dashboard uses, and scores every claim against the handlers' own decisions: the decision, and for an approval the payout within a dollar. Only `bench/score.py` reads the answer key in `data/evals/`; the agent and the backend never do, and a test checks it. It refuses to pass a budget (`BENCH_BUDGET_USD`) and resumes from the runs it has saved.
+**The model comparison**, retired on Week 2 Day 5 when the claim agent's model became part of its versioned configuration (kept on the `week2day4-end` branch). `uv run -m bench` ran each trial in `bench/plan.toml` from a fresh database, through the same harness the dashboard used, and scored every claim against the handlers' own decisions: the decision, and for an approval the payout within a dollar. Only `bench/score.py` read the answer key in `data/evals/`. It refused to pass a budget (`BENCH_BUDGET_USD`) and resumed from the runs it had saved.
 
-![Accuracy by model](bench/results.svg)
+![Accuracy by model](https://github.com/Darko-Martinovic/ai-fde-agentic-engineering/blob/week2day4-end/bench/results.svg?raw=true)
 
 | Model | Claims | Runs | Decision right | Payout right | Cost a claim | Time a claim |
 |---|---|---|---|---|---|---|
@@ -63,7 +63,7 @@ The plan is [docs/PLAN_HARNESS.md](docs/PLAN_HARNESS.md).
 | Claude Opus 5.5 | the 5 tiny | 3 | 93% | 93% | $0.1142 | 21 s |
 | Qwen 3.5 4B, local | all 25 | 2 | 54% | 46% | free | 65 s |
 
-The whole comparison cost $2.06. The full report, with every claim each model got wrong, is [bench/results.md](bench/results.md).
+The whole comparison cost $2.06. The full report, with every claim each model got wrong, is [bench/results.md](https://github.com/Darko-Martinovic/ai-fde-agentic-engineering/blob/week2day4-end/bench/results.md).
 
 ## Week 2: the AI Architect
 
@@ -159,7 +159,6 @@ npm run dev              # backend on 8000, the agent's service on 8002, dashboa
 | Reset the data | `uv run -m backend.seed` |
 | Every check | `npm run check` |
 | End-to-end tests | `npm run e2e` |
-| The model comparison (calls the models; `--estimate` prints its cost) | `uv run -m bench` |
 
 A local model needs [Ollama](https://ollama.com) with the model pulled, such as `ollama pull qwen3.5:4b`, and costs nothing. [docs/STATUS.md](docs/STATUS.md) describes everything that is built and every live run.
 

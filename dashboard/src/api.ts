@@ -14,10 +14,13 @@ import type {
   Customer,
   DocumentName,
   Handler,
+  HandlerName,
   Policy,
   Section,
   Step,
 } from "./claimTypes";
+
+import { accessToken } from "./auth";
 
 export type * from "./agentTypes";
 export * from "./claimTypes";
@@ -31,8 +34,13 @@ export class ApiError extends Error {
   }
 }
 
-async function send(path: string, init?: RequestInit): Promise<Response> {
-  const response = await fetch(path, init);
+/** Send a request, with the signed-in handler's access token, and throw the
+ *  backend's refusal. */
+async function send(path: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers);
+  const token = await accessToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const response = await fetch(path, { ...init, headers });
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as {
       detail?: unknown;
@@ -80,7 +88,9 @@ export const api = {
   getCustomer: (id: string, signal?: AbortSignal) =>
     getJson<Customer>(`/api/customers/${id}`, signal),
   listHandlers: (signal?: AbortSignal) =>
-    getJson<Handler[]>("/api/handlers", signal),
+    getJson<HandlerName[]>("/api/handlers", signal),
+  getSignedInHandler: (signal?: AbortSignal) =>
+    getJson<Handler>("/api/me", signal),
   getInstructions: (signal?: AbortSignal) =>
     getText("/api/instructions", signal),
   getPolicyWording: (signal?: AbortSignal) =>
@@ -106,14 +116,11 @@ export const api = {
     getJson<Evaluation[]>("/api/evaluations", signal),
   getEvaluation: (runId: number, signal?: AbortSignal) =>
     getJson<Evaluation>(`/api/evaluations/${String(runId)}`, signal),
-  reviewPayout: (
-    id: string,
-    review: { handler_id: string; approved: boolean; note: string },
-  ) => post<Claim>(`/api/claims/${id}/review`, review),
+  reviewPayout: (id: string, review: { approved: boolean; note: string }) =>
+    post<Claim>(`/api/claims/${id}/review`, review),
   decideAsHandler: (
     id: string,
     resolution: {
-      handler_id: string;
       decision: "approve" | "decline";
       payout: number;
       reasons: string;

@@ -15,7 +15,7 @@ from agent import api
 from backend.main import app
 
 ROOT = Path(__file__).resolve().parents[1]
-PARTS = ("backend", "agent", "bench")
+PARTS = ("backend", "agent")
 MAX_LINES = 300
 MAX_FUNCTION_LINES = 40
 
@@ -63,14 +63,9 @@ def offending(
     ]
 
 
-SVG_NAMESPACE = 'xmlns="http://www.w3.org/2000/svg"'
-
-
 def test_no_address_in_code():
-    """Hosts, ports and URLs live in .env.defaults (standard 22). The SVG
-    namespace in the comparison's chart is a name, not an address."""
-    found = offending(ADDRESS, PARTS)
-    assert [line for line in found if SVG_NAMESPACE not in line] == []
+    """Hosts, ports and URLs live in .env.defaults (standard 22)."""
+    assert offending(ADDRESS, PARTS) == []
 
 
 def test_no_model_in_code():
@@ -80,7 +75,7 @@ def test_no_model_in_code():
 
 def test_nothing_reaches_the_answer_key():
     """Only seeding reads data/evals/, into tables no claim operation reads; the
-    agent never sees it, and the comparison reads the backend's scores."""
+    agent never sees it."""
     assert offending(ANSWER_KEY, PARTS, ("backend/seed.py",)) == []
 
 
@@ -91,10 +86,12 @@ def test_only_the_api_module_calls_the_backend():
     assert offending(HTTP_CLIENT, ("agent",), allowed) == []
 
 
-def test_only_one_module_calls_the_backend_from_the_comparison():
-    """The model comparison reaches the backend only through bench/backend.py."""
-    assert offending(HTTP_CLIENT, ("bench",), ("bench/backend.py",)) == []
-    assert offending(API_PATH, ("bench",), ("bench/backend.py",)) == []
+def test_only_one_module_checks_sign_ins():
+    """The backend reaches Supabase Auth only through backend/auth.py, which
+    names its address and the path to its keys once (standards 7, 15)."""
+    allowed = ("backend/auth.py",)
+    supabase = re.compile(r"VITE_SUPABASE|jwks|PyJWKClient")
+    assert offending(supabase, ("backend",), allowed) == []
 
 
 def test_only_one_module_calls_the_agents_service():
