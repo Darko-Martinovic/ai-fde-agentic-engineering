@@ -4,10 +4,15 @@ from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
-from agent.config import model
+from agent.versions import Model, Version
 
-# A model to work claims on in tests, which never call it
-FREE = model("openrouter:openrouter/free")
+# A version of the claim agent to work claims as in tests, on a free model the
+# tests never call
+FREE = Version(
+    number=1,
+    instructions="# UnderCover claim agent\n\nDecide the claim.",
+    model=Model(name="openrouter/free", provider="openrouter", options={}),
+)
 
 
 class StubModel(GenericFakeChatModel):

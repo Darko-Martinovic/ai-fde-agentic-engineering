@@ -2,12 +2,6 @@ import type { ClaimStatus, ClaimSummary, DecisionKind } from "./claimTypes";
 
 /* What the agent's runs and its work look like, as the backend sends them. */
 
-export interface ModelChoice {
-  spec: string;
-  label: string;
-  default: boolean;
-}
-
 export type RunStatus = "running" | "finished" | "stopped";
 
 /** What the agent's service says when it takes a start or a stop. */
@@ -54,6 +48,8 @@ export interface RunFacts {
   run_id: number;
   kind: "dispatch" | "evaluation";
   agents: number;
+  /** The version of the claim agent's configuration it used, and its model */
+  version: number;
   model: string;
   reasoning_effort: string;
   evaluation_set: EvaluationSet | null;

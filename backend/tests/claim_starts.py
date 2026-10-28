@@ -1,7 +1,7 @@
 """Starting a claim, in a dispatch as the agent does or on its own, for the
 backend's tests."""
 
-DISPATCH = {"agents": 3, "model": "test", "reasoning_effort": "none"}
+DISPATCH = {"agents": 3}
 
 
 def a_run(client):

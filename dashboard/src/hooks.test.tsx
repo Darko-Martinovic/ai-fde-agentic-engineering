@@ -20,11 +20,11 @@ afterEach(() => {
 it("follows the hash", async () => {
   const { result } = renderHook(() => useRoute());
   act(() => {
-    window.location.hash = "#/instructions";
+    window.location.hash = "#/configuration";
     window.dispatchEvent(new HashChangeEvent("hashchange"));
   });
   await waitFor(() => {
-    expect(result.current).toEqual({ page: "instructions" });
+    expect(result.current).toEqual({ page: "configuration" });
   });
 });
 

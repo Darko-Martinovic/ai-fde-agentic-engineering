@@ -7,8 +7,8 @@ import json
 from langchain_core.messages import AIMessage, ToolMessage
 
 from agent import api
-from agent.config import Model
 from agent.tools import ClaimContext
+from agent.versions import Model
 
 
 def steps(message: AIMessage) -> list[tuple[str, str]]:
@@ -47,11 +47,11 @@ def tokens(message: AIMessage | None) -> tuple[int, int]:
     return used.get("input_tokens", 0), used.get("output_tokens", 0)
 
 
-def cost(model: Model, message: AIMessage) -> float:
-    """What a model call cost in US dollars: as the provider reports it, as
-    OpenRouter does, or else at the model's prices in models.toml."""
+def cost(message: AIMessage) -> float:
+    """What a model call cost in US dollars, as OpenRouter reports it; nothing
+    for a local model, which reports none."""
     reported = (message.response_metadata.get("token_usage") or {}).get("cost")
-    return float(reported) if reported is not None else model.cost(*tokens(message))
+    return float(reported or 0)
 
 
 def model_call(
@@ -64,10 +64,10 @@ def model_call(
         {
             "thread_id": context.thread_id,
             "run_id": context.run_id,
-            "model": model.spec,
+            "model": model.name,
             "input_tokens": tokens_in,
             "output_tokens": tokens_out,
-            "cost": cost(model, message),
+            "cost": cost(message),
             "seconds": seconds,
         },
     )

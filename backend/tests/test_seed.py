@@ -1,5 +1,6 @@
 import shutil
 
+import pytest
 from sqlalchemy import Column, Integer, MetaData, Table, delete, func, inspect, select
 
 from backend import db, seed
@@ -64,3 +65,43 @@ def test_seeding_stores_the_answer_key_apart(tmp_path):
         tiny = select(func.count()).where(db.handler_decisions.c.tiny)
         assert conn.execute(tiny).scalar_one() == 10
     assert count_claims() == 25
+
+
+def test_seeding_makes_version_1_and_the_models_allowed(client):
+    configuration = client.get("/api/configuration").json()
+    assert configuration["current"] == 1
+    assert len(configuration["versions"]) == 1
+    luna, *others = configuration["models_allowed"]
+    assert (luna["model"], luna["reasoning_efforts"], luna["input_price"]) == (
+        "openai/gpt-6-luna",
+        ["none", "low", "medium"],
+        0.1,
+    )
+    assert len(others) == 2
+
+
+@pytest.mark.parametrize("spec", ["anthropic:claude-haiku-5-5", "openrouter"])
+def test_a_model_name_that_isnt_a_free_model_is_refused(monkeypatch, spec):
+    monkeypatch.setenv("MODEL_NAME", spec)
+    with pytest.raises(ValueError, match="a free model is openrouter:model"):
+        seed.reset()
+
+
+def test_on_a_free_model_it_is_version_1_and_the_only_model_allowed(
+    client, monkeypatch
+):
+    monkeypatch.setenv("MODEL_NAME", "openrouter:openrouter/free")
+    seed.reset()
+    current = client.get("/api/versions/current").json()
+    assert (current["model"], current["reasoning_effort"], current["provider"]) == (
+        "openrouter/free",
+        "default",
+        "openrouter",
+    )
+    assert current["options"] == {}
+    [free] = client.get("/api/configuration").json()["models_allowed"]
+    assert (free["model"], free["input_price"], free["output_price"]) == (
+        "openrouter/free",
+        0,
+        0,
+    )

@@ -36,7 +36,7 @@ When the last phase is done, review the whole branch against `main` in the same 
 The checks show that the code works, but not that it is fit to merge. Every code change gets a review before it is committed.
 
 - The reviewer is a fresh subagent that didn't write the code. Give it `docs/CODE_STANDARDS.md` and the diff, and ask it to review as a strict senior engineer deciding whether to merge the PR.
-- It checks every standard, in particular: one way to call each service, with each URL written once; modules that keep to their own job and don't borrow each other's helpers; the framework's own way of doing things over hand-rolled code; functions that do one job; configuration only from the env files and `settings/models.toml`; and agent instructions written as goals.
+- It checks every standard, in particular: one way to call each service, with each URL written once; modules that keep to their own job and don't borrow each other's helpers; the framework's own way of doing things over hand-rolled code; functions that do one job; configuration only from the env files and `data/models.json`; and agent instructions written as goals.
 - Fix everything it would block the PR for before you commit. If you disagree with a finding, say so in your report instead of skipping it quietly.
 
 ## Rules

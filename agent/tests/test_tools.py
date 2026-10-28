@@ -46,7 +46,7 @@ def test_the_agent_works_out_the_payout_with_the_rules(backend, run, memory_save
 
 def test_a_copy_reads_as_any_claim(backend, memory_saver):
     """The claim agent works an evaluation's copy without knowing it's one."""
-    run = api.create_evaluation("held_out", True, 5, FREE.spec, "none")
+    run = api.create_evaluation("held_out", True, 5)
     copy_id = run["claims"][0]["claim_id"]
     llm = stub(tool_call("get_claim"), decide("decline", 0))
     harness.work_claim(copy_id, run["run_id"], FREE, memory_saver, llm)

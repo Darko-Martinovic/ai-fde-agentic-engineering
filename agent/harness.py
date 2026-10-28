@@ -1,5 +1,6 @@
-"""Builds and runs the claim agents: the model, the claim graph for each claim,
-and its work on the claim, reported in a line."""
+"""Builds and runs the claim agents, each from a version of the claim agent's
+configuration: the model, the claim graph for each claim, and its work on the
+claim, reported in a line."""
 
 from collections.abc import Callable
 from time import monotonic
@@ -14,10 +15,10 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.types import Command
 
-from agent import api, graph, recording, tracing
-from agent.config import Model
+from agent import api, graph, recording, tracing, versions
 from agent.reports import AWAITING_SIGN_OFF, IN_PROGRESS, report
 from agent.tools import ClaimContext
+from agent.versions import Model, Version
 from settings import setting
 
 STOPPED = "The agent stopped before finishing the claim: it replied with no decision"
@@ -26,8 +27,10 @@ STOPPED = "The agent stopped before finishing the claim: it replied with no deci
 # the dispatcher to carry on after a wait.
 TRANSIENT = (ModelRateLimitError, ModelTimeoutError)
 
-# Our providers, and the LangChain integration that serves each one
-INTEGRATIONS = {"openrouter": "openai", "anthropic": "anthropic", "ollama": "ollama"}
+# Our providers, and the LangChain integration that serves each one: the
+# models allowed are on OpenRouter, and a free model in MODEL_NAME may be on
+# OpenRouter or a local Ollama
+INTEGRATIONS = {"openrouter": "openai", "ollama": "ollama"}
 
 
 def timeout() -> float:
@@ -36,17 +39,12 @@ def timeout() -> float:
 
 # How to reach each provider, from the settings. A call fails when the provider
 # sends nothing for MODEL_TIMEOUT seconds, which doesn't bound a reply that
-# keeps coming (models.toml caps a reply's tokens for that), and only the claim
+# keeps coming (data/models.json caps a reply's tokens for that), and only the claim
 # graph's model retries it, not the provider's client.
 CONNECTIONS: dict[str, Callable[[], dict[str, Any]]] = {
     "openrouter": lambda: {
         "base_url": setting("OPENROUTER_BASE_URL"),
         "api_key": setting("OPENROUTER_API_KEY"),
-        "timeout": timeout(),
-        "max_retries": 0,
-    },
-    "anthropic": lambda: {
-        "api_key": setting("ANTHROPIC_API_KEY"),
         "timeout": timeout(),
         "max_retries": 0,
     },
@@ -59,7 +57,7 @@ CONNECTIONS: dict[str, Callable[[], dict[str, Any]]] = {
 
 
 def chat_model(model: Model) -> BaseChatModel:
-    """Build the chat model for one of the models allowed."""
+    """Build the chat model a version runs on, at its reasoning effort."""
     return init_chat_model(
         model.name,
         model_provider=INTEGRATIONS[model.provider],
@@ -77,17 +75,23 @@ def contents() -> str:
     return "## The sections you can read\n\n" + "\n".join(lines)
 
 
-def instructions() -> str:
-    """The claim agent's instructions and the documents' contents, from the API."""
-    return f"{api.get_instructions()}\n\n{contents()}"
+def instructions(version: Version) -> str:
+    """A version's instructions, and the documents' contents from the API."""
+    return f"{version.instructions}\n\n{contents()}"
+
+
+def current_version() -> Version:
+    """The current version of the claim agent's configuration."""
+    return versions.version(api.get_current_version())
 
 
 def claim_graph(
-    model: Model, saver: BaseCheckpointSaver[Any], llm: BaseChatModel | None = None
+    version: Version, saver: BaseCheckpointSaver[Any], llm: BaseChatModel | None = None
 ) -> graph.ClaimGraph:
-    """The claim graph on a model, with the claim agent's instructions, saving its
-    progress with `saver`."""
-    return graph.claim_graph(llm or chat_model(model), model, saver, instructions())
+    """The claim graph as a version builds it, saving its progress with `saver`."""
+    return graph.claim_graph(
+        llm or chat_model(version.model), version.model, saver, instructions(version)
+    )
 
 
 def undecided(claim: dict[str, Any]) -> bool:
@@ -162,7 +166,7 @@ def run_graph(
 def work_claim(
     claim_id: str,
     run_id: int | None,
-    model: Model,
+    version: Version,
     saver: BaseCheckpointSaver[Any],
     llm: BaseChatModel | None = None,
 ) -> str:
@@ -172,7 +176,7 @@ def work_claim(
     context = ClaimContext(
         run_id=run_id, claim_id=claim_id, thread_id=f"{claim_id}-{uuid4().hex[:8]}"
     )
-    claim_graph_on_model = claim_graph(model, saver, llm)
+    claim_graph_on_model = claim_graph(version, saver, llm)
     api.start_claim(claim_id, run_id, context.thread_id)
     return tracing.claim_trace(
         "work-claim",
@@ -182,7 +186,7 @@ def work_claim(
             claim_graph_on_model, context, first_message(claim_id), config
         ),
         run_id,
-        model=model.spec,
+        model=version.model.name,
     )
 
 
@@ -221,7 +225,7 @@ def where_from(
 def carry_on(
     claim_id: str,
     run_id: int | None,
-    model: Model,
+    version: Version,
     saver: BaseCheckpointSaver[Any],
     llm: BaseChatModel | None = None,
 ) -> str:
@@ -236,7 +240,7 @@ def carry_on(
         context = ClaimContext(
             run_id=run_id, claim_id=claim_id, thread_id=claim["thread_id"]
         )
-        claim_graph_on_model = claim_graph(model, saver, llm)
+        claim_graph_on_model = claim_graph(version, saver, llm)
         start = where_from(claim_graph_on_model, claim, context)
     except Exception as error:  # noqa: BLE001 - one claim never stops a run
         return f"{claim_id}: not picked up ({type(error).__name__}: {error})"
@@ -246,14 +250,14 @@ def carry_on(
         context.thread_id,
         lambda config: run_graph(claim_graph_on_model, context, start, config),
         run_id,
-        model=model.spec,
+        model=version.model.name,
     )
 
 
 def work_in_run(
     claim_id: str,
     run_id: int | None,
-    model: Model,
+    version: Version,
     new_saver: Callable[[], BaseCheckpointSaver[Any]],
     llm: BaseChatModel | None = None,
 ) -> str:
@@ -264,7 +268,7 @@ def work_in_run(
     saver = new_saver()
     claim = api.get_claim(claim_id)
     work = carry_on if claim["status"] == IN_PROGRESS else work_claim
-    report = work(claim_id, run_id, model, saver, llm)
+    report = work(claim_id, run_id, version, saver, llm)
     if claim["evaluation_id"] is not None:
         forget_held(claim_id, saver)
     return report

@@ -40,17 +40,15 @@ def ask(path: str, body: dict[str, Any]) -> dict[str, Any]:
     return response.json()
 
 
-def start_dispatch(agents: int, model: str) -> dict[str, Any]:
+def start_dispatch(agents: int) -> dict[str, Any]:
     """Ask the agent's service to start a dispatch of the queue."""
-    return ask("/api/dispatches", {"agents": agents, "model": model})
+    return ask("/api/dispatches", {"agents": agents})
 
 
-def start_evaluation(
-    evaluation_set: str, tiny: bool, agents: int, model: str
-) -> dict[str, Any]:
+def start_evaluation(evaluation_set: str, tiny: bool, agents: int) -> dict[str, Any]:
     """Ask the agent's service to start an evaluation of a labelled set."""
     body = {"evaluation_set": evaluation_set, "tiny": tiny, "agents": agents}
-    return ask("/api/evaluations", body | {"model": model})
+    return ask("/api/evaluations", body)
 
 
 def stop_run() -> dict[str, Any]:

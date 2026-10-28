@@ -10,6 +10,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from agent import api, dispatcher, harness, service
 from agent.tests.stub import FREE, ByClaim, StubModel, decide, stub
 from backend.tests.direct_changes import set_status
+from backend.tests.new_versions import GEMINI, add_version
 from backend.tests.sign_ins import DANA, headers
 
 NOTE = "The bill is $3,800.00, less the $100.00 the clinic waived."
@@ -166,35 +167,68 @@ def test_a_dispatch_starts_at_once_and_works_the_queue(
 ):
     client, _ = agent_service
     declines(monkeypatch, "CLM-1004", "CLM-1005")
-    started = client.post("/api/dispatches", json={"agents": 2, "model": FREE.spec})
+    started = client.post("/api/dispatches", json={"agents": 2})
     assert started.status_code == 202
-    assert started.json() == {"agents": 2, "model": FREE.spec}
+    assert started.json() == {"agents": 2}
     run = backend.get("/api/dispatches/latest").json()
-    assert (run["agents"], run["model"], run["reasoning_effort"]) == (
+    assert (run["agents"], run["version"], run["model"], run["reasoning_effort"]) == (
         2,
-        FREE.spec,
-        "none",
+        1,
+        "openai/gpt-6-luna",
+        "low",
     )
     assert run["status"] == "finished"
     assert [c["status"] for c in run["claims"]] == ["decided", "decided"]
     assert not service.RUNNING.locked()
 
 
-def test_a_dispatch_records_the_models_reasoning_effort(
+def test_a_dispatch_builds_its_claim_agents_from_the_current_version(
     backend, agent_service, monkeypatch
 ):
+    """With version 2 current on another model, the dispatch records it and its
+    claim agents get its instructions and its model."""
     client, _ = agent_service
+    add_version("# Version two\n\nDecide carefully.")
     declines(monkeypatch, "CLM-1005")
-    luna = "openrouter:openai/gpt-6-luna"
-    client.post("/api/dispatches", json={"agents": 1, "model": luna})
+    built, prompts = [], []
+    llm, real = harness.chat_model, harness.instructions
+
+    def chat_model(model):
+        built.append(model)
+        return llm(model)
+
+    def instructions(version):
+        prompts.append(real(version))
+        return prompts[-1]
+
+    create_dispatch = api.create_dispatch
+
+    def then_version_three(agents):
+        """Version 3 is kept once the dispatch has recorded version 2."""
+        run = create_dispatch(agents)
+        add_version("# Version three", "deepseek/deepseek-v4.1-flash", "low")
+        return run
+
+    monkeypatch.setattr(harness, "chat_model", chat_model)
+    monkeypatch.setattr(harness, "instructions", instructions)
+    monkeypatch.setattr(api, "create_dispatch", then_version_three)
+    client.post("/api/dispatches", json={"agents": 1})
     run = backend.get("/api/dispatches/latest").json()
-    assert (run["model"], run["reasoning_effort"]) == (luna, "low")
+    assert (run["version"], run["model"], run["reasoning_effort"]) == (
+        2,
+        GEMINI,
+        "minimal",
+    )
+    assert [(m.name, m.options) for m in built] == [
+        (GEMINI, {"reasoning_effort": "minimal"})
+    ]
+    assert prompts[0].startswith("# Version two")
 
 
 def test_a_second_start_is_refused_while_one_runs(backend, agent_service):
     client, _ = agent_service
     with service.RUNNING:
-        refused = client.post("/api/dispatches", json={"agents": 3, "model": FREE.spec})
+        refused = client.post("/api/dispatches", json={"agents": 3})
     assert refused.status_code == 409
     assert refused.json()["detail"] == "A dispatch or an evaluation is already running"
     assert backend.get("/api/dispatches/latest").json() is None
@@ -203,12 +237,11 @@ def test_a_second_start_is_refused_while_one_runs(backend, agent_service):
 @pytest.mark.parametrize(
     "body",
     [
-        {"agents": 0, "model": FREE.spec},
-        {"agents": 26, "model": FREE.spec},
-        {"agents": 3, "model": "someone/else"},
+        {"agents": 0},
+        {"agents": 26},
     ],
 )
-def test_a_start_needs_one_to_25_agents_and_a_model_allowed(agent_service, body):
+def test_a_start_needs_one_to_25_agents(agent_service, body):
     client, _ = agent_service
     assert client.post("/api/dispatches", json=body).status_code == 422
 
@@ -222,7 +255,7 @@ def test_a_dispatcher_that_fails_stops_its_run_and_frees_the_next_start(
         raise RuntimeError("the backend went away")
 
     monkeypatch.setattr(dispatcher, "work_run", broken)
-    client.post("/api/dispatches", json={"agents": 3, "model": FREE.spec})
+    client.post("/api/dispatches", json={"agents": 3})
     assert backend.get("/api/dispatches/latest").json()["status"] == "stopped"
     assert not service.RUNNING.locked()
 
@@ -238,7 +271,7 @@ def test_stop_asks_the_running_dispatch_to_stop(agent_service):
 
 
 def test_starting_the_service_stops_a_run_left_running(backend):
-    run = api.create_dispatch(3, FREE.spec, "none")
+    run = api.create_dispatch(3)
     with TestClient(service.app):
         pass
     assert backend.get("/api/dispatches/latest").json()["run_id"] == run["run_id"]
@@ -273,7 +306,7 @@ def test_a_start_clears_an_earlier_stop(backend, agent_service, monkeypatch):
     client, _ = agent_service
     declines(monkeypatch, "CLM-1005")
     service.STOP.set()
-    client.post("/api/dispatches", json={"agents": 1, "model": FREE.spec})
+    client.post("/api/dispatches", json={"agents": 1})
     run = backend.get("/api/dispatches/latest").json()
     assert run["status"] == "finished"
     assert run["claims"][0]["status"] == "decided"
@@ -324,7 +357,7 @@ def test_an_evaluation_works_copies_and_leaves_the_queue_alone(
         },
     )
     body = {"evaluation_set": "evaluation", "tiny": True, "agents": 5}
-    started = client.post("/api/evaluations", json=body | {"model": FREE.spec})
+    started = client.post("/api/evaluations", json=body)
     assert started.status_code == 202
     assert backend.get("/api/claims").json() == queue
     [listed] = backend.get("/api/evaluations").json()
@@ -353,11 +386,11 @@ def test_a_dispatch_after_an_evaluation_leaves_its_copies_alone(
 ):
     client, _ = agent_service
     copies_decide(monkeypatch, {})
-    run = api.create_evaluation("held_out", True, 5, FREE.spec, "none")
+    run = api.create_evaluation("held_out", True, 5)
     api.start_claim("CLM-1104-E1", run["run_id"], "CLM-1104-E1-left")
     api.finish_run(run["run_id"], True)
     declines(monkeypatch, "CLM-1005")
-    client.post("/api/dispatches", json={"agents": 3, "model": FREE.spec})
+    client.post("/api/dispatches", json={"agents": 3})
     dispatch = backend.get("/api/dispatches/latest").json()
     assert [c["claim_id"] for c in dispatch["claims"]] == ["CLM-1005"]
     assert backend.get("/api/claims/CLM-1104-E1").json()["status"] == "in_progress"
@@ -369,9 +402,23 @@ def test_one_run_at_a_time_whichever_kind(agent_service):
         "evaluation_set": "held_out",
         "tiny": True,
         "agents": 5,
-        "model": FREE.spec,
     }
     with service.RUNNING:
         assert client.post("/api/evaluations", json=evaluation).status_code == 409
-        dispatch = {"agents": 3, "model": FREE.spec}
+        dispatch = {"agents": 3}
         assert client.post("/api/dispatches", json=dispatch).status_code == 409
+
+
+def test_a_resume_carries_the_claim_on_as_the_current_version(
+    backend, monkeypatch, memory_saver
+):
+    add_version("# Version two")
+    seen = []
+
+    def carry_on(claim_id, run_id, version, saver):
+        seen.append((claim_id, run_id, version.number))
+        return "carried on"
+
+    monkeypatch.setattr(harness, "carry_on", carry_on)
+    assert service.carrier(lambda: memory_saver)("CLM-1003") == "carried on"
+    assert seen == [("CLM-1003", None, 2)]

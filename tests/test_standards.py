@@ -69,8 +69,22 @@ def test_no_address_in_code():
 
 
 def test_no_model_in_code():
-    """Models live in models.toml and MODEL_NAME (standard 22)."""
+    """Models live in data/models.json and MODEL_NAME (standard 22)."""
     assert offending(MODEL_ID) == []
+
+
+def test_only_one_module_reads_the_free_model():
+    """MODEL_NAME, a student's free model, is read only by
+    backend/free_model.py; the claim agent's model comes from its version."""
+    model_name = re.compile(r"MODEL_NAME[\"']")
+    assert offending(model_name, PARTS, ("backend/free_model.py",)) == []
+
+
+def test_nothing_is_left_of_the_model_list_before_versions():
+    """The instructions, the model list and the model comparison gave way to
+    the versions of the configuration and data/models.json."""
+    gone = re.compile(r"get_instructions|list_models|models\.toml|\bbench\b")
+    assert offending(gone) == []
 
 
 def test_nothing_reaches_the_answer_key():
@@ -79,11 +93,14 @@ def test_nothing_reaches_the_answer_key():
     assert offending(ANSWER_KEY, PARTS, ("backend/seed.py",)) == []
 
 
-def test_only_the_api_module_calls_the_backend():
-    """The agent reaches the backend only through agent/api.py (standards 7, 15)."""
-    allowed = ("agent/api.py",)
-    assert offending(API_PATH, ("agent",), allowed) == []
-    assert offending(HTTP_CLIENT, ("agent",), allowed) == []
+def test_only_the_api_modules_call_the_backend():
+    """The agent reaches the backend only through its client, agent/api.py, on
+    the one connection in agent/connection.py, which names its address once
+    (standards 7, 15)."""
+    connection = ("agent/connection.py",)
+    assert offending(API_PATH, ("agent",), ("agent/api.py",)) == []
+    assert offending(HTTP_CLIENT, ("agent",), connection) == []
+    assert offending(re.compile("UNDERCOVER_API"), ("agent",), connection) == []
 
 
 def test_only_one_module_checks_sign_ins():
@@ -198,8 +215,10 @@ def test_the_agent_cannot_read_the_scoreboard_or_start_runs():
         "get_evaluation",
         "start_dispatch",
         "start_evaluation",
+        "get_configuration",
+        "get_version_details",
     }
     assert kept_out <= operation_ids()
     assert not kept_out & set(dir(api))
-    reads = re.compile(r"[\"']/api/(evaluations|dispatches)")
+    reads = re.compile(r"[\"']/api/(evaluations|dispatches|configuration)")
     assert offending(reads, ("agent",), ("agent/service.py",)) == []

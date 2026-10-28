@@ -2,16 +2,16 @@ import json
 from time import monotonic
 
 import pytest
-from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage
 from langchain_core.utils.function_calling import convert_to_openai_tool
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 
-from agent import harness
-from agent.config import model
+from agent import api, connection, harness, versions
 from agent.tests.stub import FREE, REASONS, StubModel, decide, stub, tool_call
 from agent.tools import CLAIM_TOOLS
+from agent.versions import Model
+from backend.tests.new_versions import GEMINI, add_version
 from backend.tests.sign_ins import DANA, headers
 from backend.tests.usage_rows import model_calls, work_times
 
@@ -132,7 +132,6 @@ def test_reports_say_where_each_claim_stands(backend, run, memory_saver):
 
 
 def test_usage_is_recorded_on_the_run(backend, run, memory_saver):
-    priced = model("anthropic:claude-haiku-5-5")
     reply = AIMessage(
         content="",
         tool_calls=[{"name": "get_claim", "args": {}, "id": "1"}],
@@ -141,19 +140,20 @@ def test_usage_is_recorded_on_the_run(backend, run, memory_saver):
             "output_tokens": 1000,
             "total_tokens": 21000,
         },
+        response_metadata={"token_usage": {"cost": 0.003}},
     )
     harness.work_claim(
-        "CLM-1001", run, priced, memory_saver, stub(reply, AIMessage(content="."))
+        "CLM-1001", run, FREE, memory_saver, stub(reply, AIMessage(content="."))
     )
     usage = backend.get("/api/dispatches/latest").json()["usage"]
     assert usage["model_calls"] == 2
     assert usage["input_tokens"] == 20000
-    assert usage["cost"] == pytest.approx(priced.cost(20000, 1000))
+    assert usage["cost"] == pytest.approx(0.003)
 
 
-def test_instructions_list_the_sections_not_the_wording(backend):
-    prompt = harness.instructions()
-    assert prompt.startswith("# UnderCover claim agent")
+def test_instructions_are_the_versions_with_the_sections_not_the_wording(backend):
+    prompt = harness.instructions(FREE)
+    assert prompt.startswith(FREE.instructions)
     assert "- Claims manual 9. Repeat claims" in prompt
     assert "- Policy wording 3. Trip Delay" in prompt
     assert "# UnderCover Travel Insurance: Policy Wording" not in prompt
@@ -188,23 +188,59 @@ def test_sections_read_are_recorded(backend, run, memory_saver):
     assert refused == ["Refused (404): There is no section 99 in the manual"]
 
 
-@pytest.mark.parametrize(
-    ("spec", "kind"),
-    [
-        ("openrouter:deepseek/deepseek-v4.1-flash", ChatOpenAI),
-        ("anthropic:claude-haiku-5-5", ChatAnthropic),
-        ("ollama:qwen3.5:4b", ChatOllama),
-    ],
-)
-def test_chat_model_for_each_provider(spec, kind, monkeypatch):
+DEEPSEEK = Model("deepseek/deepseek-v4.1-flash", "openrouter", {})
+QWEN = Model("qwen3.5:4b", "ollama", {})
+
+
+def test_the_current_version_is_the_newest_kept(backend):
+    first = harness.current_version()
+    assert (first.number, first.model.name, first.model.options) == (
+        1,
+        "openai/gpt-6-luna",
+        {"max_tokens": 16000, "reasoning_effort": "low"},
+    )
+    add_version("# Version two")
+    add_version("# Version three", verdict=None, based_on=2)
+    second = harness.current_version()
+    assert (second.number, second.instructions, second.model.name) == (
+        2,
+        "# Version two",
+        GEMINI,
+    )
+
+
+def test_a_version_builds_its_model_with_its_options(backend, monkeypatch):
+    """Version 1's model, Luna, gets its reply cap from data/models.json and
+    the version's reasoning effort."""
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    allowed = model(spec)
-    llm = harness.chat_model(allowed)
+    luna = harness.chat_model(versions.version(api.get_version(1)).model)
+    assert isinstance(luna, ChatOpenAI)
+    assert (luna.model_name, luna.max_tokens, luna.reasoning_effort) == (
+        "openai/gpt-6-luna",
+        16000,
+        "low",
+    )
+
+
+@pytest.mark.parametrize(
+    ("options", "built"), [({}, None), ({"reasoning_effort": "medium"}, "medium")]
+)
+def test_a_model_is_built_with_the_versions_options(options, built, monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    llm = harness.chat_model(Model("openai/gpt-6-luna", "openrouter", options))
+    assert isinstance(llm, ChatOpenAI)
+    assert llm.reasoning_effort == built
+
+
+@pytest.mark.parametrize(
+    ("model", "kind"), [(DEEPSEEK, ChatOpenAI), (QWEN, ChatOllama)]
+)
+def test_chat_model_for_each_provider(model, kind, monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    llm = harness.chat_model(model)
     assert isinstance(llm, kind)
-    assert spec.endswith(getattr(llm, "model_name", None) or getattr(llm, "model", ""))
-    for option, value in allowed.options.items():
-        assert getattr(llm, option) == value
+    built = llm.model_name if isinstance(llm, ChatOpenAI) else llm.model_dump()["model"]
+    assert built == model.name
 
 
 def test_chat_model_reaches_the_configured_address(monkeypatch):
@@ -212,10 +248,10 @@ def test_chat_model_reaches_the_configured_address(monkeypatch):
     monkeypatch.setenv("OPENROUTER_BASE_URL", "http://openrouter.test/api")
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama.test")
     monkeypatch.setenv("OLLAMA_NUM_CTX", "4096")
-    openrouter = harness.chat_model(model("openrouter:deepseek/deepseek-v4.1-flash"))
+    openrouter = harness.chat_model(DEEPSEEK)
     assert isinstance(openrouter, ChatOpenAI)
     assert openrouter.openai_api_base == "http://openrouter.test/api"
-    ollama = harness.chat_model(model("ollama:qwen3.5:4b"))
+    ollama = harness.chat_model(QWEN)
     assert isinstance(ollama, ChatOllama)
     assert ollama.base_url == "http://ollama.test"
     assert ollama.num_ctx == 4096
@@ -223,21 +259,17 @@ def test_chat_model_reaches_the_configured_address(monkeypatch):
 
 def test_chat_model_times_out_and_leaves_retries_to_the_agents(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     monkeypatch.setenv("MODEL_TIMEOUT", "42")
-    openrouter = harness.chat_model(model("openrouter:deepseek/deepseek-v4.1-flash"))
+    openrouter = harness.chat_model(DEEPSEEK)
     assert isinstance(openrouter, ChatOpenAI)
     assert (openrouter.request_timeout, openrouter.max_retries) == (42.0, 0)
-    anthropic = harness.chat_model(model("anthropic:claude-haiku-5-5"))
-    assert isinstance(anthropic, ChatAnthropic)
-    assert (anthropic.default_request_timeout, anthropic.max_retries) == (42.0, 0)
-    ollama = harness.chat_model(model("ollama:qwen3.5:4b"))
+    ollama = harness.chat_model(QWEN)
     assert isinstance(ollama, ChatOllama)
     assert ollama.client_kwargs == {"timeout": 42.0}
 
 
 def test_a_refusal_of_invalid_input_reads_as_text(backend):
-    with pytest.raises(harness.api.Refused, match=r"Refused \(422\): \[") as refused:
+    with pytest.raises(connection.Refused, match=r"Refused \(422\): \[") as refused:
         harness.api.pay_claim("CLM-1001", -5)
     assert refused.value.status == 422
 
@@ -299,13 +331,12 @@ def test_the_cost_openrouter_reports_is_recorded(backend, memory_saver):
     assert second["cost"] == 0.0
 
 
-def test_with_no_cost_reported_the_models_prices_are_used(backend, memory_saver):
-    priced = model("anthropic:claude-haiku-5-5")
+def test_a_call_with_no_cost_reported_costs_nothing(backend, memory_saver):
     llm = stub(costing(tokens=(20000, 1000)), decide("approve", 420.0))
-    harness.work_claim("CLM-1001", None, priced, memory_saver, llm)
+    harness.work_claim("CLM-1001", None, FREE, memory_saver, llm)
     first, _ = model_calls("CLM-1001")
-    assert first["cost"] == pytest.approx(priced.cost(20000, 1000))
-    assert first["model"] == "anthropic:claude-haiku-5-5"
+    assert (first["cost"], first["input_tokens"]) == (0, 20000)
+    assert first["model"] == "openrouter/free"
 
 
 def test_a_claim_worked_alone_records_its_calls_and_its_spell_with_no_run(

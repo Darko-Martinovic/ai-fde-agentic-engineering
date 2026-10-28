@@ -2,9 +2,6 @@ import pytest
 from langchain_core.messages import AIMessage
 
 from agent import recording
-from agent.config import model
-
-HAIKU = model("anthropic:claude-haiku-5-5")
 
 
 def test_steps_from_a_reply():
@@ -28,14 +25,13 @@ def reply(token_usage):
     return message
 
 
-def test_the_cost_the_provider_reports_is_the_cost():
-    assert recording.cost(HAIKU, reply({"cost": 0.0042})) == 0.0042
+def test_the_cost_openrouter_reports_is_the_cost():
+    assert recording.cost(reply({"cost": 0.0042})) == 0.0042
 
 
 @pytest.mark.parametrize("token_usage", [{}, None, {"cost": None}])
-def test_with_no_cost_reported_the_models_prices_give_it(token_usage):
-    priced = recording.cost(HAIKU, reply(token_usage))
-    assert priced == pytest.approx(HAIKU.cost(20000, 1000))
+def test_a_local_model_reports_no_cost_and_costs_nothing(token_usage):
+    assert recording.cost(reply(token_usage)) == 0
 
 
 def test_a_reply_with_no_usage_has_no_tokens():

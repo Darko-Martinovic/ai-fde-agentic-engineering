@@ -19,7 +19,11 @@ const PAGES: { label: string; href: string; routes: Route["page"][] }[] = [
     href: paths.scoreboard,
     routes: ["scoreboard", "evaluation"],
   },
-  { label: "Instructions", href: paths.instructions, routes: ["instructions"] },
+  {
+    label: "Configuration",
+    href: paths.configuration,
+    routes: ["configuration", "version"],
+  },
 ];
 
 function healthLabel(data: unknown, error: string | null): string {

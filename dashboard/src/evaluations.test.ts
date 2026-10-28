@@ -27,7 +27,5 @@ it("names the model with its reasoning effort, if it had one", () => {
   expect(modelWithEffort("GPT-6 Luna", "low")).toBe(
     "GPT-6 Luna, low reasoning",
   );
-  expect(modelWithEffort("Qwen 3.5 4B (local)", "none")).toBe(
-    "Qwen 3.5 4B (local)",
-  );
+  expect(modelWithEffort("qwen3.5:4b", "default")).toBe("qwen3.5:4b");
 });

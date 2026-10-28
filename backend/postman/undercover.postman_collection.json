@@ -627,36 +627,6 @@
           ]
         },
         {
-          "name": "Get the claim agent's instructions",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/instructions",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "instructions"
-              ]
-            },
-            "description": "`get_instructions`: the claim agent's instructions."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
-                  "pm.test(\"is the claim agent's\", () => pm.expect(pm.response.text()).to.include(\"# UnderCover claim agent\"));"
-                ]
-              }
-            }
-          ]
-        },
-        {
           "name": "List sections",
           "request": {
             "method": "GET",
@@ -796,6 +766,181 @@
       ]
     },
     {
+      "name": "Configuration",
+      "item": [
+        {
+          "name": "Get the current version",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/versions/current",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "versions",
+                "current"
+              ]
+            },
+            "description": "`get_current_version`: the version the claim agent runs as: its instructions, model, reasoning effort and how to build the model, with no scores."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const version = pm.response.json();",
+                  "pm.test(\"is version 1 on Luna at low\", () => {",
+                  "  pm.expect(version.number).to.eql(1);",
+                  "  pm.expect(version.model).to.eql(\"openai/gpt-6-luna\");",
+                  "  pm.expect(version.reasoning_effort).to.eql(\"low\");",
+                  "  pm.expect(version.options.max_tokens).to.eql(16000);",
+                  "});",
+                  "pm.test(\"holds no scores\", () => pm.expect(Object.keys(version).sort()).to.eql([\"instructions\", \"model\", \"number\", \"options\", \"provider\", \"reasoning_effort\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get version 1",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/versions/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "versions",
+                "1"
+              ]
+            },
+            "description": "`get_version`: one version as the claim agent runs it, as a run uses it."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"is version 1\", () => pm.expect(pm.response.json().number).to.eql(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get a version that isn't there",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/versions/999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "versions",
+                "999"
+              ]
+            },
+            "description": "`get_version`: 404 for a version that doesn't exist."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get the configuration",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/configuration",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "configuration"
+              ]
+            },
+            "description": "`get_configuration`: every version, newest first, with its status and the lines it changed, and the models allowed, for the Configuration page."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const configuration = pm.response.json();",
+                  "pm.test(\"version 1 is current\", () => {",
+                  "  pm.expect(configuration.current).to.eql(1);",
+                  "  pm.expect(configuration.versions[0].status).to.eql(\"current\");",
+                  "});",
+                  "pm.test(\"three models allowed\", () => pm.expect(configuration.models_allowed).to.have.lengthOf(3));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get version 1's details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/configuration/versions/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "configuration",
+                "versions",
+                "1"
+              ]
+            },
+            "description": "`get_version_details`: one version with what it changed from the version it was based on; version 1 was the claims team's and changed nothing."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const details = pm.response.json();",
+                  "pm.test(\"proposed by the claims team, with no changes\", () => {",
+                  "  pm.expect(details.proposed_by).to.eql(\"The claims team\");",
+                  "  pm.expect(details.changes).to.eql([]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Workflow",
       "description": "Moves CLM-1001, CLM-1002 and CLM-1010 through the queue, so it changes the data. Run `uv run -m backend.seed` first to start from fresh data.",
       "item": [
@@ -820,10 +965,10 @@
                 "dispatches"
               ]
             },
-            "description": "`create_dispatch`: a dispatch, as the agent's service records one, that the claims below start in.",
+            "description": "`create_dispatch`: a dispatch, as the agent's service records one, on the current version of the claim agent's configuration, that the claims below start in.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"agents\": 3,\n  \"model\": \"openrouter:openai/gpt-6-luna\",\n  \"reasoning_effort\": \"low\"\n}"
+              "raw": "{\n  \"agents\": 3\n}"
             }
           },
           "event": [
@@ -834,9 +979,11 @@
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "const run = pm.response.json();",
-                  "pm.test(\"is running with three agents\", () => {",
+                  "pm.test(\"is running with three agents on version 1\", () => {",
                   "  pm.expect(run.status).to.eql(\"running\");",
                   "  pm.expect(run.agents).to.eql(3);",
+                  "  pm.expect(run.version).to.eql(1);",
+                  "  pm.expect(run.model).to.eql(\"openai/gpt-6-luna\");",
                   "});",
                   "pm.collectionVariables.set(\"runId\", run.run_id);"
                 ]
@@ -2163,7 +2310,7 @@
             "description": "`start_dispatch`: 422 for N below 1, before the agent's service is asked. A start with N from 1 to 25 starts a real dispatch, which calls the model, so the collection doesn't send one.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"agents\": 0,\n  \"model\": \"openrouter:openai/gpt-6-luna\"\n}"
+              "raw": "{\n  \"agents\": 0\n}"
             }
           },
           "event": [
@@ -2201,7 +2348,7 @@
             "description": "`start_dispatch`: 401 without a signed-in handler, before the agent's service is asked.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"agents\": 3,\n  \"model\": \"openrouter:openai/gpt-6-luna\"\n}"
+              "raw": "{\n  \"agents\": 3\n}"
             }
           },
           "event": [
@@ -2288,7 +2435,7 @@
             "description": "`create_evaluation`: an evaluation, as the agent's service records one, with its copies of the held-out set's five tiny claims.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"evaluation_set\": \"held_out\",\n  \"tiny\": true,\n  \"agents\": 5,\n  \"model\": \"openrouter:openai/gpt-6-luna\",\n  \"reasoning_effort\": \"low\"\n}"
+              "raw": "{\n  \"evaluation_set\": \"held_out\",\n  \"tiny\": true,\n  \"agents\": 5\n}"
             }
           },
           "event": [
@@ -2515,7 +2662,7 @@
             "description": "`start_evaluation`: 422 for a set that isn't one, before the agent's service is asked. A real start calls the model, so the collection doesn't send one.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"evaluation_set\": \"harder\",\n  \"tiny\": true,\n  \"agents\": 5,\n  \"model\": \"openrouter:openai/gpt-6-luna\"\n}"
+              "raw": "{\n  \"evaluation_set\": \"harder\",\n  \"tiny\": true,\n  \"agents\": 5\n}"
             }
           },
           "event": [
@@ -2568,44 +2715,6 @@
                   "pm.test(\"no claim waits for a handler\", () => pm.expect(totals.waiting_for_handler).to.eql(0));",
                   "pm.test(\"paid $2,920.00 in all\", () => pm.expect(totals.paid).to.eql(2920));",
                   "pm.test(\"the recorded step counts as a get_claim call\", () => pm.expect(insights.tools).to.eql([{ tool: \"get_claim\", calls: 1, refused: 0 }]));"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "Models",
-      "description": "Starts and stops the UnderCover Agent. Run CLM-1003 calls the local Qwen model through Ollama, for nothing, for a moment before Stop ends it.",
-      "item": [
-        {
-          "name": "List models",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/models",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "models"
-              ]
-            },
-            "description": "`list_models`: the models the agent may run on, with the default marked."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
-                  "const models = pm.response.json();",
-                  "pm.test(\"one default\", () => pm.expect(models.filter((m) => m.default).length).to.eql(1));",
-                  "pm.test(\"includes local Qwen\", () => pm.expect(models.map((m) => m.spec)).to.include(\"ollama:qwen3.5:4b\"));"
                 ]
               }
             }

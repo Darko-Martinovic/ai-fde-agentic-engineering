@@ -4,9 +4,8 @@ model calls used, and its summary once it finishes."""
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
-from agent.config import model
 from backend.models import ClaimSummary
 from settings import setting
 
@@ -21,20 +20,10 @@ MAX_AGENTS = int(setting("MAX_AGENTS"))
 
 
 class DispatchIn(BaseModel):
+    """A dispatch or an evaluation to start or record: N claim agents at once,
+    on the current version of the claim agent's configuration."""
+
     agents: int = Field(ge=1, le=MAX_AGENTS)
-    model: str = Field(min_length=1)
-    reasoning_effort: str = Field(min_length=1)
-
-
-class DispatchStart(BaseModel):
-    agents: int = Field(ge=1, le=MAX_AGENTS)
-    model: str
-
-    @field_validator("model")
-    @classmethod
-    def model_is_allowed(cls, spec: str) -> str:
-        """Only a model in models.toml runs."""
-        return model(spec).spec
 
 
 class EvaluationIn(DispatchIn):
@@ -43,14 +32,8 @@ class EvaluationIn(DispatchIn):
     tiny: bool
 
 
-class EvaluationStart(DispatchStart):
-    evaluation_set: EvaluationSet
-    tiny: bool
-
-
 class Started(BaseModel):
     agents: int
-    model: str
 
 
 class Stopping(BaseModel):
@@ -106,6 +89,8 @@ class RunFacts(BaseModel):
     run_id: int
     kind: RunKind
     agents: int
+    # The version of the claim agent's configuration it used, and its model
+    version: int
     model: str
     reasoning_effort: str
     # For an evaluation: its set, and whether it's the five tiny claims

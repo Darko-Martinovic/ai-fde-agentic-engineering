@@ -62,7 +62,7 @@ test("the scoreboard starts an evaluation", async ({ page, request }) => {
   await form.getByLabel("Set").selectOption("held_out");
   await form.getByLabel("Claims").selectOption("tiny");
   await form.getByLabel("Claim agents at once").selectOption("5");
-  await expect(form.getByLabel("Model")).toHaveValue(LUNA);
+  await expect(form.getByLabel("Model")).toHaveCount(0);
   await form.getByRole("button", { name: "Start an evaluation" }).click();
   await expect
     .poll(() => started(request))
@@ -71,7 +71,6 @@ test("the scoreboard starts an evaluation", async ({ page, request }) => {
         evaluation_set: "held_out",
         tiny: true,
         agents: 5,
-        model: LUNA,
       },
     });
 });
@@ -84,8 +83,6 @@ test("the scoreboard shows an evaluation scored from its records", async ({
     evaluation_set: "held_out",
     tiny: true,
     agents: 5,
-    model: LUNA,
-    reasoning_effort: "low",
   });
   for (const answer of ANSWERS) await workCopy(request, runId, answer);
   await send(request, `/api/runs/${String(runId)}/finish`, { stopped: false });

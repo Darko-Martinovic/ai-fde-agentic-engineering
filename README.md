@@ -155,7 +155,7 @@ npm run dev              # backend on 8000, the agent's service on 8002, dashboa
 | Task | Command |
 |---|---|
 | A dispatch of the queue, or an evaluation | The queue page's Start a dispatch, or the Scoreboard's Start an evaluation, with `npm run dev` running |
-| One claim, on a model from `settings/models.toml` | `uv run -m agent CLM-1001 --model anthropic:claude-haiku-5-5` |
+| One claim, as the current version of the claim agent's configuration | `uv run -m agent CLM-1001` |
 | Reset the data | `uv run -m backend.seed` |
 | Every check | `npm run check` |
 | End-to-end tests | `npm run e2e` |

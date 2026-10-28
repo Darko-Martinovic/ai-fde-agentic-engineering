@@ -7,8 +7,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
 
-from agent import api, config, dispatcher
-from agent.tests.stub import FREE
+from agent import api, connection, dispatcher, graph
 from backend import agent_service
 from backend.main import app
 
@@ -19,8 +18,8 @@ def backend(tmp_path, monkeypatch):
     backend's call to the agent's service after a review goes nowhere; the tests
     call the service themselves."""
     monkeypatch.setenv("UNDERCOVER_DB", str(tmp_path / "undercover.db"))
-    monkeypatch.setattr(api, "client", lambda: TestClient(app))
-    monkeypatch.setattr(config, "RETRY_DELAY", 0)
+    monkeypatch.setattr(connection, "client", lambda: TestClient(app))
+    monkeypatch.setattr(graph, "RETRY_DELAY", 0)
     monkeypatch.setattr(agent_service, "resume_claim", lambda claim_id: None)
     return TestClient(app)
 
@@ -37,7 +36,7 @@ def no_waits(monkeypatch):
 @pytest.fixture
 def run(backend):
     """A dispatch to work claims in, on a free model."""
-    return api.create_dispatch(3, FREE.spec, FREE.reasoning_effort)["run_id"]
+    return api.create_dispatch(3)["run_id"]
 
 
 @pytest.fixture

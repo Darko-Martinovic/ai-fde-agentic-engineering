@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
+import { modelLabel } from "./configuration";
 import { parseRoute, type Route } from "./paths";
 
 export type Loader<T> = (signal: AbortSignal) => Promise<T>;
@@ -148,48 +149,14 @@ export function useTheme(): [Theme, (theme: Theme) => void] {
   return [theme, setTheme];
 }
 
-const MODEL_KEY = "undercover-model";
-
-function readModel(): string {
-  try {
-    return localStorage.getItem(MODEL_KEY) ?? "";
-  } catch {
-    return "";
-  }
+/** How to name a model: its label among the models allowed, or its name when
+ *  it isn't one. The configuration loads once, however many are named. */
+export function useModelLabels(): (model: string) => string {
+  const configuration = usePoll(api.getConfiguration, null);
+  return (model) => modelLabel(configuration.data?.models_allowed ?? [], model);
 }
 
-/** The models the agent may run on, and the one picked: the default (MODEL_NAME)
- *  until someone picks another, which the queue and the claim pages share. */
-export function useModelChoice() {
-  const models = usePoll(api.listModels, null);
-  const [picked, setPicked] = useState(readModel);
-  const list = models.data ?? [];
-  const allowed = list.some((m) => m.spec === picked);
-  const fallback = list.find((m) => m.default)?.spec ?? "";
-  const pick = (spec: string) => {
-    setPicked(spec);
-    try {
-      localStorage.setItem(MODEL_KEY, spec);
-    } catch {
-      // Private windows can refuse storage; the pick holds on this page.
-    }
-  };
-  return {
-    models: list,
-    model: allowed ? picked : fallback,
-    error: models.error,
-    pick,
-  };
-}
-
-/** How to name a model: its label from models.toml, or its id when it is no
- *  longer listed. The models load once, however many are named. */
-export function useModelLabels(): (spec: string) => string {
-  const models = usePoll(api.listModels, null);
-  return (spec) => models.data?.find((m) => m.spec === spec)?.label ?? spec;
-}
-
-/** A model's label from models.toml, or its id when it is no longer listed. */
-export function useModelLabel(spec: string): string {
-  return useModelLabels()(spec);
+/** A model's label among the models allowed, or its name. */
+export function useModelLabel(model: string): string {
+  return useModelLabels()(model);
 }

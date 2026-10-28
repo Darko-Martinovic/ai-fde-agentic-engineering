@@ -10,9 +10,10 @@ import type {
   Policy,
 } from "./api";
 import { HandlerContext } from "./handler";
-import { MODELS } from "./agentFixtures";
+import { CONFIGURATION } from "./improvementFixtures";
 
 export * from "./agentFixtures";
+export * from "./improvementFixtures";
 
 /** Routes keyed by "METHOD /path": a value is sent as JSON (a string as text),
  *  a Response as it is, and a missing route answers 404. */
@@ -236,7 +237,7 @@ export function claimRoutes(overrides: Routes = {}): Routes {
     "GET /api/customers/CUS-3001": CUSTOMER,
     "GET /api/handlers": HANDLERS,
     "GET /api/me": DANA,
-    "GET /api/models": MODELS,
+    "GET /api/configuration": CONFIGURATION,
     ...overrides,
   };
 }

@@ -14,7 +14,6 @@ from backend.run_models import (
     Evaluation,
     EvaluationClaim,
     EvaluationIn,
-    EvaluationStart,
     Measures,
     Run,
     RunClaim,
@@ -22,7 +21,7 @@ from backend.run_models import (
 )
 from backend.run_views import load_run
 from backend.signed_in import signed_in
-from backend.store import evaluations, runs
+from backend.store import evaluations, runs, versions
 
 router = APIRouter(prefix="/api")
 
@@ -64,18 +63,22 @@ def make_copies(conn: Connection, run_id: int, start: EvaluationIn) -> list[str]
     status_code=202,
     dependencies=[Depends(signed_in)],
 )
-def start_evaluation(start: EvaluationStart) -> Started:
+def start_evaluation(start: EvaluationIn) -> Started:
     """Ask the agent's service to start an evaluation with N claim agents at once."""
     asked = agent_service.start_evaluation(
-        start.evaluation_set, start.tiny, start.agents, start.model
+        start.evaluation_set, start.tiny, start.agents
     )
     return Started.model_validate(asked)
 
 
 @router.post("/runs/evaluations", operation_id="create_evaluation")
 def create_evaluation(start: EvaluationIn, conn: Db) -> Run:
-    """Record a new evaluation, running, with its copies of a labelled set's claims."""
-    run = start.model_dump() | {"kind": EVALUATION, "started_at": now()}
+    """Record a new evaluation, running, on the current version, with its copies."""
+    run = (
+        start.model_dump()
+        | versions.run_on(conn, versions.current(conn))
+        | {"kind": EVALUATION, "started_at": now()}
+    )
     run_id = runs.add(conn, run)
     runs.set_claims(conn, run_id, make_copies(conn, run_id, start))
     return load_run(conn, run_id)

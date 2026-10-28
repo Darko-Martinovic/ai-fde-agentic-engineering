@@ -5,7 +5,12 @@ describe("parseRoute", () => {
   it("knows the pages", () => {
     expect(parseRoute("")).toEqual({ page: "queue" });
     expect(parseRoute("#/")).toEqual({ page: "queue" });
-    expect(parseRoute("#/instructions")).toEqual({ page: "instructions" });
+    expect(parseRoute("#/configuration")).toEqual({ page: "configuration" });
+    expect(parseRoute("#/instructions")).toEqual({ page: "configuration" });
+    expect(parseRoute("#/configuration/versions/3")).toEqual({
+      page: "version",
+      number: 3,
+    });
     expect(parseRoute("#/insights")).toEqual({ page: "insights" });
     expect(parseRoute("#/claims/CLM-1001")).toEqual({
       page: "claim",
@@ -53,4 +58,5 @@ it("builds the link the route reads back", () => {
     page: "evaluation",
     runId: 12,
   });
+  expect(parseRoute(paths.version(2))).toEqual({ page: "version", number: 2 });
 });

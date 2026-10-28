@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { ScoreboardPage } from "./Scoreboard";
-import { MODELS, evaluation, mockFetch } from "../testing";
+import { CONFIGURATION, evaluation, mockFetch } from "../testing";
 
 afterEach(() => {
   cleanup();
@@ -22,7 +22,7 @@ it("lists the evaluations newest first with their measures", async () => {
       evaluation({ run_id: 5 }),
       evaluation({ evaluation_set: "evaluation", tiny: false }),
     ],
-    "GET /api/models": MODELS,
+    "GET /api/configuration": CONFIGURATION,
   });
   render(<ScoreboardPage />);
   const table = await screen.findByRole("table", { name: "Evaluations" });
@@ -45,7 +45,10 @@ it("lists the evaluations newest first with their measures", async () => {
 });
 
 it("says when there is no evaluation yet", async () => {
-  mockFetch({ "GET /api/evaluations": [], "GET /api/models": MODELS });
+  mockFetch({
+    "GET /api/evaluations": [],
+    "GET /api/configuration": CONFIGURATION,
+  });
   render(<ScoreboardPage />);
   expect(await screen.findByText("No evaluation yet.")).toBeDefined();
 });
@@ -53,11 +56,8 @@ it("says when there is no evaluation yet", async () => {
 it("starts with the evaluation set, all 25 and 3 agents, and posts the choices", async () => {
   const fetchMock = mockFetch({
     "GET /api/evaluations": [],
-    "GET /api/models": MODELS,
-    "POST /api/evaluations": {
-      agents: 5,
-      model: "openrouter:openai/gpt-6-luna",
-    },
+    "GET /api/configuration": CONFIGURATION,
+    "POST /api/evaluations": { agents: 5 },
   });
   render(<ScoreboardPage />);
   const form = screen.getByRole("form", { name: "Start an evaluation" });
@@ -70,7 +70,7 @@ it("starts with the evaluation set, all 25 and 3 agents, and posts the choices",
     "value",
     "3",
   );
-  await screen.findByRole("option", { name: "GPT-6 Luna (default)" });
+  expect(within(form).queryByLabelText("Model")).toBeNull();
   fireEvent.change(within(form).getByLabelText("Set"), {
     target: { value: "held_out" },
   });
@@ -91,7 +91,6 @@ it("starts with the evaluation set, all 25 and 3 agents, and posts the choices",
       evaluation_set: "held_out",
       tiny: true,
       agents: 5,
-      model: "openrouter:openai/gpt-6-luna",
     });
   });
 });
@@ -102,17 +101,16 @@ it.each([
 ])("shows a refusal (%i)", async (status, detail) => {
   mockFetch({
     "GET /api/evaluations": [],
-    "GET /api/models": MODELS,
+    "GET /api/configuration": CONFIGURATION,
     "POST /api/evaluations": Response.json({ detail }, { status }),
   });
   render(<ScoreboardPage />);
-  await screen.findByRole("option", { name: "GPT-6 Luna (default)" });
   fireEvent.click(screen.getByRole("button", { name: "Start an evaluation" }));
   expect((await screen.findByRole("alert")).textContent).toBe(detail);
 });
 
 it("shows when the evaluations can't load", async () => {
-  mockFetch({ "GET /api/models": MODELS });
+  mockFetch({ "GET /api/configuration": CONFIGURATION });
   render(<ScoreboardPage />);
   expect(
     await screen.findByText("No route for GET /api/evaluations"),

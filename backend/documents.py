@@ -1,8 +1,8 @@
-"""The documents the agent works from: its instructions, and the policy wording
-and the claims manual, which it looks up section by section as a handler would."""
+"""The documents the agent works from: the policy wording and the claims
+manual, which it looks up section by section as a handler would. Its
+instructions are in the versions of its configuration."""
 
 import re
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
@@ -13,7 +13,6 @@ from backend.store import records
 
 router = APIRouter(prefix="/api")
 
-CLAIM_INSTRUCTIONS = Path(__file__).parent / "instructions" / "claim.md"
 
 # Each document's title, and where it's stored when it's seeded
 TITLES: dict[DocumentName, str] = {
@@ -86,16 +85,6 @@ def title_of(section: Section) -> SectionTitle:
 def get_policy_wording(conn: Db) -> str:
     """Get the policy wording as Markdown."""
     return records.stored(conn, STORED["wording"])
-
-
-@router.get(
-    "/instructions",
-    operation_id="get_instructions",
-    response_class=PlainTextResponse,
-)
-def get_instructions() -> str:
-    """Get the claim agent's instructions, as Markdown."""
-    return CLAIM_INSTRUCTIONS.read_text(encoding="utf-8")
 
 
 @router.get("/documents/sections", operation_id="list_sections")

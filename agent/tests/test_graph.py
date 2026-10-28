@@ -4,7 +4,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langfuse.langchain import CallbackHandler
 
-from agent import config, harness
+from agent import graph, harness
 from agent.tests.stub import (
     FREE,
     REASONS,
@@ -114,7 +114,7 @@ def test_a_provider_error_is_tried_again_twice(backend, run, memory_saver):
         failures: int = 0
 
         def _generate(self, *args, **kwargs):
-            if self.failures < config.MODEL_RETRIES:
+            if self.failures < graph.MODEL_RETRIES:
                 self.failures += 1
                 raise TimeoutError("the provider timed out")
             return super()._generate(*args, **kwargs)

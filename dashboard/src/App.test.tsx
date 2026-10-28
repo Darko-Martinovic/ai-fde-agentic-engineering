@@ -5,10 +5,11 @@ import { refreshToken, refuseSignIns, signInAs } from "./authStandIn";
 import {
   DANA,
   INSIGHTS,
-  MODELS,
+  CONFIGURATION,
   QUEUE,
   calledWith,
   claim,
+  versionDetails,
   mockFetch,
 } from "./testing";
 
@@ -18,8 +19,11 @@ const ROUTES = {
   "GET /api/claims": QUEUE,
   "GET /api/dispatches/latest": null,
   "GET /api/claims/CLM-1001": claim(),
-  "GET /api/instructions": "# UnderCover claim agent\n\nDecide claims.",
-  "GET /api/models": MODELS,
+  "GET /api/configuration/versions/1": versionDetails({
+    number: 1,
+    instructions: "# UnderCover claim agent\n\nDecide claims.",
+  }),
+  "GET /api/configuration": CONFIGURATION,
   "GET /api/policy-wording": "# Policy Wording",
   "GET /api/insights": INSIGHTS,
   "GET /api/evaluations": [],
@@ -56,11 +60,11 @@ it("moves between pages", async () => {
 
   go("#/instructions");
   expect(
-    await screen.findByRole("heading", { name: "UnderCover claim agent" }),
+    await screen.findByRole("heading", { name: "Configuration" }),
   ).toBeDefined();
   expect(
     screen
-      .getByRole("link", { name: "Instructions" })
+      .getByRole("link", { name: "Configuration" })
       .getAttribute("aria-current"),
   ).toBe("page");
 
