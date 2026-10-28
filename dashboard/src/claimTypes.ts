@@ -139,10 +139,18 @@ export interface Customer {
   previous_claims: PreviousClaim[];
 }
 
-export interface Handler {
+/** A handler as the decisions they sign name them. */
+export interface HandlerName {
   handler_id: string;
   name: string;
   role: string;
+}
+
+export interface Handler extends HandlerName {
+  email: string;
+  /** Whether they can sign off payouts over the approval limit: the senior
+   *  handler's actions, such as reviewing a held payout. */
+  can_approve_over_limit: boolean;
 }
 
 export type StepKind =

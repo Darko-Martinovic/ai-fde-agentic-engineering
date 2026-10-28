@@ -2,9 +2,11 @@ import httpx
 import pytest
 
 from backend import agent_service, seed
+from backend.tests.sign_ins import DANA, MARCUS, headers
 from backend.tests.workflow_steps import decide, fail, pay
 
 LUNA = "openrouter:openai/gpt-6-luna"
+AS_MARCUS = headers(MARCUS)
 HELD_OUT_TINY = ["CLM-1114", "CLM-1106", "CLM-1112", "CLM-1104", "CLM-1110"]
 
 
@@ -97,8 +99,10 @@ def held_copy(client):
 @pytest.mark.parametrize("approved", [True, False])
 def test_nobody_can_review_a_copy(client, approved, resumed):
     held_copy(client)
-    body = {"handler_id": "HND-01", "approved": approved, "note": "Too much."}
-    refused = client.post("/api/claims/CLM-1112-E1/review", json=body)
+    body = {"approved": approved, "note": "Too much."}
+    refused = client.post(
+        "/api/claims/CLM-1112-E1/review", json=body, headers=headers(DANA)
+    )
     assert refused.status_code == 409
     assert refused.json()["detail"] == (
         "Claim CLM-1112-E1 is a copy in an evaluation and can't be reviewed or decided"
@@ -218,19 +222,24 @@ def service(monkeypatch):
 
 def test_a_start_passes_the_set_and_n_on_to_the_service(client, service):
     body = {"evaluation_set": "held_out", "tiny": True, "agents": 5, "model": LUNA}
-    started = client.post("/api/evaluations", json=body)
+    started = client.post("/api/evaluations", headers=AS_MARCUS, json=body)
     assert started.status_code == 202
     assert service == [("/api/evaluations", body)]
     assert client.get("/api/evaluations").json() == []
-    busy = client.post("/api/evaluations", json=body | {"agents": 8})
+    busy = client.post("/api/evaluations", headers=AS_MARCUS, json=body | {"agents": 8})
     assert busy.status_code == 409
-    down = client.post("/api/evaluations", json=body | {"agents": 9})
+    down = client.post("/api/evaluations", headers=AS_MARCUS, json=body | {"agents": 9})
     assert (down.status_code, down.json()["detail"]) == (
         503,
         "The agent's service isn't running",
     )
     for bad in ({"agents": 0}, {"agents": 26}, {"evaluation_set": "harder"}):
-        assert client.post("/api/evaluations", json=body | bad).status_code == 422
+        assert (
+            client.post(
+                "/api/evaluations", headers=AS_MARCUS, json=body | bad
+            ).status_code
+            == 422
+        )
     assert len(service) == 3
 
 
@@ -261,12 +270,13 @@ def test_nobody_decides_a_copy_left_for_a_handler(client, left):
         fail(client, copy_id, thread_id=f"{copy_id}-t")
     assert client.get(f"/api/claims/{copy_id}").json()["status"] == left
     body = {
-        "handler_id": "HND-01",
         "decision": "approve",
         "payout": 250.0,
         "reasons": "A handler's answer would score as the agent's.",
     }
-    refused = client.post(f"/api/claims/{copy_id}/handler-decision", json=body)
+    refused = client.post(
+        f"/api/claims/{copy_id}/handler-decision", json=body, headers=headers(DANA)
+    )
     assert refused.status_code == 409
     claim = client.get(f"/api/claims/{copy_id}").json()
     assert (claim["status"], claim["payment"]) == (left, None)

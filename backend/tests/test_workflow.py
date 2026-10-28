@@ -3,6 +3,7 @@ import pytest
 from backend import db
 from backend.store import claims
 from backend.tests.claim_starts import a_run, start, start_alone
+from backend.tests.sign_ins import MARCUS, PRIYA
 from backend.tests.workflow_steps import approved, decide, fail, pay, referred, resolve
 
 
@@ -163,15 +164,15 @@ def test_approval_limit(client, payout, status):
 
 def test_resolve_referral_with_approval(client):
     referred(client, "CLM-1010")
-    claim = resolve(client, "CLM-1010", "HND-02", "approve", 1350).json()
+    claim = resolve(client, "CLM-1010", "approve", 1350).json()
     assert claim["status"] == "decided"
     assert claim["payment"]["amount"] == 1350
-    assert claim["payment"]["authorized_by"] == "HND-02"
+    assert claim["payment"]["authorized_by"] == "HND-01"
     agent, handler = claim["decisions"]
     assert agent["decided_by"] == "agent"
     assert agent["decision"] == "refer"
     assert agent["reasons"] == "The agent's reasons to refer."
-    assert handler["decided_by"] == "HND-02"
+    assert handler["decided_by"] == "HND-01"
     assert handler["decision"] == "approve"
     assert handler["reasons"] == "The handler's reasons."
     assert handler["policy_section"] is None
@@ -179,7 +180,7 @@ def test_resolve_referral_with_approval(client):
 
 def test_resolve_referral_with_decline(client):
     referred(client, "CLM-1010")
-    claim = resolve(client, "CLM-1010", "HND-03", "decline", 0).json()
+    claim = resolve(client, "CLM-1010", "decline", 0, handler=PRIYA).json()
     assert claim["status"] == "decided"
     assert claim["payment"] is None
     assert claim["decisions"][-1]["decision"] == "decline"
@@ -187,18 +188,13 @@ def test_resolve_referral_with_decline(client):
 
 def test_resolve_needs_a_referred_claim(client):
     approved(client, "CLM-1002", 1150)
-    response = resolve(client, "CLM-1002", "HND-02", "approve", 1150)
+    response = resolve(client, "CLM-1002", "approve", 1150)
     assert response.status_code == 409
-
-
-def test_resolve_by_unknown_handler(client):
-    referred(client, "CLM-1010")
-    assert resolve(client, "CLM-1010", "HND-99", "decline", 0).status_code == 404
 
 
 def test_handler_cannot_refer(client):
     referred(client, "CLM-1010")
-    assert resolve(client, "CLM-1010", "HND-02", "refer", 0).status_code == 422
+    assert resolve(client, "CLM-1010", "refer", 0).status_code == 422
 
 
 def test_queue_shows_decisions_and_payments(client):
@@ -206,7 +202,7 @@ def test_queue_shows_decisions_and_payments(client):
     pay(client, "CLM-1001", 420)
     approved(client, "CLM-1002", 1150)
     referred(client, "CLM-1010")
-    resolve(client, "CLM-1010", "HND-02", "decline", 0)
+    resolve(client, "CLM-1010", "decline", 0, handler=MARCUS)
     queue = {c["claim_id"]: c for c in client.get("/api/claims").json()}
     assert (queue["CLM-1001"]["decision"], queue["CLM-1001"]["paid"]) == (
         "approve",
@@ -290,7 +286,7 @@ def test_a_handler_decides_a_claim_left_for_them(client):
     fail(client, "CLM-1004")
     start(client, "CLM-1004")
     fail(client, "CLM-1004")
-    claim = resolve(client, "CLM-1004", "HND-01", "approve", 74).json()
+    claim = resolve(client, "CLM-1004", "approve", 74).json()
     assert claim["status"] == "decided"
     assert claim["payment"]["authorized_by"] == "HND-01"
 

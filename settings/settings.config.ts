@@ -19,6 +19,12 @@ export function loadSettings(
   }
 }
 
+/** A setting that may be left out, such as the Supabase project's address,
+ *  which is in .env alone: empty when it's missing. */
+export function optionalSetting(name: string): string {
+  return process.env[name] ? setting(name) : "";
+}
+
 export function setting(name: string): string {
   const value = process.env[name];
   if (value === undefined) throw new Error(`${name} isn't set`);

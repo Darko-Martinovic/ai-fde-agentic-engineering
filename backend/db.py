@@ -93,6 +93,8 @@ handlers = Table(
     "handlers",
     metadata,
     text_column("handler_id", primary_key=True),
+    # Who a sign-in is: the email a handler signs in with
+    Column("email", Text, nullable=False, unique=True),
     text_column("data"),
 )
 settings = Table(

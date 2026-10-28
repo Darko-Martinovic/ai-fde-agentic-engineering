@@ -1,5 +1,15 @@
+import { render } from "@testing-library/react";
+import { createElement, type ReactNode } from "react";
 import { vi } from "vitest";
-import type { Claim, ClaimSummary, Customer, Decision, Policy } from "./api";
+import type {
+  Claim,
+  ClaimSummary,
+  Customer,
+  Decision,
+  Handler,
+  Policy,
+} from "./api";
+import { HandlerContext } from "./handler";
 import { MODELS } from "./agentFixtures";
 
 export * from "./agentFixtures";
@@ -179,14 +189,28 @@ export const CUSTOMER: Customer = {
   ],
 };
 
-export const HANDLERS = [
-  {
-    handler_id: "HND-01",
-    name: "Dana Whitfield",
-    role: "Senior Claims Handler",
-  },
-  { handler_id: "HND-02", name: "Marcus Oyelaran", role: "Claims Handler" },
-];
+export const DANA: Handler = {
+  handler_id: "HND-01",
+  name: "Dana Whitfield",
+  role: "Senior Claims Handler",
+  email: "dana.whitfield@undercover.example",
+  can_approve_over_limit: true,
+};
+
+export const MARCUS: Handler = {
+  handler_id: "HND-02",
+  name: "Marcus Oyelaran",
+  role: "Claims Handler",
+  email: "marcus.oyelaran@undercover.example",
+  can_approve_over_limit: false,
+};
+
+export const HANDLERS = [DANA, MARCUS];
+
+/** Render a page as the signed-in handler, Dana Whitfield unless named. */
+export function renderAs(ui: ReactNode, handler: Handler = DANA) {
+  return render(createElement(HandlerContext.Provider, { value: handler }, ui));
+}
 
 export function decision(overrides: Partial<Decision> = {}): Decision {
   return {
@@ -211,6 +235,7 @@ export function claimRoutes(overrides: Routes = {}): Routes {
     "GET /api/policies/POL-2001": POLICY,
     "GET /api/customers/CUS-3001": CUSTOMER,
     "GET /api/handlers": HANDLERS,
+    "GET /api/me": DANA,
     "GET /api/models": MODELS,
     ...overrides,
   };

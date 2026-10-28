@@ -5,8 +5,10 @@ import httpx
 import pytest
 
 from backend import agent_service
+from backend.tests.sign_ins import MARCUS, headers
 
 LUNA = "openrouter:openai/gpt-6-luna"
+AS_MARCUS = headers(MARCUS)
 
 
 @pytest.fixture
@@ -32,7 +34,9 @@ def service(monkeypatch):
 def test_a_start_asks_the_service_once_and_writes_nothing(client, service):
     asked, answers = service
     answers["/api/dispatches"] = (202, {"agents": 7, "model": LUNA})
-    started = client.post("/api/dispatches", json={"agents": 7, "model": LUNA})
+    started = client.post(
+        "/api/dispatches", headers=AS_MARCUS, json={"agents": 7, "model": LUNA}
+    )
     assert started.status_code == 202
     assert started.json() == {"agents": 7, "model": LUNA}
     assert asked == [("/api/dispatches", {"agents": 7, "model": LUNA})]
@@ -43,14 +47,18 @@ def test_the_services_refusal_comes_back(client, service):
     _, answers = service
     detail = "A dispatch or an evaluation is already running"
     answers["/api/dispatches"] = (409, {"detail": detail})
-    refused = client.post("/api/dispatches", json={"agents": 3, "model": LUNA})
+    refused = client.post(
+        "/api/dispatches", headers=AS_MARCUS, json={"agents": 3, "model": LUNA}
+    )
     assert (refused.status_code, refused.json()["detail"]) == (409, detail)
 
 
 def test_a_service_that_isnt_running_says_so(client, service):
     _, answers = service
     answers["/api/dispatches"] = httpx.ConnectError("refused")
-    down = client.post("/api/dispatches", json={"agents": 3, "model": LUNA})
+    down = client.post(
+        "/api/dispatches", headers=AS_MARCUS, json={"agents": 3, "model": LUNA}
+    )
     assert down.status_code == 503
     assert down.json()["detail"] == "The agent's service isn't running"
 
@@ -65,21 +73,23 @@ def test_a_service_that_isnt_running_says_so(client, service):
 )
 def test_a_start_needs_one_to_25_agents_and_a_model_allowed(client, service, body):
     asked, _ = service
-    assert client.post("/api/dispatches", json=body).status_code == 422
+    assert (
+        client.post("/api/dispatches", headers=AS_MARCUS, json=body).status_code == 422
+    )
     assert asked == []
 
 
 def test_a_stop_is_passed_on_with_the_services_answer(client, service):
     asked, answers = service
     answers["/api/runs/stop"] = (202, {"stopping": True})
-    stopping = client.post("/api/runs/stop-request")
+    stopping = client.post("/api/runs/stop-request", headers=AS_MARCUS)
     assert (stopping.status_code, stopping.json()) == (202, {"stopping": True})
     assert asked == [("/api/runs/stop", {})]
     answers["/api/runs/stop"] = (
         409,
         {"detail": "No dispatch or evaluation is running"},
     )
-    nothing = client.post("/api/runs/stop-request")
+    nothing = client.post("/api/runs/stop-request", headers=AS_MARCUS)
     assert nothing.status_code == 409
     assert nothing.json()["detail"] == "No dispatch or evaluation is running"
 
@@ -94,6 +104,8 @@ def test_a_stop_is_passed_on_with_the_services_answer(client, service):
 def test_a_service_that_fails_is_a_502(client, service, answer):
     _, answers = service
     answers["/api/dispatches"] = answer
-    failed = client.post("/api/dispatches", json={"agents": 3, "model": LUNA})
+    failed = client.post(
+        "/api/dispatches", headers=AS_MARCUS, json={"agents": 3, "model": LUNA}
+    )
     assert failed.status_code == 502
     assert failed.json()["detail"] == "The agent's service failed"

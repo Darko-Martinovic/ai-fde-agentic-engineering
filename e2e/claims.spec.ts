@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { startClaim } from "./claim-starts";
+import { SIGNED_IN } from "./signed-in";
 import { resumed } from "./stand-in";
 
 // The agent's decisions are set up through the API, so no model is called.
@@ -55,7 +56,6 @@ test("a sign-off reaches the agent, which pays the claim", async ({
   ).toBe(409);
   await page.goto("/#/claims/CLM-1020");
   await expect(page.getByText("Awaiting sign-off").first()).toBeVisible();
-  await page.getByLabel("Handler").selectOption("HND-01");
   await page.getByRole("button", { name: "Sign off $1,350.00" }).click();
   await expect(page.getByText(/Signed off by Dana Whitfield/)).toBeVisible();
   await expect(page.getByText("In progress").first()).toBeVisible();
@@ -77,14 +77,13 @@ test("a rejection goes back to the agent with its note", async ({
 }) => {
   await agentDecides(request, "CLM-1002", "approve", 1150);
   await page.goto("/#/claims/CLM-1002");
-  await page.getByLabel("Handler").selectOption("HND-02");
   await page
     .getByLabel("Note for the agent")
     .fill("The wool suit is limited to $300.00.");
   await page.getByRole("button", { name: "Reject" }).click();
   await expect(
     page.getByText(
-      /Rejected by Marcus Oyelaran at .*: The wool suit is limited to \$300\.00\./,
+      /Rejected by Dana Whitfield at .*: The wool suit is limited to \$300\.00\./,
     ),
   ).toBeVisible();
   await expect(page.getByText("In progress").first()).toBeVisible();
@@ -95,9 +94,35 @@ test("a handler decides a referral", async ({ page, request }) => {
   await agentDecides(request, "CLM-1010", "refer", 0);
   await page.goto("/#/claims/CLM-1010");
   await expect(page.getByText("Set up by the end-to-end test.")).toBeVisible();
-  await page.getByLabel("Handler").selectOption("HND-02");
   await page.getByLabel("Payout in US dollars").fill("1350");
   await page.getByLabel("Reasons").fill("Covered emergency treatment.");
   await page.getByRole("button", { name: "Approve and pay $1,350.00" }).click();
-  await expect(page.getByText(/authorized by Marcus Oyelaran/)).toBeVisible();
+  await expect(page.getByText(/authorized by Dana Whitfield/)).toBeVisible();
+});
+
+test("signing out lands on the sign-in page", async ({ page }) => {
+  await page.goto("/#/insights");
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await page.goto("/#/scoreboard");
+  await expect(page).toHaveURL(/#\/sign-in\?next=%23%2Fscoreboard$/);
+});
+
+test.describe("signed in as Marcus Oyelaran", () => {
+  test.use({ storageState: SIGNED_IN.marcus });
+
+  test("he sees why he can't review a held payout", async ({
+    page,
+    request,
+  }) => {
+    await agentDecides(request, "CLM-1021", "approve", 2100);
+    await page.goto("/#/claims/CLM-1021");
+    await expect(
+      page.getByText(
+        "Only a handler who can sign off payouts over the approval limit can review this payout. You're signed in as Marcus Oyelaran, who can't.",
+      ),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /Sign off/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Reject" })).toHaveCount(0);
+  });
 });

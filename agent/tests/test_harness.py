@@ -12,6 +12,7 @@ from agent import harness
 from agent.config import model
 from agent.tests.stub import FREE, REASONS, StubModel, decide, stub, tool_call
 from agent.tools import CLAIM_TOOLS
+from backend.tests.sign_ins import DANA, headers
 from backend.tests.usage_rows import model_calls, work_times
 
 
@@ -352,8 +353,8 @@ def held(backend, run, memory_saver):
 
 
 def review(backend, approved, note=""):
-    body = {"handler_id": "HND-01", "approved": approved, "note": note}
-    backend.post("/api/claims/CLM-1002/review", json=body)
+    body = {"approved": approved, "note": note}
+    backend.post("/api/claims/CLM-1002/review", json=body, headers=headers(DANA))
 
 
 def test_the_wait_for_a_sign_off_never_counts(backend, run, memory_saver, clock):

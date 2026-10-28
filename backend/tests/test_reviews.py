@@ -1,17 +1,27 @@
 import logging
 
 import httpx
+import pytest
 
 from backend import agent_service
 from backend.agent_service import resume_claim as real_resume_claim  # not the stand-in
-from backend.tests.workflow_steps import approved, decide, fail, pay, review
+from backend.tests.sign_ins import MARCUS
+from backend.tests.workflow_steps import (
+    approved,
+    decide,
+    fail,
+    pay,
+    referred,
+    resolve,
+    review,
+)
 
 NOTE = "The suit is limited to $300.00 under the per-item limit."
 
 
 def test_a_sign_off_hands_the_claim_back_to_the_agent(client, resumed):
     approved(client, "CLM-1003", 3750)
-    claim = review(client, "CLM-1003", "HND-01").json()
+    claim = review(client, "CLM-1003").json()
     assert (claim["status"], claim["payment"]) == ("in_progress", None)
     signed = claim["decisions"][-1]
     assert (signed["review"], signed["reviewed_by"]) == ("signed_off", "HND-01")
@@ -32,7 +42,7 @@ def test_the_agent_is_told_once_the_review_is_saved(client, monkeypatch):
 
     monkeypatch.setattr(agent_service, "resume_claim", look)
     approved(client, "CLM-1003", 3750)
-    review(client, "CLM-1003", "HND-01")
+    review(client, "CLM-1003")
     [decision] = seen
     assert decision["review"] == "signed_off"
 
@@ -54,19 +64,44 @@ def test_a_held_payout_isnt_paid_before_a_sign_off(client):
     assert client.get("/api/claims/CLM-1003").json()["payment"] is None
 
 
-def test_a_review_needs_a_known_handler(client, resumed):
+@pytest.mark.parametrize("approved_", [True, False])
+def test_only_a_senior_handler_reviews_a_held_payout(client, resumed, approved_):
     approved(client, "CLM-1003", 3750)
-    response = review(client, "CLM-1003", "HND-99")
+    response = review(client, "CLM-1003", approved_, NOTE, handler=MARCUS)
     assert (response.status_code, response.json()["detail"]) == (
-        404,
-        "Handler HND-99 not found",
+        403,
+        "Only a handler who can sign off payouts over $1,000.00 can review this"
+        " payout. Marcus Oyelaran can't.",
+    )
+    claim = client.get("/api/claims/CLM-1003").json()
+    assert (claim["status"], claim["decisions"][-1]["review"]) == (
+        "awaiting_sign_off",
+        None,
     )
     assert resumed == []
 
 
+def test_any_handler_decides_a_referral_under_the_limit(client):
+    referred(client, "CLM-1010")
+    claim = resolve(client, "CLM-1010", "approve", 900, handler=MARCUS).json()
+    assert (claim["status"], claim["payment"]["authorized_by"]) == ("decided", "HND-02")
+
+
+def test_only_a_senior_handler_approves_a_referral_over_the_limit(client):
+    referred(client, "CLM-1010")
+    response = resolve(client, "CLM-1010", "approve", 1350, handler=MARCUS)
+    assert (response.status_code, response.json()["detail"]) == (
+        403,
+        "Only a handler who can sign off payouts over $1,000.00 can approve this"
+        " payout. Marcus Oyelaran can't.",
+    )
+    claim = client.get("/api/claims/CLM-1010").json()
+    assert (claim["status"], claim["payment"]) == ("referred", None)
+
+
 def test_a_review_needs_a_held_payout(client, resumed):
     approved(client, "CLM-1001", 420)
-    response = review(client, "CLM-1001", "HND-01")
+    response = review(client, "CLM-1001")
     assert (response.status_code, response.json()["detail"]) == (
         409,
         "Claim CLM-1001 is in_progress, not awaiting_sign_off",
@@ -76,23 +111,23 @@ def test_a_review_needs_a_held_payout(client, resumed):
 
 def test_a_rejection_hands_the_note_back_to_the_agent(client, resumed):
     approved(client, "CLM-1002", 1350)
-    claim = review(client, "CLM-1002", "HND-02", approved=False, note=NOTE).json()
+    claim = review(client, "CLM-1002", approved=False, note=NOTE).json()
     assert claim["status"] == "in_progress"
     rejected = claim["decisions"][-1]
-    assert (rejected["review"], rejected["reviewed_by"]) == ("rejected", "HND-02")
+    assert (rejected["review"], rejected["reviewed_by"]) == ("rejected", "HND-01")
     assert rejected["review_note"] == NOTE
     assert resumed == ["CLM-1002"]
 
 
 def test_a_rejection_needs_a_note(client):
     approved(client, "CLM-1002", 1350)
-    response = review(client, "CLM-1002", "HND-02", approved=False, note="  ")
+    response = review(client, "CLM-1002", approved=False, note="  ")
     assert response.status_code == 422
 
 
 def test_after_a_rejection_the_agents_decision_goes_back_to_a_handler(client):
     approved(client, "CLM-1002", 1350)
-    review(client, "CLM-1002", "HND-02", approved=False, note=NOTE)
+    review(client, "CLM-1002", approved=False, note=NOTE)
     again = decide(client, "CLM-1002", "approve", 500).json()
     assert again["status"] == "awaiting_sign_off"
     assert len(again["decisions"]) == 2
@@ -103,22 +138,29 @@ def test_after_a_rejection_the_agents_decision_goes_back_to_a_handler(client):
 
 def test_a_decline_after_a_rejection_is_referred(client):
     approved(client, "CLM-1002", 1350)
-    review(client, "CLM-1002", "HND-02", approved=False, note=NOTE)
+    review(client, "CLM-1002", approved=False, note=NOTE)
     assert decide(client, "CLM-1002", "decline", 0).json()["status"] == "referred"
 
 
 def test_a_second_rejection_refers_the_claim(client, resumed):
     approved(client, "CLM-1002", 1350)
-    review(client, "CLM-1002", "HND-02", approved=False, note=NOTE)
+    review(client, "CLM-1002", approved=False, note=NOTE)
     decide(client, "CLM-1002", "approve", 1300)
-    claim = review(client, "CLM-1002", "HND-01", approved=False, note=NOTE).json()
+    claim = review(client, "CLM-1002", approved=False, note=NOTE).json()
     assert claim["status"] == "referred"
     assert resumed == ["CLM-1002"]
 
 
 def test_a_failure_after_a_rejection_is_left_for_a_handler(client):
     approved(client, "CLM-1002", 1350)
-    review(client, "CLM-1002", "HND-02", approved=False, note=NOTE)
+    review(client, "CLM-1002", approved=False, note=NOTE)
     claim = fail(client, "CLM-1002").json()
     assert claim["status"] == "left_for_handler"
     assert len(claim["decisions"]) == 1
+
+
+def test_a_handler_declines_a_referral_whatever_payout_is_sent(client):
+    """Only an approval over the limit is a senior action."""
+    referred(client, "CLM-1010")
+    claim = resolve(client, "CLM-1010", "decline", 0, handler=MARCUS).json()
+    assert claim["status"] == "decided"

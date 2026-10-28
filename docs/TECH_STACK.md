@@ -5,7 +5,6 @@
 - `dashboard/`: React, Vite and TypeScript. It calls the backend only through `api.ts`, at relative `/api` URLs that Vite proxies to `UNDERCOVER_API`.
 - `e2e/`: Playwright tests.
 - `data/`: the business data the backend starts from. The agent never sees `data/evals/`, which holds the answer key; seeding stores it apart for the scoreboard.
-- `bench/`: the model comparison, apart from the product, which runs its trials as evaluations through the backend.
 
 Python 3.12 with uv, all in the root `pyproject.toml`. Node 26.
 

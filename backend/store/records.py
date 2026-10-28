@@ -28,9 +28,9 @@ def handlers(conn: Connection) -> list[str]:
     return list(conn.execute(found).scalars())
 
 
-def handler(conn: Connection, handler_id: str) -> str | None:
-    """Return a handler's record as JSON, or None if there's no such handler."""
-    found = select(db.handlers.c.data).where(db.handlers.c.handler_id == handler_id)
+def handler_by_email(conn: Connection, email: str) -> str | None:
+    """Return the record, as JSON, of the handler with this email, or None."""
+    found = select(db.handlers.c.data).where(db.handlers.c.email == email.lower())
     return conn.execute(found).scalar_one_or_none()
 
 
@@ -66,7 +66,11 @@ def insert(
     conn.execute(
         insert_into(db.handlers),
         [
-            {"handler_id": h["handler_id"], "data": json.dumps(h)}
+            {
+                "handler_id": h["handler_id"],
+                "email": h["email"].lower(),
+                "data": json.dumps(h),
+            }
             for h in handler_records
         ],
     )

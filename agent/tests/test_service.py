@@ -10,6 +10,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from agent import api, dispatcher, harness, service
 from agent.tests.stub import FREE, ByClaim, StubModel, decide, stub
 from backend.tests.direct_changes import set_status
+from backend.tests.sign_ins import DANA, headers
 
 NOTE = "The bill is $3,800.00, less the $100.00 the clinic waived."
 
@@ -40,8 +41,8 @@ def held(backend, run, memory_saver, payout=3750.0):
 
 
 def review(backend, approved, note=""):
-    body = {"handler_id": "HND-01", "approved": approved, "note": note}
-    return backend.post("/api/claims/CLM-1003/review", json=body)
+    body = {"approved": approved, "note": note}
+    return backend.post("/api/claims/CLM-1003/review", json=body, headers=headers(DANA))
 
 
 def test_health(agent_service):

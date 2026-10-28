@@ -18,6 +18,29 @@ describe("parseRoute", () => {
       runId: 7,
     });
     expect(parseRoute("#/scoreboard/seven")).toEqual({ page: "queue" });
+    expect(parseRoute("#/sign-in")).toEqual({
+      page: "sign-in",
+      next: "#/",
+    });
+  });
+});
+
+it("goes on from the sign-in page to the page asked for", () => {
+  expect(parseRoute(paths.signIn("#/scoreboard/7"))).toEqual({
+    page: "sign-in",
+    next: "#/scoreboard/7",
+  });
+  expect(parseRoute(paths.signIn(paths.signIn("#/insights")))).toEqual({
+    page: "sign-in",
+    next: "#/",
+  });
+  expect(parseRoute(paths.signIn("https://elsewhere"))).toEqual({
+    page: "sign-in",
+    next: "#/",
+  });
+  expect(parseRoute("#/sign-in?next=%E0")).toEqual({
+    page: "sign-in",
+    next: "#/",
   });
 });
 

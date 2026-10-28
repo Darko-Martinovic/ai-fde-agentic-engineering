@@ -4,7 +4,7 @@ which asks the agent's service; the service records it under /api/runs, which
 makes the copies; and the scoreboard reads them under /api/evaluations, scored
 when they're read. Nothing the agent reads holds the handlers' decisions."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import Connection, RowMapping
 
 from backend import agent_service, scoring
@@ -21,6 +21,7 @@ from backend.run_models import (
     Started,
 )
 from backend.run_views import load_run
+from backend.signed_in import signed_in
 from backend.store import evaluations, runs
 
 router = APIRouter(prefix="/api")
@@ -57,7 +58,12 @@ def make_copies(conn: Connection, run_id: int, start: EvaluationIn) -> list[str]
     return [copy["record"]["claim_id"] for copy in copies]
 
 
-@router.post("/evaluations", operation_id="start_evaluation", status_code=202)
+@router.post(
+    "/evaluations",
+    operation_id="start_evaluation",
+    status_code=202,
+    dependencies=[Depends(signed_in)],
+)
 def start_evaluation(start: EvaluationStart) -> Started:
     """Ask the agent's service to start an evaluation with N claim agents at once."""
     asked = agent_service.start_evaluation(
