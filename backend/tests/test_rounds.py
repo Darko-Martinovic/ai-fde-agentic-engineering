@@ -340,3 +340,26 @@ def test_a_restart_stops_the_open_rounds_not_waiting_for_a_handler(client):
     assert client.get(f"/api/rounds/{waiting}").json()["stop_reason"] == (
         "The agent's service restarted while the round was working"
     )
+
+
+def test_a_round_shows_each_proposal_beside_what_it_would_change(client):
+    round_id = a_round(client)
+    propose(client, round_id, CHANGE | {"reasoning_effort": "medium"})
+    waiting = client.get(f"/api/rounds/{round_id}").json()["waiting"]
+    assert (waiting["model_before"], waiting["reasoning_effort_before"]) == (
+        "openai/gpt-6-luna",
+        "low",
+    )
+    lines = [line for hunk in waiting["changes"] for line in hunk["lines"]]
+    assert {"kind": "added", "text": "Decide the claim with care."} in lines
+    review(client, round_id, waiting["proposal_id"], approved=False, note="No.")
+    propose_recipe(client, round_id)
+    worked = client.get("/api/improvement").json()["rounds"][0]
+    assert [p["kind"] for p in worked["proposals"]] == ["change", "recipe"]
+    recipe = worked["waiting"]
+    assert recipe["model_before"] is None
+    assert any(
+        line["kind"] == "removed"
+        for hunk in recipe["changes"]
+        for line in hunk["lines"]
+    )

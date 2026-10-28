@@ -8,8 +8,10 @@ import {
   CONFIGURATION,
   QUEUE,
   SETTINGS_VIEW,
+  RECIPE_1,
   calledWith,
   claim,
+  improvement,
   versionDetails,
   mockFetch,
 } from "./testing";
@@ -29,6 +31,8 @@ const ROUTES = {
   "GET /api/policy-wording": "# Policy Wording",
   "GET /api/insights": INSIGHTS,
   "GET /api/evaluations": [],
+  "GET /api/improvement": improvement(),
+  "GET /api/improvement/recipes/1": RECIPE_1,
 };
 
 afterEach(() => {
@@ -81,6 +85,24 @@ it("moves between pages", async () => {
   expect(
     screen
       .getByRole("link", { name: "Scoreboard" })
+      .getAttribute("aria-current"),
+  ).toBe("page");
+
+  go("#/improvement");
+  expect(await screen.findByText(/^No rounds yet\./)).toBeDefined();
+  expect(
+    screen
+      .getByRole("link", { name: "Improvement" })
+      .getAttribute("aria-current"),
+  ).toBe("page");
+
+  go("#/improvement/recipes/1");
+  expect(
+    await screen.findByRole("heading", { level: 1, name: "Recipe 1" }),
+  ).toBeDefined();
+  expect(
+    screen
+      .getByRole("link", { name: "Improvement" })
       .getAttribute("aria-current"),
   ).toBe("page");
 

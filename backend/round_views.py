@@ -7,17 +7,18 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy import Connection, RowMapping
 
-from backend import spending
+from backend import diffs, spending
 from backend.api import found
 from backend.round_models import (
     Progress,
     Proposal,
     ProposalKind,
+    ProposalView,
     Round,
     RoundStatus,
     Stage,
 )
-from backend.store import platform_settings, rounds, runs
+from backend.store import platform_settings, rounds, runs, versions
 
 # The evaluations a version tried in a round gets: one of the evaluation set
 # and two of the held-out set
@@ -108,6 +109,28 @@ def step(evaluations: list[RowMapping]) -> int:
     return progress(evaluations) + 1
 
 
+def proposal_view(
+    conn: Connection, row: dict[str, Any], proposal: dict[str, Any]
+) -> ProposalView:
+    """A proposal beside what it would change, against the version and the
+    recipe the round started from."""
+    proposed = proposal["proposed"]
+    before: dict[str, Any] = {"model_before": None, "reasoning_effort_before": None}
+    if proposal["kind"] == ProposalKind.CHANGE:
+        version = found(versions.version(conn, row["version_before"]), "Version", "")
+        old, new = version["instructions"], proposed["instructions"]
+        before = {
+            "model_before": version["model"],
+            "reasoning_effort_before": version["reasoning_effort"],
+        }
+    else:
+        recipe = found(rounds.recipe(conn, row["recipe_number"]), "Recipe", "")
+        old, new = recipe["recipe"], proposed["recipe"]
+    return ProposalView.model_validate(
+        proposal | before | {"changes": diffs.changes(old, new)}
+    )
+
+
 def load_round(conn: Connection, round_id: int) -> Round:
     """A round as it stands."""
     row = load(conn, round_id)
@@ -115,6 +138,7 @@ def load_round(conn: Connection, round_id: int) -> Round:
     pending = waiting(conn, round_id)
     where, how_far = stage(row, evaluations, pending)
     settings = platform_settings.row(conn, row["settings_number"])
+    proposed = rounds.round_proposals(conn, round_id)
     return Round.model_validate(
         row
         | {
@@ -122,6 +146,14 @@ def load_round(conn: Connection, round_id: int) -> Round:
             "progress": how_far,
             "spent": spending.spent(conn, round_id),
             "spending_limit": settings["spending_limit"],
-            "waiting": pending,
+            "proposals": proposed,
+            "waiting": next(
+                (
+                    proposal_view(conn, row, p)
+                    for p in proposed
+                    if pending and p["proposal_id"] == pending.proposal_id
+                ),
+                None,
+            ),
         }
     )

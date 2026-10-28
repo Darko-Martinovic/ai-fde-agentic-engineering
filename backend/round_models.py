@@ -117,6 +117,17 @@ class Proposal(BaseModel):
     review_note: str | None
 
 
+class ProposalView(Proposal):
+    """A proposal beside what it would change: for a change, the lines of the
+    instructions and the model and reasoning effort before it, against the
+    version the round started from; for a recipe, the lines of the recipe the
+    round follows."""
+
+    changes: list[Hunk]
+    model_before: str | None
+    reasoning_effort_before: str | None
+
+
 class Recipe(BaseModel):
     number: int
     recipe: str
@@ -166,7 +177,10 @@ class Round(BaseModel):
     progress: Progress | None
     spent: float
     spending_limit: float
-    waiting: Proposal | None
+    # Every proposal, oldest first, and the one waiting for a handler, if any,
+    # beside what it would change
+    proposals: list[Proposal]
+    waiting: ProposalView | None
 
 
 class Verdict(BaseModel):

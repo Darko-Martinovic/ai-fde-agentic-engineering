@@ -37,6 +37,7 @@ export function run(overrides: Partial<Run> = {}): Run {
     version: 1,
     model: "openai/gpt-6-luna",
     reasoning_effort: "low",
+    round_id: null,
     evaluation_set: null,
     tiny: null,
     status: "running",

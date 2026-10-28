@@ -28,9 +28,18 @@ import type {
   VersionDetails,
 } from "./improvementTypes";
 
+import type {
+  Improvement,
+  RecipeDetails,
+  Reviewing,
+  Round,
+  RoundStarted,
+} from "./roundTypes";
+
 export type * from "./agentTypes";
 export * from "./claimTypes";
 export type * from "./improvementTypes";
+export type * from "./roundTypes";
 
 export class ApiError extends Error {
   constructor(
@@ -146,6 +155,25 @@ export const api = {
     getJson<Evaluation[]>("/api/evaluations", signal),
   getEvaluation: (runId: number, signal?: AbortSignal) =>
     getJson<Evaluation>(`/api/evaluations/${String(runId)}`, signal),
+  getImprovement: (signal?: AbortSignal) =>
+    getJson<Improvement>("/api/improvement", signal),
+  getRecipe: (number: number, signal?: AbortSignal) =>
+    getJson<RecipeDetails>(
+      `/api/improvement/recipes/${String(number)}`,
+      signal,
+    ),
+  startRound: () => post<RoundStarted>("/api/improvement/rounds"),
+  stopRound: (roundId: number) =>
+    post<Round>(`/api/improvement/rounds/${String(roundId)}/stop`),
+  approveProposal: (roundId: number, proposalId: number) =>
+    post<Reviewing>(
+      `/api/improvement/rounds/${String(roundId)}/proposals/${String(proposalId)}/approval`,
+    ),
+  rejectProposal: (roundId: number, proposalId: number, note: string) =>
+    post<Reviewing>(
+      `/api/improvement/rounds/${String(roundId)}/proposals/${String(proposalId)}/rejection`,
+      { note },
+    ),
   reviewPayout: (id: string, review: { approved: boolean; note: string }) =>
     post<Claim>(`/api/claims/${id}/review`, review),
   decideAsHandler: (

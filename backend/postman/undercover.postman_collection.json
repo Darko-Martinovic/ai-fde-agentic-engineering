@@ -3670,7 +3670,7 @@
                 "improvement"
               ]
             },
-            "description": "`get_improvement`: every round, newest first, with where it has got to and what it has spent, and every version of the recipe."
+            "description": "`get_improvement`: every round, newest first, with where it has got to, what it has spent, each proposal with its review, and the one waiting beside what it would change; and every version of the recipe."
           },
           "event": [
             {
@@ -3683,6 +3683,11 @@
                   "pm.test(\"shows the round and the new recipe\", () => {",
                   "  pm.expect(improvement.rounds[0].round_id).to.eql(Number(pm.collectionVariables.get(\"roundId\")));",
                   "  pm.expect(improvement.current_recipe).to.eql(Number(pm.collectionVariables.get(\"recipeNumber\")));",
+                  "});",
+                  "pm.test(\"lists each proposal with its review\", () => {",
+                  "  const kinds = improvement.rounds[0].proposals.map((p) => p.kind);",
+                  "  pm.expect(kinds).to.eql([\"change\", \"recipe\"]);",
+                  "  pm.expect(improvement.rounds[0].proposals[0].reviewed_by).to.eql(\"HND-01\");",
                   "});"
                 ]
               }
