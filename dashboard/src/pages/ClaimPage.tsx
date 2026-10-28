@@ -1,3 +1,5 @@
+import { PageHeader } from "../components/PageHeader";
+import { StateMessage } from "../components/StateMessage";
 import { useCallback } from "react";
 import { api, type Claim, type Step } from "../api";
 import {
@@ -7,12 +9,7 @@ import {
   PolicyPanel,
   StoryPanel,
 } from "../components/ClaimParts";
-import {
-  ClaimType,
-  ErrorNote,
-  Loading,
-  StatusBadge,
-} from "../components/elements";
+import { ClaimType, StatusBadge } from "../components/elements";
 import { DecisionPanel } from "../components/Decisions";
 import { date, money } from "../format";
 import { usePoll } from "../hooks";
@@ -22,29 +19,27 @@ import { paths } from "../paths";
 
 function ClaimHead({ claim }: Readonly<{ claim: Claim }>) {
   return (
-    <header className="claim-head">
-      <div>
-        <p className="claim-head__id mono">{claim.claim_id}</p>
-        {claim.evaluation_id !== null && (
-          <p className="claim-head__copy">
-            {`A copy of ${claim.copy_of ?? ""} in `}
-            <a href={paths.evaluation(claim.evaluation_id)}>
-              {`evaluation #${String(claim.evaluation_id)}`}
-            </a>
-          </p>
-        )}
-        <h1>{claim.summary}</h1>
-        <p className="claim-head__meta">
-          <ClaimType type={claim.claim_type} />
-          <span>{claim.incident_location}</span>
-          <span>Submitted {date(claim.submitted_on)}</span>
-          <span className="mono">{money(claim.amount_claimed)}</span>
+    <div className="claim-head">
+      {claim.evaluation_id !== null && (
+        <p className="claim-head__copy">
+          {`A copy of ${claim.copy_of ?? ""} in `}
+          <a href={paths.evaluation(claim.evaluation_id)}>
+            {`evaluation #${String(claim.evaluation_id)}`}
+          </a>
         </p>
-      </div>
-      <div className="claim-head__side">
-        <StatusBadge status={claim.status} />
-      </div>
-    </header>
+      )}
+      <PageHeader
+        title={claim.summary}
+        purpose={`Claim ${claim.claim_id}: the claim, the policy and customer it rests on, and the agent's and the handlers' work on it.`}
+        action={<StatusBadge status={claim.status} />}
+      />
+      <p className="claim-head__meta">
+        <ClaimType type={claim.claim_type} />
+        <span>{claim.incident_location}</span>
+        <span>Submitted {date(claim.submitted_on)}</span>
+        <span className="mono">{money(claim.amount_claimed)}</span>
+      </p>
+    </div>
   );
 }
 
@@ -84,7 +79,6 @@ function ClaimView({
           <StoryPanel claim={claim} />
           <ItemsPanel claim={claim} />
           <DocumentsPanel claim={claim} />
-          <SectionsPanel steps={steps} />
           <StepsPanel steps={steps} live={live} />
         </div>
         <div className="claim-grid__side">
@@ -95,6 +89,9 @@ function ClaimView({
           />
           <PolicyPanel policy={policy.data} />
           <CustomerPanel customer={customer.data} />
+          {/* Last in its column, so the sections the agent reads as it works
+              move nothing below them */}
+          <SectionsPanel steps={steps} />
         </div>
       </div>
     </>
@@ -128,10 +125,14 @@ export function ClaimPage({ claimId }: Readonly<{ claimId: string }>) {
         Back to the queue
       </a>
       {claim.error && (
-        <ErrorNote message={claim.error} onRetry={claim.reload} />
+        <StateMessage
+          kind="error"
+          message={claim.error}
+          onRetry={claim.reload}
+        />
       )}
       {claim.data === null && !claim.error && (
-        <Loading label={`Loading ${claimId}`} />
+        <StateMessage kind="loading" message={`Loading ${claimId}`} />
       )}
       {claim.data && (
         <ClaimView

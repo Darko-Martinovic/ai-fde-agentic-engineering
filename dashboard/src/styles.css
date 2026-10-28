@@ -257,13 +257,6 @@ main {
   max-width: 860px;
 }
 
-.lede {
-  margin: 0;
-  font-family: var(--serif);
-  font-size: 20px;
-  color: var(--ink-soft);
-}
-
 .panel {
   padding: 20px 22px;
   border-radius: var(--radius);
@@ -357,21 +350,9 @@ main {
   border-radius: var(--radius-small);
 }
 
-.note--error {
-  background: color-mix(in srgb, var(--raspberry) 14%, var(--panel));
-  color: var(--raspberry-ink);
-}
-
 .note--success {
   background: color-mix(in srgb, var(--sea-green) 16%, var(--panel));
   color: var(--green-ink);
-}
-
-.loading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--ink-soft);
 }
 
 .spinner {
@@ -389,15 +370,6 @@ main {
   }
 }
 
-.empty {
-  margin: 0;
-  padding: 32px;
-  border-radius: var(--radius);
-  background: var(--panel);
-  color: var(--ink-soft);
-  text-align: center;
-}
-
 /* Badges, colored by state and decision */
 
 .badge {
@@ -413,10 +385,15 @@ main {
   color: var(--tone-ink);
 }
 
-.badge--waiting,
+/* A claim waiting is quiet, one in progress Marigold as a running run is,
+   one awaiting a sign-off Cerulean, so it never reads as Declined (Coral) */
+.badge--waiting {
+  --tone: var(--sea-mist);
+  --tone-ink: var(--ink-soft);
+}
+
 .tile--waiting {
-  --tone: var(--cerulean);
-  --tone-ink: var(--cerulean-ink);
+  --tone: var(--sea-mist);
 }
 
 .badge--in_progress,
@@ -426,7 +403,11 @@ main {
 }
 
 .badge--awaiting_sign_off,
-.tile--awaiting_sign_off,
+.tile--awaiting_sign_off {
+  --tone: var(--cerulean);
+  --tone-ink: var(--cerulean-ink);
+}
+
 .badge--decline {
   --tone: var(--coral);
   --tone-ink: var(--coral-ink);
@@ -474,7 +455,7 @@ main {
   transition: transform 0.15s ease;
 }
 
-.tile--waiting,
+.tile--awaiting_sign_off,
 .tile--referred,
 .tile--left_for_handler {
   color: #ffffff;
@@ -572,10 +553,8 @@ main {
   background: none;
   color: var(--ink-soft);
   font: inherit;
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -724,24 +703,12 @@ main {
 
 .claim-head {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 22px 24px;
-  border-radius: var(--radius);
-  background: var(--panel);
-  box-shadow: var(--shadow);
+  flex-direction: column;
+  gap: 8px;
 }
 
 .claim-head h1 {
   font-size: 26px;
-}
-
-.claim-head__id {
-  margin: 0 0 4px;
-  color: var(--cerulean-ink);
-  font-weight: 700;
 }
 
 .claim-head__meta {
@@ -751,17 +718,6 @@ main {
   gap: 8px 20px;
   margin: 12px 0 0;
   color: var(--ink-soft);
-}
-
-.claim-head__side {
-  display: grid;
-  justify-items: end;
-  gap: 12px;
-}
-
-.claim-head__side .badge {
-  font-size: 14px;
-  padding: 5px 14px;
 }
 
 .form-error {
@@ -787,10 +743,6 @@ main {
 @media (max-width: 960px) {
   .claim-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .claim-head__side {
-    justify-items: start;
   }
 }
 
@@ -831,9 +783,8 @@ main {
 
 .items thead th {
   color: var(--ink-soft);
-  font-size: 12.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .items tbody tr:nth-child(odd) {
@@ -1228,8 +1179,8 @@ main {
 }
 
 .tone--refer {
-  --tone: var(--marigold);
-  --tone-text: var(--midnight);
+  --tone: var(--raspberry);
+  --tone-text: #ffffff;
 }
 
 .tone--calls {
@@ -1280,9 +1231,7 @@ main {
 
 .bars__label {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .bar {
@@ -1439,6 +1388,7 @@ main {
 
 .run-facts dd {
   margin: 0;
+  font-family: var(--mono);
   font-size: 16px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -1493,9 +1443,20 @@ main {
   vertical-align: bottom;
 }
 
+/* The agent's reasons beside each copy: three lines, the rest on the copy's
+   own page, so a row stays the height of its other cells */
 .queue-table td.reasons {
-  min-width: 320px;
+  min-width: 360px;
+  max-width: 480px;
   white-space: normal;
+}
+
+.reasons__text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
 }
 
 .claim-head__copy {
@@ -1563,7 +1524,7 @@ main {
 .page-header {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
 }

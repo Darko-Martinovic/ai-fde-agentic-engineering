@@ -1,7 +1,14 @@
 /** How the Improvement page words a round: where it has got to, its verdict,
  *  what it has spent and its scores. */
 
-import type { HandlerName, Proposal, Round, Scores, Stage } from "./api";
+import type {
+  HandlerName,
+  Proposal,
+  Round,
+  Scores,
+  Stage,
+  Version,
+} from "./api";
 import { cost, money, NOTHING, when } from "./format";
 import { who } from "./handlerNames";
 
@@ -50,13 +57,26 @@ export function spentLine(round: Round): string {
   return `${cost(round.spent)} of ${money(round.spending_limit)}`;
 }
 
+/** What a score line shows: a held-out accuracy and grade. */
+type Shown = Pick<Scores, "accuracy" | "grade">;
+
+/** A version's held-out accuracy and grade, or none before a round has
+ *  evaluated it. */
+export function heldOutOf(version: Version): Shown | null {
+  if (version.held_out_accuracy === null) return null;
+  return {
+    accuracy: version.held_out_accuracy,
+    grade: version.held_out_grade,
+  };
+}
+
 /** A held-out accuracy, such as "72%", or nothing without scores. */
-export function accuracyLine(scores: Scores | null): string {
+export function accuracyLine(scores: Shown | null): string {
   return scores ? `${String(Math.round(scores.accuracy * 100))}%` : NOTHING;
 }
 
 /** A held-out grade, from 0 (F) to 3 (A), or nothing without one. */
-export function gradeLine(scores: Scores | null): string {
+export function gradeLine(scores: Shown | null): string {
   const grade = scores?.grade ?? null;
   return grade === null ? NOTHING : grade.toFixed(2);
 }

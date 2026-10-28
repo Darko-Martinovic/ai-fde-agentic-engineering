@@ -1,5 +1,6 @@
+import { StateMessage } from "./StateMessage";
 import { api, type Run, type RunClaim } from "../api";
-import { DecisionBadge, ErrorNote, Panel, StatusBadge } from "./elements";
+import { DecisionBadge, Panel, StatusBadge } from "./elements";
 import { clock, cost, duration, money } from "../format";
 import { useModelLabel, useNow, usePoll } from "../hooks";
 import { paths } from "../paths";
@@ -80,8 +81,8 @@ function RunClaims({ claims }: Readonly<{ claims: RunClaim[] }>) {
             <th>Customer</th>
             <th>Where it stands</th>
             <th>Decision</th>
-            <th>Time</th>
-            <th>Model cost</th>
+            <th className="numeric">Time</th>
+            <th className="numeric">Model cost</th>
           </tr>
         </thead>
         <tbody>
@@ -99,8 +100,8 @@ function RunClaims({ claims }: Readonly<{ claims: RunClaim[] }>) {
               <td>
                 <Outcome claim={claim} />
               </td>
-              <td className="mono">{duration(claim.seconds)}</td>
-              <td className="mono">{cost(claim.model_cost)}</td>
+              <td className="mono numeric">{duration(claim.seconds)}</td>
+              <td className="mono numeric">{cost(claim.model_cost)}</td>
             </tr>
           ))}
         </tbody>
@@ -140,11 +141,19 @@ export function DispatchPanel() {
     <>
       <DispatchForm running={running} onChange={latest.reload} />
       {latest.error && (
-        <ErrorNote message={latest.error} onRetry={latest.reload} />
+        <StateMessage
+          kind="error"
+          message={latest.error}
+          onRetry={latest.reload}
+        />
       )}
       {!latest.error && latest.data === null && (
         <Panel title="The latest dispatch" className="panel--run">
-          <p className="muted">No dispatch yet.</p>
+          <StateMessage
+            kind="empty"
+            message="No dispatch yet."
+            next="Choose how many claim agents work at once and start one: it works the claims in progress, then the waiting ones, oldest first."
+          />
         </Panel>
       )}
       {latest.data && <RunView run={latest.data} />}

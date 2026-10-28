@@ -1,6 +1,8 @@
+import { PageHeader } from "../components/PageHeader";
+import { StateMessage } from "../components/StateMessage";
 import { useState } from "react";
 import { api, type Evaluation, type EvaluationSet } from "../api";
-import { ErrorNote, Loading, Panel } from "../components/elements";
+import { Panel } from "../components/elements";
 import { when } from "../format";
 import { useAction, useModelLabels, usePoll } from "../hooks";
 import {
@@ -99,11 +101,11 @@ function EvaluationRow({
       </td>
       <td>{whichClaims(evaluation, evaluation.claims.length)}</td>
       {measureCells(evaluation.measures).map((cell) => (
-        <td key={cell.label} className="mono">
+        <td key={cell.label} className="mono numeric">
           {cell.value}
         </td>
       ))}
-      <td className="mono">{evaluation.agents}</td>
+      <td className="mono numeric">{evaluation.agents}</td>
       <td>{modelWithEffort(label, evaluation.reasoning_effort)}</td>
       <td>
         <RunBadge status={evaluation.status} />
@@ -116,7 +118,13 @@ function EvaluationRow({
 function Evaluations({ evaluations }: Readonly<{ evaluations: Evaluation[] }>) {
   const labelOf = useModelLabels();
   if (evaluations.length === 0) {
-    return <p className="muted">No evaluation yet.</p>;
+    return (
+      <StateMessage
+        kind="empty"
+        message="No evaluation yet."
+        next="Start one above: claim agents on the current version work copies of a labelled set, scored against the handlers' decisions."
+      />
+    );
   }
   const labels = measureCells(evaluations[0].measures).map((c) => c.label);
   return (
@@ -127,9 +135,11 @@ function Evaluations({ evaluations }: Readonly<{ evaluations: Evaluation[] }>) {
             <th>Evaluation</th>
             <th>Claims</th>
             {labels.map((label) => (
-              <th key={label}>{label}</th>
+              <th key={label} className="numeric">
+                {label}
+              </th>
             ))}
-            <th>Agents</th>
+            <th className="numeric">Agents</th>
             <th>Model</th>
             <th>Status</th>
             <th>Started</th>
@@ -155,13 +165,21 @@ export function ScoreboardPage() {
   const evaluations = usePoll(api.listEvaluations, 2000);
   return (
     <div className="page">
+      <PageHeader
+        title="Scoreboard"
+        purpose="How well the claim agent decides claims the handlers have already decided, measured on copies so the queue is never touched."
+      />
       <EvaluationForm onChange={evaluations.reload} />
-      <Panel title="Scoreboard" className="panel--scoreboard">
+      <Panel title="Evaluations" className="panel--scoreboard">
         {evaluations.error && (
-          <ErrorNote message={evaluations.error} onRetry={evaluations.reload} />
+          <StateMessage
+            kind="error"
+            message={evaluations.error}
+            onRetry={evaluations.reload}
+          />
         )}
         {evaluations.data === null && !evaluations.error && (
-          <Loading label="Loading the evaluations" />
+          <StateMessage kind="loading" message="Loading the evaluations" />
         )}
         {evaluations.data && <Evaluations evaluations={evaluations.data} />}
       </Panel>

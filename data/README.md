@@ -4,12 +4,19 @@ The data behind UnderCover Travel Insurance, a fictional insurer. Everything her
 
 ## The insurer's systems
 
-- `company.json`: company settings, including the $1,000 payout approval limit.
+- `company.json`: company settings, including the $1,000 payout approval limit, which seeding makes the first row of the platform's settings; from then on the limit is a setting a senior handler changes on the dashboard.
 - `plans.json`: the three plans (Economy, Premium, First) with their limits, waiting periods and deductibles, and the three add-ons.
 - `policies.json`: one policy per trip, with the plan, the add-ons, the purchase date, the trip and the travelers.
 - `customers.json`: contact details and claim history, with the date and a one line summary of each earlier claim. This is personal data.
-- `handlers.json`: the claims handlers, with the email each signs in with. Dana Whitfield, the senior handler, can sign off payouts over the limit; Marcus Oyelaran and Priya Raman can't (`can_approve_over_limit`).
+- `handlers.json`: the claims handlers, with the email each signs in with (`dana.whitfield@undercover.example` and so on, as users in the Supabase project's Auth). Dana Whitfield, the senior handler, can sign off payouts over the limit and so change the settings, start and stop rounds and review the improver's proposals; Marcus Oyelaran and Priya Raman can't (`can_approve_over_limit`).
 - `claims.json`: the claims queue, twenty-five claims. Each has the customer's story, the items claimed and the supporting documents as text.
+
+## The claim agent and its improvement
+
+- `models.json`: the models the claim agent may use, on OpenRouter, each with its reasoning efforts, its prices in US dollars per million tokens and the options it's built with, and the model version 1 runs on (GPT-6 Luna at low reasoning effort). A student on free models sets `MODEL_NAME` in `.env`, as `provider:model`, before seeding: it's then the only model allowed, at no reasoning effort of its own and a price of 0, the improver runs on it too, and the judge isn't called.
+- `improvement.json`: what a round of improvement works to, the lab's values: the objectives on the held-out set (accuracy 0.6, grade 1.0), the noise and the tolerance for each measure, the spending limit for each round ($0.50) and the claim agents at once in a round's evaluations (25). Seeding makes them, with the approval limit, the first row of the settings.
+
+The claim agent's first instructions and the improver's are in `backend/instructions/`, beside the improver's first recipe, the lab's.
 
 ## The documents
 

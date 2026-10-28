@@ -30,7 +30,7 @@ it("shows each copy beside the handler's decision, the misses marked", async () 
   });
   render(<EvaluationPage runId={4} />);
   expect(
-    await screen.findByRole("region", { name: "Evaluation #4" }),
+    await screen.findByRole("heading", { level: 1, name: "Evaluation #4" }),
   ).toBeDefined();
   expect(screen.getByText("Held-out set, 3 tiny")).toBeDefined();
   expect(screen.getByText("80%")).toBeDefined();

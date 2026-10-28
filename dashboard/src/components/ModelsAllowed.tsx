@@ -9,8 +9,8 @@ export function ModelsAllowed({
   return (
     <Panel title="Models the claim agent may use">
       <p className="muted">
-        Set in data/models.json and can&apos;t be changed here. Prices are in US
-        dollars per million tokens.
+        Set by the claims team, and not changed here. Prices are in US dollars
+        per million tokens.
       </p>
       <div className="table-scroll">
         <table className="data-table" aria-label="Models allowed">

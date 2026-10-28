@@ -1,4 +1,5 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { errorMessage, useAction, usePoll, useRoute } from "./hooks";
 
@@ -32,6 +33,45 @@ describe("usePoll", () => {
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(result.current.data).toBe(2);
+  });
+
+  it("lets a load slower than the interval finish, rather than cutting it short", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let started = 0;
+    const load = () => {
+      started += 1;
+      return new Promise<number>((resolve) => {
+        setTimeout(() => {
+          resolve(started);
+        }, 2500);
+      });
+    };
+    // Strict mode loads twice on mount, cutting the first load short, as the
+    // dashboard does in development
+    const { result } = renderHook(() => usePoll(load, 1000), {
+      wrapper: StrictMode,
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2600);
+    });
+    expect(result.current.data).toBe(2);
+    expect(started).toBe(2);
+  });
+
+  it("gives up on a load that never answers and loads afresh", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let started = 0;
+    const load = () => {
+      started += 1;
+      return started === 1
+        ? new Promise<number>(() => undefined)
+        : Promise.resolve(started);
+    };
+    const { result } = renderHook(() => usePoll(load, 1000));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4100);
     });
     expect(result.current.data).toBe(2);
   });

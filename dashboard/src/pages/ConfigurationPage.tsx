@@ -1,3 +1,4 @@
+import { StateMessage } from "../components/StateMessage";
 import { useCallback } from "react";
 import {
   api,
@@ -5,11 +6,12 @@ import {
   type HandlerName,
   type Version,
 } from "../api";
-import { ErrorNote, Loading, Markdown, Panel } from "../components/elements";
+import { Markdown, Panel } from "../components/elements";
 import { PageHeader } from "../components/PageHeader";
 import { VersionBadge } from "../components/VersionBadge";
 import { modelLabel, approval } from "../configuration";
 import { usePoll } from "../hooks";
+import { accuracyLine, gradeLine, heldOutOf } from "../improvement";
 import { paths } from "../paths";
 
 function CurrentVersion({
@@ -43,7 +45,11 @@ function CurrentVersion({
         </dl>
       )}
       {version.error && (
-        <ErrorNote message={version.error} onRetry={version.reload} />
+        <StateMessage
+          kind="error"
+          message={version.error}
+          onRetry={version.reload}
+        />
       )}
       {version.data && (
         <details className="instructions">
@@ -80,9 +86,11 @@ function VersionRow({
         <span className="added">+{String(version.lines_added)}</span>{" "}
         <span className="removed">−{String(version.lines_removed)}</span>
       </td>
+      <td className="numeric">{accuracyLine(heldOutOf(version))}</td>
+      <td className="numeric">{gradeLine(heldOutOf(version))}</td>
       <td>{version.proposed_by}</td>
       <td>{approval(version, handlers)}</td>
-      <td>{version.verdict_reason ?? ""}</td>
+      <td className="sentence">{version.verdict_reason ?? ""}</td>
     </tr>
   );
 }
@@ -103,6 +111,12 @@ function VersionsTable({
               <th scope="col">Reasoning effort</th>
               <th scope="col" className="numeric">
                 Lines changed
+              </th>
+              <th scope="col" className="numeric">
+                Held-out accuracy
+              </th>
+              <th scope="col" className="numeric">
+                Held-out grade
               </th>
               <th scope="col">Proposed by</th>
               <th scope="col">Approved</th>
@@ -132,7 +146,11 @@ function PolicyWording() {
       <details className="wording">
         <summary>The policy wording the claim agent works from</summary>
         {wording.error && (
-          <ErrorNote message={wording.error} onRetry={wording.reload} />
+          <StateMessage
+            kind="error"
+            message={wording.error}
+            onRetry={wording.reload}
+          />
         )}
         {wording.data !== null && <Markdown text={wording.data} />}
       </details>
@@ -152,13 +170,14 @@ export function ConfigurationPage() {
         purpose="The claim agent's instructions, model and reasoning effort, kept in versions. Dispatches and evaluations use the current version."
       />
       {configuration.error && (
-        <ErrorNote
+        <StateMessage
+          kind="error"
           message={configuration.error}
           onRetry={configuration.reload}
         />
       )}
       {configuration.data === null && !configuration.error && (
-        <Loading label="Loading the configuration" />
+        <StateMessage kind="loading" message="Loading the configuration" />
       )}
       {configuration.data && (
         <>

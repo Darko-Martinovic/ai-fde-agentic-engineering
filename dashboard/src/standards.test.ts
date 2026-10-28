@@ -50,6 +50,21 @@ describe("the dashboard keeps to the code standards", () => {
     expect(offending(product(), /@supabase\/supabase-js/, auth)).toEqual([]);
   });
 
+  it("gives every page a header with its title and purpose", () => {
+    const pages = product().filter(
+      (file) => file.includes("/pages/") && !file.endsWith("SignInPage.tsx"),
+    );
+    const without = pages.filter(
+      (file) => !readFileSync(ROOT + file, "utf-8").includes("<PageHeader"),
+    );
+    expect(without).toEqual([]);
+  });
+
+  it("shows loading, empty and error states only through StateMessage", () => {
+    const own = /className="(empty|loading|note note--error)"/;
+    expect(offending(product(), own)).toEqual([]);
+  });
+
   it("builds page links only in paths.ts (standard 19)", () => {
     expect(offending(product(), /["'`]#\//, [`${SOURCE}paths.ts`])).toEqual([]);
   });

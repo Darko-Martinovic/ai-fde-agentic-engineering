@@ -1,3 +1,5 @@
+import { PageHeader } from "../components/PageHeader";
+import { StateMessage } from "../components/StateMessage";
 import type { ReactNode } from "react";
 import {
   api,
@@ -9,8 +11,6 @@ import {
 import {
   ClaimType,
   DecisionBadge,
-  ErrorNote,
-  Loading,
   Panel,
   StatusBadge,
 } from "../components/elements";
@@ -280,21 +280,31 @@ export function InsightsPage() {
 
   return (
     <div className="page">
-      <p className="lede">
-        How the agent's work on the queue adds up, from its decisions, its steps
-        and the payments.
-      </p>
+      <PageHeader
+        title="Insights"
+        purpose="How the agent's work on the queue adds up, from its decisions, its steps and the payments."
+      />
       {insights.error && (
-        <ErrorNote message={insights.error} onRetry={insights.reload} />
+        <StateMessage
+          kind="error"
+          message={insights.error}
+          onRetry={insights.reload}
+        />
       )}
       {data === null && !insights.error && (
-        <Loading label="Adding up the agent's work" />
+        <StateMessage kind="loading" message="Adding up the agent's work" />
       )}
       {data !== null && !worked(data) && (
-        <p className="empty">
-          The agent hasn't worked a claim yet. Run it from the{" "}
-          <a href={paths.queue}>queue</a>, and its work adds up here.
-        </p>
+        <StateMessage
+          kind="empty"
+          message="The agent hasn't worked a claim yet."
+          next={
+            <>
+              Dispatch it from the <a href={paths.queue}>queue</a>, and its work
+              adds up here.
+            </>
+          }
+        />
       )}
       {data !== null && worked(data) && <Report insights={data} />}
     </div>

@@ -25,6 +25,8 @@ export function version(overrides: Partial<Version> = {}): Version {
     status: "current",
     lines_added: 0,
     lines_removed: 0,
+    held_out_accuracy: 0.6,
+    held_out_grade: 1.5,
     ...overrides,
   };
 }

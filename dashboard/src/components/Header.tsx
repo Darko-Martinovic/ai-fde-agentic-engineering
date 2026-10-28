@@ -6,7 +6,7 @@ import { Logo } from "./elements";
 
 /** The pages in the header, each with the routes that mark it current. */
 const PAGES: { label: string; href: string; routes: Route["page"][] }[] = [
-  { label: "Queue", href: paths.queue, routes: ["queue"] },
+  { label: "Queue", href: paths.queue, routes: ["queue", "claim"] },
   { label: "Insights", href: paths.insights, routes: ["insights"] },
   {
     label: "Scoreboard",

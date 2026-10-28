@@ -48,6 +48,8 @@ it("shows the current version and every version with its status", async () => {
   expect(await within(newer).findByText(/^Dana Whitfield, /)).toBeDefined();
   expect(within(first).getByText("Current")).toBeDefined();
   expect(within(first).getByText("Not needed")).toBeDefined();
+  expect(within(first).getByText("60%").className).toBe("numeric");
+  expect(within(first).getByText("1.50").className).toBe("numeric");
 });
 
 it("shows a version's diff with its additions and removals marked", async () => {
