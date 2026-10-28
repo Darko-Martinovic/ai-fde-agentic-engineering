@@ -90,7 +90,17 @@ test("the scoreboard shows an evaluation scored from its records", async ({
   await page.goto("/#/scoreboard");
   const table = page.getByRole("table", { name: "Evaluations" });
   const row = table.getByRole("row").filter({ hasText: `#${String(runId)}` });
-  for (const value of ["80%", "40%", "$620.00", "60%", "$0.0125", "40 s"]) {
+  // Four decided copies graded B (2.2) by the judge's stand-in, and an F for
+  // the one never decided
+  for (const value of [
+    "80%",
+    "40%",
+    "1.76",
+    "$620.00",
+    "60%",
+    "$0.0125",
+    "40 s",
+  ]) {
     await expect(row.getByText(value, { exact: true })).toBeVisible();
   }
 
@@ -108,6 +118,18 @@ test("the scoreboard shows an evaluation scored from its records", async ({
       .filter({ hasText: `${claimId}-E${String(runId)}` });
     await expect(copyRow.getByText(verdict)).toBeVisible();
   }
+  const undecided = copies
+    .getByRole("row")
+    .filter({ hasText: `CLM-1114-E${String(runId)}` });
+  await expect(undecided.getByText("F", { exact: true })).toBeVisible();
+  const graded = copies
+    .getByRole("row")
+    .filter({ hasText: `CLM-1104-E${String(runId)}` });
+  await expect(graded.getByText("2.20")).toBeVisible();
+  await expect(
+    graded.getByText(/Same grounds: Yes\. Same section: No\./),
+  ).toBeVisible();
+  await expect(page.getByText("$0.0001")).toBeVisible();
 
   await copies
     .getByRole("link", { name: `CLM-1112-E${String(runId)}` })

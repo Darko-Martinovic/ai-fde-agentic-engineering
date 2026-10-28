@@ -88,6 +88,13 @@ def test_the_approval_limit_comes_from_the_settings():
     assert offending(re.compile(r"\b1_?000\b"), ("backend",)) == []
 
 
+def test_only_one_module_calls_the_judge():
+    """The judge, its address and the Decisions call are written once, in
+    backend/judge.py (standards 7, 15)."""
+    judge = re.compile(r"jev-|JUDGE_URL|decisions\.create|from openrouter")
+    assert offending(judge, PARTS, ("backend/judge.py",)) == []
+
+
 def test_nothing_is_left_of_the_model_list_before_versions():
     """The instructions, the model list and the model comparison gave way to
     the versions of the configuration and data/models.json."""

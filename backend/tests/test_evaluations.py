@@ -164,6 +164,9 @@ def test_an_evaluation_is_scored_from_its_records(client):
             "model_cost_per_claim": 0.0125,
             "seconds_per_claim": 40,
             "run_seconds": evaluation["measures"]["run_seconds"],
+            # Four decided copies graded B (2.2), and CLM-1114 an F unasked
+            "grade": (4 * 2.2 + 0) / 5,
+            "judge_cost": 4 * 0.00002,
         }
     )
     assert evaluation["measures"]["run_seconds"] >= 0

@@ -14,7 +14,8 @@ import pytest  # noqa: E402
 from langgraph.checkpoint.memory import InMemorySaver  # noqa: E402
 
 from agent import checkpoints  # noqa: E402
-from backend import auth  # noqa: E402
+from backend import auth, judge  # noqa: E402
+from backend.tests.judge_answers import B  # noqa: E402
 from backend.tests.sign_ins import Keys  # noqa: E402
 
 
@@ -37,3 +38,17 @@ def memory_saver(monkeypatch):
 def sign_in_keys(monkeypatch):
     """Sign-ins are checked against the test's key, never Supabase's."""
     monkeypatch.setattr(auth, "keys", Keys)
+
+
+@pytest.fixture(autouse=True)
+def judged(monkeypatch):
+    """The judge grades every claim B, never reaching OpenRouter; the states
+    it was asked about."""
+    asked = []
+
+    def ask(state):
+        asked.append(state)
+        return B
+
+    monkeypatch.setattr(judge, "ask", ask)
+    return asked

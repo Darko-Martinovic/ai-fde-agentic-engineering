@@ -43,6 +43,17 @@ export default defineConfig({
         UNDERCOVER_API: setting("E2E_API_URL"),
         UNDERCOVER_AGENT: setting("E2E_AGENT_URL"),
         VITE_SUPABASE_URL: setting("E2E_AUTH_URL"),
+        JUDGE_URL: setting("E2E_JUDGE_URL"),
+        OPENROUTER_API_KEY: "e2e-key",
+      },
+    },
+    {
+      command: "node e2e/judge-stand-in.ts",
+      url: `${setting("E2E_JUDGE_URL")}/health`,
+      reuseExistingServer: false,
+      env: {
+        E2E_JUDGE_PORT: setting("E2E_JUDGE_PORT"),
+        AGENT_HOST: setting("AGENT_HOST"),
       },
     },
     {

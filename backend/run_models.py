@@ -118,6 +118,10 @@ class Measures(BaseModel):
     seconds_per_claim: float
     # From its start to its finish, once it has finished
     run_seconds: float | None
+    # The judge's average grade from 0 (F) to 3 (A) over the copies it graded,
+    # none with none graded, and what its grading cost, apart from the agents'
+    grade: float | None
+    judge_cost: float
 
 
 class EvaluationClaim(RunClaim):
@@ -130,6 +134,13 @@ class EvaluationClaim(RunClaim):
     handler_payout: float
     right: bool
     mistake_cost: float
+    # The judge's grade on the agent's explanation, its most likely level and
+    # the probability of each check, or none when it couldn't grade it
+    grade: float | None
+    letter: str | None
+    same_grounds: float | None
+    same_section: float | None
+    judge_cost: float
 
 
 class Evaluation(RunFacts):

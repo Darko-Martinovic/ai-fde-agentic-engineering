@@ -5,9 +5,11 @@ finish, when the backend builds its summary from its records. The dashboard
 reads the latest under /api/dispatches."""
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import Connection
 
-from backend import agent_service
-from backend.api import Db, found, now
+from backend import agent_service, grading
+from backend.api import Db, found, now, transaction
+from backend.free_model import free_model
 from backend.run_models import (
     DISPATCH,
     DispatchIn,
@@ -20,7 +22,7 @@ from backend.run_models import (
 )
 from backend.run_views import load_run, require_running, run_claims, summary
 from backend.signed_in import signed_in
-from backend.store import claims, runs, versions
+from backend.store import claims, grades, runs, versions
 
 router = APIRouter(prefix="/api")
 
@@ -71,14 +73,29 @@ def record_run_claims(run_id: int, listed: RunClaimsIn, conn: Db) -> Run:
     return load_run(conn, run_id)
 
 
+def to_grade(conn: Connection, run_id: int, stopped: bool) -> list[grading.Case]:
+    """What a finishing run has to grade: an evaluation's copies, unless it
+    stopped or a free model runs everything, which has no judge."""
+    run = require_running(conn, run_id)
+    if stopped or run.evaluation_set is None or free_model():
+        return []
+    return grading.cases(conn, run_id, run.evaluation_set)
+
+
 @router.post("/runs/{run_id}/finish", operation_id="finish_run")
-def finish_run(run_id: int, finish: FinishIn, conn: Db) -> Run:
-    """Finish a running run, or mark it stopped, with a dispatch's summary."""
-    require_running(conn, run_id)
-    left = summary(run_claims(conn, run_id)).model_dump_json()
-    status = "stopped" if finish.stopped else "finished"
-    runs.finish(conn, run_id, status, left, now())
-    return load_run(conn, run_id)
+def finish_run(run_id: int, finish: FinishIn) -> Run:
+    """Finish a running run, grading an evaluation, or mark it stopped."""
+    with transaction() as conn:
+        cases = to_grade(conn, run_id, finish.stopped)
+    # The judge answers on threads of its own while no connection is held
+    graded = grading.grade_all(cases)
+    with transaction() as conn:
+        require_running(conn, run_id)
+        grades.add(conn, run_id, graded)
+        left = summary(run_claims(conn, run_id)).model_dump_json()
+        status = "stopped" if finish.stopped else "finished"
+        runs.finish(conn, run_id, status, left, now())
+        return load_run(conn, run_id)
 
 
 @router.post("/runs/stop-all", operation_id="stop_runs")

@@ -74,6 +74,10 @@ export interface Measures {
   model_cost_per_claim: number;
   seconds_per_claim: number;
   run_seconds: number | null;
+  /** The judge's average grade from 0 (F) to 3 (A), none with none graded */
+  grade: number | null;
+  /** What the judge cost, apart from the claim agents */
+  judge_cost: number;
 }
 
 /** An evaluation's copy, the agent's decision beside the handler's. */
@@ -84,7 +88,17 @@ export interface EvaluationClaim extends RunClaim {
   handler_payout: number;
   right: boolean;
   mistake_cost: number;
+  /** The judge's grade, its most likely level and the probability of each
+   *  check, none when it couldn't grade the copy */
+  grade: number | null;
+  letter: Letter | null;
+  same_grounds: number | null;
+  same_section: number | null;
+  judge_cost: number;
 }
+
+/** The judge's levels, from F to A */
+export type Letter = "F" | "C" | "B" | "A";
 
 export interface Evaluation extends RunFacts {
   measures: Measures;

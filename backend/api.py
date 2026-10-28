@@ -3,6 +3,7 @@ claim's line in the queue, and loading a claim."""
 
 import json
 from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
@@ -15,12 +16,19 @@ from backend.seed import ready
 from backend.store import claims, records, runs
 
 
-def database() -> Iterator[Connection]:
-    """The database for one request, in one transaction, seeded on first use. A
-    request's work is committed when it succeeds and undone when it fails."""
+@contextmanager
+def transaction() -> Iterator[Connection]:
+    """The database, seeded on first use, in a transaction of its own: its work
+    is committed when it succeeds and undone when it fails."""
     engine = db.engine()
     ready(engine)
     with engine.begin() as conn:
+        yield conn
+
+
+def database() -> Iterator[Connection]:
+    """The database for one request, in one transaction."""
+    with transaction() as conn:
         yield conn
 
 
