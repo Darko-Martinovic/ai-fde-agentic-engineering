@@ -149,6 +149,7 @@ def agent_decisions(conn: Connection) -> list[RowMapping]:
             decision.decision,
             decision.payout,
             decision.policy_section,
+            decision.approval_limit,
         )
         .where(decision.decided_by == "agent")
         .order_by(decision.decision_id)

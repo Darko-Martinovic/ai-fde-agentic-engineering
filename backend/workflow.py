@@ -7,6 +7,7 @@ from backend.api import Db, found, load_claim, now
 from backend.claim_rules import (
     add_decision,
     add_payment,
+    approval_limit,
     held,
     require_status,
     status_after,
@@ -98,12 +99,13 @@ def decide_claim(claim_id: str, decision: DecisionIn, conn: Db) -> Claim:
     if claim.decisions and claim.decisions[-1].review != "rejected":
         return repeated_decision(claim, decision)
     require_status(claim, "in_progress")
-    status = status_after(conn, claim, decision)
+    limit = approval_limit(conn)
+    status = status_after(claim, decision, limit)
     if not claims.move(conn, claim_id, seen, status):
         # Another request decided the claim first, as when the agent asks twice
         # at once: this one is a repeat of it, or refused
         return repeated_decision(load_claim(conn, claim_id), decision)
-    add_decision(conn, claim_id, "agent", decision, decision.policy_section)
+    add_decision(conn, claim_id, "agent", decision, limit)
     return load_claim(conn, claim_id)
 
 
@@ -118,7 +120,7 @@ def pay_claim(claim_id: str, payment: PaymentIn, conn: Db) -> Claim:
         return repeated_payment(claim, payment)
     if approval is None or approval.decision != "approve":
         raise HTTPException(409, f"Claim {claim_id} is not approved")
-    reason = held(conn, claim, approval)
+    reason = held(claim, approval)
     if reason:
         raise HTTPException(409, reason)
     if round(payment.amount, 2) != approval.payout:

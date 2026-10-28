@@ -43,12 +43,13 @@ def models(conn: Connection) -> list[dict[str, Any]]:
 
 def add(
     conn: Connection, settings: dict[str, Any], changed_by: str | None, at: str
-) -> int:
-    """Record the settings as they now stand, a new row; return its number."""
-    added = insert(platform_settings).values(
-        settings=json.dumps(settings), changed_by=changed_by, changed_at=at
+) -> None:
+    """Record the settings as they now stand, a new row."""
+    conn.execute(
+        insert(platform_settings).values(
+            settings=json.dumps(settings), changed_by=changed_by, changed_at=at
+        )
     )
-    return conn.execute(added.returning(platform_settings.c.number)).scalar_one()
 
 
 def current(conn: Connection) -> dict[str, Any]:

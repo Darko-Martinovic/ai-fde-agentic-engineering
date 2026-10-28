@@ -5,11 +5,9 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from backend.run_models import MAX_AGENTS
 from backend.version_models import ModelAllowed
-from settings import setting
 
-# The most claim agents a run may have working at once
-MAX_AGENTS = int(setting("MAX_AGENTS"))
 # The judge grades from 0 (F) to 3 (A)
 TOP_GRADE = 3
 

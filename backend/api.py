@@ -92,5 +92,5 @@ def load_policy(conn: Connection, policy_id: str) -> Policy:
 
 
 def company(conn: Connection) -> dict[str, Any]:
-    """The company's rules, such as the payout approval limit."""
+    """The company's rules, such as the meal allowance without receipts."""
     return json.loads(records.stored(conn, "company"))

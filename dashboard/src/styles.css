@@ -25,6 +25,8 @@
   --radius: 18px;
   --radius-small: 10px;
   --shadow: 0 1px 2px rgb(7 59 76 / 6%), 0 8px 24px rgb(7 59 76 / 6%);
+  --shadow-modal: 0 24px 64px rgb(7 59 76 / 30%);
+  --backdrop: rgb(4 35 46 / 55%);
 
   --sans: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
   --serif: "Instrument Serif", Georgia, serif;
@@ -47,6 +49,8 @@
     --cerulean-ink: #6dcbea;
     --raspberry-ink: #ff8fa9;
     --shadow: none;
+    --shadow-modal: 0 0 0 1px var(--line);
+    --backdrop: rgb(0 0 0 / 65%);
     color-scheme: dark;
   }
 }
@@ -64,6 +68,8 @@
   --cerulean-ink: #6dcbea;
   --raspberry-ink: #ff8fa9;
   --shadow: none;
+  --shadow-modal: 0 0 0 1px var(--line);
+  --backdrop: rgb(0 0 0 / 65%);
   color-scheme: dark;
 }
 
@@ -1715,11 +1721,11 @@ main {
   border-radius: var(--radius);
   background: var(--panel);
   color: var(--ink);
-  box-shadow: 0 24px 64px rgb(7 59 76 / 30%);
+  box-shadow: var(--shadow-modal);
 }
 
 .confirm::backdrop {
-  background: rgb(4 35 46 / 55%);
+  background: var(--backdrop);
 }
 
 .confirm h2 {
@@ -1761,11 +1767,6 @@ main {
   gap: 16px;
 }
 
-.settings-group p {
-  margin: 0 0 12px;
-  color: var(--ink-soft);
-}
-
 .field__unit {
   font-weight: 400;
   color: var(--ink-soft);
@@ -1790,6 +1791,15 @@ main {
 
 .settings-group p {
   margin: 0;
+  color: var(--ink-soft);
+}
+
+.settings-group__fields {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 .changes th.numeric {

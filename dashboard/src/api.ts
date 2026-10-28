@@ -41,6 +41,17 @@ export class ApiError extends Error {
   }
 }
 
+/** The backend's reason for a refusal: its message, or for input it can't
+ *  take (422) the first field's problem. */
+function refusal(detail: unknown): string | null {
+  if (typeof detail === "string") return detail;
+  if (!Array.isArray(detail)) return null;
+  const [first] = detail as ({ loc?: unknown[]; msg?: string } | undefined)[];
+  if (!first?.msg) return null;
+  const field = first.loc?.slice(1).join(" ");
+  return field ? `${field}: ${first.msg}` : first.msg;
+}
+
 /** Send a request, with the signed-in handler's access token, and throw the
  *  backend's refusal. */
 async function send(path: string, init: RequestInit = {}): Promise<Response> {
@@ -53,9 +64,7 @@ async function send(path: string, init: RequestInit = {}): Promise<Response> {
       detail?: unknown;
     };
     const detail =
-      typeof body.detail === "string"
-        ? body.detail
-        : `Request failed (${String(response.status)})`;
+      refusal(body.detail) ?? `Request failed (${String(response.status)})`;
     throw new ApiError(response.status, detail);
   }
   return response;

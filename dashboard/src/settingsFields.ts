@@ -1,5 +1,6 @@
 import type { SettingsIn } from "./api";
 import { money } from "./format";
+import { MAX_AGENTS } from "./runs";
 
 /* The platform's settings as the Settings page lists them: each with its
  * label, its unit, and how it reads. */
@@ -18,6 +19,9 @@ export interface Field {
   label: string;
   unit: string;
   step: string;
+  /** The range the backend takes; no max is no limit */
+  min: number;
+  max?: number;
   read: (value: number) => string;
 }
 
@@ -38,6 +42,7 @@ function margins(group: "noise" | "tolerance"): Field[] {
       label: "Accuracy",
       unit: "a difference",
       step: "0.01",
+      min: 0,
       read: share,
     },
     {
@@ -45,6 +50,7 @@ function margins(group: "noise" | "tolerance"): Field[] {
       label: "Grade",
       unit: "a difference",
       step: "0.01",
+      min: 0,
       read: grade,
     },
     {
@@ -52,6 +58,7 @@ function margins(group: "noise" | "tolerance"): Field[] {
       label: "Cost per claim",
       unit: "a fraction of the old",
       step: "0.01",
+      min: 0,
       read: share,
     },
     {
@@ -59,6 +66,7 @@ function margins(group: "noise" | "tolerance"): Field[] {
       label: "Time per claim",
       unit: "a fraction of the old",
       step: "0.01",
+      min: 0,
       read: share,
     },
   ];
@@ -75,6 +83,7 @@ export const GROUPS: FieldGroup[] = [
         label: "Approval limit",
         unit: "US dollars",
         step: "0.01",
+        min: 0.01,
         read: money,
       },
     ],
@@ -89,6 +98,8 @@ export const GROUPS: FieldGroup[] = [
         label: "Accuracy",
         unit: "0 to 1",
         step: "0.01",
+        min: 0,
+        max: 1,
         read: share,
       },
       {
@@ -96,6 +107,8 @@ export const GROUPS: FieldGroup[] = [
         label: "Grade",
         unit: "0 (F) to 3 (A)",
         step: "0.01",
+        min: 0,
+        max: 3,
         read: grade,
       },
     ],
@@ -121,13 +134,16 @@ export const GROUPS: FieldGroup[] = [
         label: "Spending limit for each round",
         unit: "US dollars",
         step: "0.01",
+        min: 0.01,
         read: money,
       },
       {
         key: "agents",
         label: "Claim agents at once",
-        unit: "1 to 25",
+        unit: `1 to ${String(MAX_AGENTS)}`,
         step: "1",
+        min: 1,
+        max: MAX_AGENTS,
         read: whole,
       },
     ],

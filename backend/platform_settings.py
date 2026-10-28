@@ -1,8 +1,8 @@
 """The platform's settings: the approval limit, and what a round of improvement
 works to (the objectives, the noise and tolerance, the spending limit and its
 claim agents at once), each change a new row with who made it and when. Every
-signed-in handler reads them; a handler who can sign off payouts over the
-limit changes them. The models the claim agent may use are listed beside them,
+one reads them; a handler who can sign off payouts over the limit changes
+them. The models the claim agent may use are listed beside them,
 read only, from data/models.json."""
 
 from typing import Annotated

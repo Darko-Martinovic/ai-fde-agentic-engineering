@@ -128,3 +128,58 @@ it("sets the appearance and remembers it", async () => {
   expect(document.documentElement.dataset.theme).toBeUndefined();
   await screen.findByRole("spinbutton", { name: /^Approval limit/ });
 });
+
+it("names each change's group, where the label alone is ambiguous", async () => {
+  mockFetch(ROUTES);
+  renderAs(<SettingsPage />);
+  const noise = await screen.findByRole("group", { name: "Noise" });
+  fireEvent.change(
+    within(noise).getByRole("spinbutton", { name: /^Accuracy/ }),
+    {
+      target: { value: "0.2" },
+    },
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Save the changes" }));
+  const dialog = screen.getByRole("dialog", { name: "Change the settings?" });
+  expect(within(dialog).getByText("Noise: Accuracy")).toBeDefined();
+});
+
+it("offers each setting only in the range the backend takes", async () => {
+  mockFetch(ROUTES);
+  renderAs(<SettingsPage />);
+  const agents = await screen.findByRole("spinbutton", {
+    name: /^Claim agents at once \(1 to 25\)/,
+  });
+  expect([agents.getAttribute("min"), agents.getAttribute("max")]).toEqual([
+    "1",
+    "25",
+  ]);
+  expect(agents).toHaveProperty("required", true);
+});
+
+it("says which setting the backend can't take", async () => {
+  mockFetch({
+    ...ROUTES,
+    "PUT /api/settings": Response.json(
+      {
+        detail: [
+          {
+            loc: ["body", "approval_limit"],
+            msg: "Input should be greater than 0",
+          },
+        ],
+      },
+      { status: 422 },
+    ),
+  });
+  renderAs(<SettingsPage />);
+  fireEvent.change(
+    await screen.findByRole("spinbutton", { name: /^Claim agents at once/ }),
+    { target: { value: "10" } },
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Save the changes" }));
+  fireEvent.click(screen.getByRole("button", { name: "Change the settings" }));
+  expect((await screen.findByRole("alert")).textContent).toBe(
+    "approval_limit: Input should be greater than 0",
+  );
+});

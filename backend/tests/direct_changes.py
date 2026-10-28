@@ -9,6 +9,7 @@ from sqlalchemy import Connection
 
 from backend import db
 from backend.seed import ready
+from backend.settings_models import SettingsIn
 from backend.store import claims, platform_settings, steps
 
 
@@ -32,11 +33,7 @@ def set_approval_limit(amount):
     """Change the payout approval limit in the settings, as nobody."""
     with records_in_use() as conn:
         settings = platform_settings.current(conn)
-        changed = {
-            name: value
-            for name, value in settings.items()
-            if name not in {"number", "changed_by", "changed_at"}
-        }
+        changed = SettingsIn.model_validate(settings).model_dump()
         changed["approval_limit"] = amount
         platform_settings.add(conn, changed, None, settings["changed_at"])
 

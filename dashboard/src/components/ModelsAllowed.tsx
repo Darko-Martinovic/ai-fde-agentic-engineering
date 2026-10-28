@@ -1,10 +1,6 @@
 import type { ModelAllowed } from "../api";
+import { price } from "../format";
 import { Panel } from "./elements";
-
-/** A price per million tokens, such as $0.10. */
-function perMillion(price: number): string {
-  return `$${price.toFixed(2)}`;
-}
 
 /** The models the claim agent may use, set in data/models.json: read only. */
 export function ModelsAllowed({
@@ -38,8 +34,8 @@ export function ModelsAllowed({
                   <span className="muted mono"> {model.model}</span>
                 </td>
                 <td>{model.reasoning_efforts.join(", ")}</td>
-                <td className="numeric">{perMillion(model.input_price)}</td>
-                <td className="numeric">{perMillion(model.output_price)}</td>
+                <td className="numeric">{price(model.input_price)}</td>
+                <td className="numeric">{price(model.output_price)}</td>
               </tr>
             ))}
           </tbody>

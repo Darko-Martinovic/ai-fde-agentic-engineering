@@ -26,6 +26,12 @@ import {
 
 type Draft = Record<FieldKey, string>;
 
+/** The group each field is in, to name it where its label alone is ambiguous,
+ *  as the noise's accuracy and the tolerance's are. */
+const GROUP_OF = Object.fromEntries(
+  GROUPS.flatMap((group) => group.fields.map((f) => [f.key, group.title])),
+) as Record<FieldKey, string>;
+
 function draftOf(settings: SettingsIn): Draft {
   return Object.fromEntries(
     FIELDS.map((field) => [field.key, String(valueAt(settings, field.key))]),
@@ -38,7 +44,7 @@ function changesIn(settings: SettingsIn, draft: Draft) {
   const fields: Field[] = [];
   for (const field of FIELDS) {
     const value = Number(draft[field.key]);
-    if (draft[field.key] !== "" && value !== valueAt(settings, field.key)) {
+    if (value !== valueAt(settings, field.key)) {
       changed = withValue(changed, field.key, value);
       fields.push(field);
     }
@@ -81,7 +87,7 @@ function ChangesTable({
       <tbody>
         {fields.map((field) => (
           <tr key={field.key}>
-            <td>{field.label}</td>
+            <td>{`${GROUP_OF[field.key]}: ${field.label}`}</td>
             <td className="numeric">
               {field.read(valueAt(settings, field.key))}
             </td>
@@ -113,7 +119,9 @@ function SettingField({
       </span>
       <input
         type="number"
-        min="0"
+        required
+        min={field.min}
+        max={field.max}
         step={field.step}
         inputMode="decimal"
         value={value}
@@ -152,17 +160,20 @@ function SettingsForm({
             className="settings-group"
           >
             <p>{group.purpose}</p>
-            {group.fields.map((field) => (
-              <SettingField
-                key={field.key}
-                field={field}
-                value={draft[field.key]}
-                locked={locked}
-                onChange={(value) => {
-                  setDraft({ ...draft, [field.key]: value });
-                }}
-              />
-            ))}
+            <fieldset className="settings-group__fields">
+              <legend className="visually-hidden">{group.title}</legend>
+              {group.fields.map((field) => (
+                <SettingField
+                  key={field.key}
+                  field={field}
+                  value={draft[field.key]}
+                  locked={locked}
+                  onChange={(value) => {
+                    setDraft({ ...draft, [field.key]: value });
+                  }}
+                />
+              ))}
+            </fieldset>
           </Panel>
         ))}
       </div>

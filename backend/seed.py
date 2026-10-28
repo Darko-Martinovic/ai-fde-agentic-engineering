@@ -12,6 +12,7 @@ from sqlalchemy import Connection, Engine
 
 from backend import db
 from backend.free_model import free_model
+from backend.settings_models import SettingsIn
 from backend.store import claims, evaluations, platform_settings, records, versions
 from backend.version_models import CLAIMS_TEAM, NO_EFFORT, Verdict
 
@@ -89,8 +90,8 @@ def seed_configuration(conn: Connection, now: str) -> None:
     """Store the first settings, the models allowed and version 1 of the claim
     agent's configuration, kept: today's instructions on its first model."""
     limit = read("company.json")["payout_approval_limit"]
-    first = {"approval_limit": limit} | read(IMPROVEMENT)
-    platform_settings.add(conn, first, None, now)
+    first = SettingsIn.model_validate({"approval_limit": limit} | read(IMPROVEMENT))
+    platform_settings.add(conn, first.model_dump(), None, now)
     platform_settings.add_models(conn, models_allowed())
     versions.add(
         conn,

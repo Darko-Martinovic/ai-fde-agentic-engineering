@@ -42,7 +42,7 @@ def rejections(claim: Claim) -> int:
     return sum(decision.review == "rejected" for decision in claim.decisions)
 
 
-def status_after(conn: Connection, claim: Claim, decision: DecisionIn) -> ClaimStatus:
+def status_after(claim: Claim, decision: DecisionIn, limit: float) -> ClaimStatus:
     """Where the agent's decision puts the claim. After a handler has rejected a
     payout, the agent's next decision always goes back to a handler: an approval
     waits for a sign-off whatever its size, and anything else is referred."""
@@ -50,11 +50,11 @@ def status_after(conn: Connection, claim: Claim, decision: DecisionIn) -> ClaimS
         return "awaiting_sign_off" if decision.decision == "approve" else "referred"
     if decision.decision != "approve":
         return STATUS_AFTER[decision.decision]
-    over_limit = decision.payout > approval_limit(conn)
+    over_limit = decision.payout > limit
     return "awaiting_sign_off" if over_limit else "in_progress"
 
 
-def held(conn: Connection, claim: Claim, approval: Decision) -> str | None:
+def held(claim: Claim, approval: Decision) -> str | None:
     """Why an approval can't be paid without a handler's sign-off, or None when it
     can: it's over the limit, or follows a rejection, and isn't signed off."""
     if approval.review == "signed_off":
@@ -72,8 +72,11 @@ def add_decision(
     claim_id: str,
     decided_by: str,
     decision: DecisionIn | HandlerDecisionIn,
-    policy_section: str | None,
+    limit: float,
 ) -> None:
+    """Record a decision with the approval limit it's held to: the agent's
+    with the section it rests on, a handler's with none."""
+    section = decision.policy_section if isinstance(decision, DecisionIn) else None
     claims.add_decision(
         conn,
         claim_id,
@@ -82,9 +85,9 @@ def add_decision(
             "decision": decision.decision,
             "payout": round(decision.payout, 2),
             "reasons": decision.reasons,
-            "policy_section": policy_section,
+            "policy_section": section,
             "decided_at": now(),
-            "approval_limit": approval_limit(conn),
+            "approval_limit": limit,
         },
     )
 
