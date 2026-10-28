@@ -1,0 +1,247 @@
+/* The Improvement page: a round's steps, the proposal waiting for review, the
+   rounds table's notes, and the charts of the versions tried. The chart's two
+   verdict colors were checked for color-blind separation and contrast on
+   each theme's panel. */
+
+:root {
+  --chart-kept: var(--cerulean);
+  --chart-rolled-back: var(--coral-ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --chart-rolled-back: #e07050;
+  }
+}
+
+:root[data-theme="dark"] {
+  --chart-rolled-back: #e07050;
+}
+
+.round-action {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.round-now {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.round-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.round-step {
+  padding: 8px 12px;
+  border-radius: var(--radius-small);
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  counter-increment: step;
+}
+
+.round-step::before {
+  content: counter(step) ". ";
+  font-family: var(--mono);
+}
+
+.round-step--done {
+  color: var(--ink);
+}
+
+.round-step--done::after {
+  content: " ✓";
+  color: var(--green-ink);
+}
+
+.round-step--current {
+  border-color: var(--sea-green);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--sea-green);
+}
+
+.round-step--skipped {
+  border-style: dashed;
+  text-decoration: line-through;
+}
+
+.badge--round-open {
+  --tone: var(--sea-green);
+  --tone-ink: var(--green-ink);
+}
+
+.badge--round-finished {
+  --tone: var(--cerulean);
+  --tone-ink: var(--cerulean-ink);
+}
+
+.badge--round-stopped {
+  --tone: var(--raspberry);
+  --tone-ink: var(--raspberry-ink);
+}
+
+.proposal .diff {
+  margin-bottom: 16px;
+}
+
+.review-proposal {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.review-proposal textarea {
+  min-height: 72px;
+}
+
+.cell-note {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.cell-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+}
+
+.recipe-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recipe-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.version-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.version-chart {
+  margin: 0;
+}
+
+.version-chart figcaption {
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.version-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.version-chart text {
+  fill: var(--ink-soft);
+}
+
+.version-chart__grid line {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.version-chart__baseline line {
+  stroke: var(--ink-soft);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
+.version-chart__point circle {
+  stroke: var(--panel);
+  stroke-width: 2;
+}
+
+.version-chart__point--kept circle {
+  fill: var(--chart-kept);
+}
+
+.version-chart__point--rolled-back circle {
+  fill: var(--panel);
+  stroke: var(--chart-rolled-back);
+  stroke-width: 3;
+}
+
+.version-chart__point text {
+  fill: var(--ink);
+}
+
+.version-chart__axis {
+  font-family: var(--sans);
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+}
+
+.chart-legend li::before {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 8px;
+  vertical-align: -1px;
+  border-radius: 50%;
+}
+
+.chart-legend__kept::before {
+  background: var(--chart-kept);
+}
+
+.chart-legend__rolled-back::before {
+  border: 3px solid var(--chart-rolled-back);
+}
+
+.chart-legend .chart-legend__baseline::before {
+  width: 18px;
+  height: 2px;
+  border-radius: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--ink-soft) 0 6px,
+    transparent 6px 10px
+  );
+  vertical-align: 3px;
+}
+
+.rounds-table th,
+.rounds-table td {
+  vertical-align: top;
+}
+
+.rounds-table th[scope="row"],
+.rounds-table td.numeric {
+  white-space: nowrap;
+}

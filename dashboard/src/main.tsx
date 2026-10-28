@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import "./styles.css";
+import "./improvement.css";
 import { applyTheme, readTheme } from "./theme";
 
 // The theme this browser keeps, before the first render, so a page never

@@ -14,6 +14,11 @@ const PAGES: { label: string; href: string; routes: Route["page"][] }[] = [
     routes: ["scoreboard", "evaluation"],
   },
   {
+    label: "Improvement",
+    href: paths.improvement,
+    routes: ["improvement", "recipe"],
+  },
+  {
     label: "Configuration",
     href: paths.configuration,
     routes: ["configuration", "version"],

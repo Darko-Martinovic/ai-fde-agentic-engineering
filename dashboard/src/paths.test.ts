@@ -13,6 +13,9 @@ describe("parseRoute", () => {
       number: 3,
     });
     expect(parseRoute("#/insights")).toEqual({ page: "insights" });
+    expect(parseRoute("#/improvement")).toEqual({ page: "improvement" });
+    expect(parseRoute(paths.recipe(2))).toEqual({ page: "recipe", number: 2 });
+    expect(parseRoute("#/improvement/recipes/two")).toEqual({ page: "queue" });
     expect(parseRoute("#/claims/CLM-1001")).toEqual({
       page: "claim",
       claimId: "CLM-1001",

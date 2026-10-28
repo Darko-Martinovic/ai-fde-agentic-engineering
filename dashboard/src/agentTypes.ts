@@ -52,6 +52,8 @@ export interface RunFacts {
   version: number;
   model: string;
   reasoning_effort: string;
+  /** The round of improvement an evaluation is part of, if any */
+  round_id: number | null;
   evaluation_set: EvaluationSet | null;
   tiny: boolean | null;
   status: RunStatus;

@@ -7,6 +7,8 @@ export type Route =
   | { page: "settings" }
   | { page: "version"; number: number }
   | { page: "insights" }
+  | { page: "improvement" }
+  | { page: "recipe"; number: number }
   | { page: "scoreboard" }
   | { page: "evaluation"; runId: number }
   | { page: "sign-in"; next: string };
@@ -21,6 +23,8 @@ const INSTRUCTIONS = "#/instructions";
 const EVALUATION = `${SCOREBOARD}/`;
 const NUMBER = /^\d+$/;
 const INSIGHTS = "#/insights";
+const IMPROVEMENT = "#/improvement";
+const RECIPE = `${IMPROVEMENT}/recipes/`;
 const SETTINGS = "#/settings";
 const SIGN_IN = "#/sign-in";
 const NEXT = `${SIGN_IN}?next=`;
@@ -31,6 +35,8 @@ export const paths = {
   configuration: CONFIGURATION,
   settings: SETTINGS,
   scoreboard: SCOREBOARD,
+  improvement: IMPROVEMENT,
+  recipe: (number: number) => `${RECIPE}${String(number)}`,
   claim: (claimId: string) => `${CLAIM}${claimId}`,
   evaluation: (runId: number) => `${EVALUATION}${String(runId)}`,
   version: (number: number) => `${VERSION}${String(number)}`,
@@ -59,7 +65,8 @@ function after(hash: string, prefix: string): string {
   return hash.startsWith(prefix) ? hash.slice(prefix.length) : "";
 }
 
-/** A page whose link ends with an id: a claim, an evaluation or a version. */
+/** A page whose link ends with an id: a claim, an evaluation, a version or a
+ *  recipe. */
 function pageWithId(hash: string): Route | null {
   const claimId = after(hash, CLAIM);
   if (CLAIM_ID.test(claimId)) return { page: "claim", claimId };
@@ -67,6 +74,8 @@ function pageWithId(hash: string): Route | null {
   if (NUMBER.test(runId)) return { page: "evaluation", runId: Number(runId) };
   const number = after(hash, VERSION);
   if (NUMBER.test(number)) return { page: "version", number: Number(number) };
+  const recipe = after(hash, RECIPE);
+  if (NUMBER.test(recipe)) return { page: "recipe", number: Number(recipe) };
   return null;
 }
 
@@ -75,6 +84,7 @@ const PAGES: Partial<Record<string, Route>> = {
   [CONFIGURATION]: { page: "configuration" },
   [INSTRUCTIONS]: { page: "configuration" },
   [INSIGHTS]: { page: "insights" },
+  [IMPROVEMENT]: { page: "improvement" },
   [SETTINGS]: { page: "settings" },
 };
 

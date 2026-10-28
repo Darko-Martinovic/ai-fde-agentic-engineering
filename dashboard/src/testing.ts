@@ -14,6 +14,7 @@ import { CONFIGURATION, SETTINGS_VIEW } from "./improvementFixtures";
 
 export * from "./agentFixtures";
 export * from "./improvementFixtures";
+export * from "./roundFixtures";
 
 /** Routes keyed by "METHOD /path": a value is sent as JSON (a string as text),
  *  a Response as it is, and a missing route answers 404. */

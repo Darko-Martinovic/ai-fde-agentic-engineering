@@ -334,15 +334,15 @@ In the backend: `recipes` and recipe 1, `rounds`, `proposals`, `improver_calls`,
 
 The Improvement page and a recipe's page, with `RoundProgress`, `VersionChart`, `DiffView` and `ConfirmDialog`, and round starts and reviews through the agent's stand-in.
 
-- [ ] vitest: no rounds says "No rounds yet." with what Start a round does; Start posts once and shows a refusal; Stop shows while a round is open
-- [ ] vitest: each stage shows where the round has got to, with "First evaluations, 2 of 3"; a finished round its verdict and why; a stopped one who or what stopped it
-- [ ] vitest: a waiting change shows its diff, model and effort before and after, and the reason; Approve confirms then posts to the proposal shown; Reject needs a reason; a 409 shows in an alert; a waiting recipe uses the same `DiffView`
-- [ ] vitest: Marcus sees no Approve, Reject or Start, with why
-- [ ] vitest: the rounds table, right-aligned, with scores before and after, verdict, who reviewed what and when, and cost against the limit; the chart one point per version tried in each of two charts, colored by verdict, with version 1's line and labelled axes
-- [ ] e2e: a round played out through the API to a waiting change shows its diff; Dana's approval, confirmed, reaches the stand-in with the round, the proposal and Dana; once the test records the review and version as the service would, the page moves to "Evaluations, 0 of 3" without a reload
-- [ ] e2e: rejecting a recipe with a reason reaches the stand-in with it; Marcus sees no buttons
-- [ ] Browser: a round played out to a waiting change, in light and dark at 1280 by 800 and 1440 by 900, the diff readable and no console errors. `npm run seed` afterwards
-- [ ] `npm run check` passes
+- [x] vitest: no rounds says "No rounds yet." with what Start a round does; Start posts once and shows a refusal; Stop shows while a round is open
+- [x] vitest: each stage shows where the round has got to, with "First evaluations, 2 of 3"; a finished round its verdict and why; a stopped one who or what stopped it
+- [x] vitest: a waiting change shows its diff, model and effort before and after, and the reason; Approve confirms then posts to the proposal shown; Reject needs a reason; a 409 shows in an alert; a waiting recipe uses the same `DiffView`
+- [x] vitest: Marcus sees no Approve, Reject or Start, with why
+- [x] vitest: the rounds table, right-aligned, with scores before and after, verdict, who reviewed what and when, and cost against the limit; the chart one point per version tried in each of two charts, colored by verdict, with version 1's line and labelled axes
+- [x] e2e: a round played out through the API to a waiting change shows its diff; Dana's approval, confirmed, reaches the stand-in with the round, the proposal and Dana; once the test records the review and version as the service would, the page moves to "Evaluations, 0 of 3" without a reload (Built: "Evaluations, 1 of 3", since a stage counts the evaluation underway from 1, as the brief's "1, 2 or 3 of 3")
+- [x] e2e: rejecting a recipe with a reason reaches the stand-in with it; Marcus sees no buttons
+- [x] Browser: a round played out to a waiting change, in light and dark at 1280 by 800 and 1440 by 900, the diff readable and no console errors. `npm run seed` afterwards
+- [x] `npm run check` passes
 
 ## Phase 7: The whole dashboard, the live runs and the docs
 
