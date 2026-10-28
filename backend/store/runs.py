@@ -100,3 +100,28 @@ def attempts(conn: Connection, claim_id: str) -> list[RowMapping]:
         .order_by(attempt.attempt_id)
     )
     return list(conn.execute(found).mappings())
+
+
+def of_round(conn: Connection, round_id: int) -> list[RowMapping]:
+    """A round's evaluations, oldest first."""
+    found = (
+        select(db.runs).where(db.runs.c.round_id == round_id).order_by(db.runs.c.run_id)
+    )
+    return list(conn.execute(found).mappings())
+
+
+def scored_on(conn: Connection, version: int) -> list[RowMapping]:
+    """The finished evaluations of a whole set that rounds ran on a version,
+    which its scores are the averages of."""
+    run = db.runs.c
+    found = (
+        select(db.runs)
+        .where(
+            run.version == version,
+            run.round_id.is_not(None),
+            run.status == "finished",
+            run.tiny.is_(False),
+        )
+        .order_by(run.run_id)
+    )
+    return list(conn.execute(found).mappings())

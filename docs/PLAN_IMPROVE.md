@@ -76,7 +76,7 @@ The agent, in six parts (`docs/CODE_STANDARDS.md` 13 changes):
 - `improver.py` (new, the sixth part): the improver, a LangChain `create_agent`, with its context, its four tools, its middleware and `work_stretch`, which runs it until it waits for a handler or ends.
 - `rounds.py` (new, a support of the service): a round's work, its first evaluations, its stretches and its finish. `service.py` stays under 300 lines.
 - `service.py`: builds each run's claim agents from its version; gains `start_round` and `review_proposal`; the one-run lock names what holds it.
-- `tracing.py`: a round's improver traces in one session; its evaluations' claims tagged with the round as well as the run.
+- `tracing.py`: a round's improver traces in one session; its evaluations' claims tagged with the round as well as the run. (Built: the dispatcher sets the round's tag in a context variable for its run, `tracing.RUN_TAGS`, so `work_in_run` keeps its five arguments.)
 
 `service` uses `rounds`, `dispatcher`, `harness` and `api`; `rounds` uses `improver`, `dispatcher` and `improver_api`; `improver` uses `improver_api` and reaches claim agents only through the function the service hands it. `tools`, `graph` and `harness` never import `improver_api` (a test checks it).
 
@@ -154,7 +154,7 @@ A round's spending is its improver's calls, every model call in its evaluations,
 
 ### Stopping, restarts and one thing at a time
 
-- Stopping a round marks it stopped, rolls back a version under test, and from then on the backend refuses anything the round records. The improver checks the round before each model call (`before_model`) and ends its stretch; the service lets go of the lock when the work in hand ends.
+- Stopping a round marks it stopped, rolls back a version under test, and from then on the backend refuses anything the round records. The improver checks the round before each model call (`before_model`) and ends its stretch; the service lets go of the lock when the work in hand ends. (Built: claims already being worked when a round stops or spends its limit finish their work, so their model calls still count; no claim starts after. The service's `stop_run` refuses while a round holds the lock, since a round is stopped as a round. The verdict stage stands from the version's last evaluation until the improver proposes a recipe.)
 - On start the service marks running runs stopped, as today, and every open round not waiting for a handler. A round waiting for a handler survives a restart: its proposal is in the backend and the improver's progress is in its own `PostgresSaver` on the round's thread, `durability="sync"`.
 - A stretch that fails stops the round with the error as the reason.
 
@@ -162,7 +162,7 @@ A round's spending is its improver's calls, every model call in its evaluations,
 
 - `create_agent` on GPT-6 Luna at `medium` (or `MODEL_NAME` at `default`), `context_schema` with the round and the evaluation function, read by the tools through `ToolRuntime`.
 - The lab's four tools with the lab's names: `read_results` (`get_improver_view` as JSON), `propose_change`, `run_evaluation`, `propose_recipe`.
-- Middleware: `HumanInTheLoopMiddleware` on the two propose tools (approve, reject), with the `when` predicate; `ModelCallLimitMiddleware(thread_limit=20, exit_behavior="error")`; a `wrap_model_call` that sets `parallel_tool_calls=False`; `after_model` recording each call's tokens and cost with the round; `before_model` ending a stopped round's stretch.
+- Middleware: `HumanInTheLoopMiddleware` on the two propose tools (approve, reject), with the `when` predicate; `ModelCallLimitMiddleware(thread_limit=20, exit_behavior="error")`; a `wrap_model_call` that sets `parallel_tool_calls=False`; `after_model` recording each call's tokens and cost with the round; `before_model` ending a stopped round's stretch. (Built: the `wrap_model_call` records each call as well, since it alone sees how long the call took; the improver's model is `IMPROVER_MODEL` at `IMPROVER_REASONING_EFFORT` in `settings/.env.defaults`, chosen by the backend, so `free_model.py` stays the only reader of `MODEL_NAME`; `create_recipe` returns the recipe it made, and `create_version` the round with its version under test.)
 - Its instructions (`backend/instructions/improver.md`) are goals around the recipe: do better on claims it hasn't seen, within the objectives and the spending limit; what the claim agent works from (its instructions with the policy wording and the claims manual, the claim, the policy, the customer's earlier claims, and its tools for searching, reading sections and working out a payout); a change never names a claim; nothing takes effect until a handler approves it. The recipe is data, so it may be steps.
 - What it sees (`get_improver_view`): the current version and its scores on both sets; from its latest round evaluation on the evaluation set, the wrong claims and the five right ones with the lowest grades, with the handler's decision, payout, reason and reference beside the agent's and the judge's grade and two checks; the earlier rounds; the objectives, noise, tolerance and rule; what's left of the spending limit; the models allowed. From the held-out set, scores only.
 
@@ -309,26 +309,26 @@ Built on 2026-10-28. `backend/grading.py` gathers what an evaluation's copies ne
 
 In the backend: `recipes` and recipe 1, `rounds`, `proposals`, `improver_calls`, verdicts on versions, `version_scores.py`, `verdict.py`, `spending.py`, the `rounds` and `improvement` routers, `create_round_evaluation`, and the refusals for a stopped or spent round. In the agent: `improver_api.py`, `improver.py`, `rounds.py`, `start_round` and `review_proposal`, the lock that names what holds it, `stop_rounds` at start, the round's session and tags. Tested on a stub model with a script of tool calls and a stub judge.
 
-- [ ] pytest, `verdict.py`, against an old version at 0.60, 1.50, $0.0010 and 20 s with the lab's noise and tolerance: 0.72, 1.50, $0.0019, 24 s kept, "accuracy improved"; $0.0021 rolled back, "cost_per_claim got worse"; 0.60, 1.50, $0.0008, 20 s kept, "cost_per_claim improved"; 0.68, 1.60 rolled back, "no score improved by more than the noise"; grade 0.90 rolled back, "it missed the objectives on grade"; no grade rolled back
-- [ ] pytest: a version's scores average only its rounds' finished whole-set evaluations, leaving out a Scoreboard one and a stopped one
-- [ ] pytest: `get_improver_view` holds what the brief lists, and no held-out claim id, summary or reason
-- [ ] pytest: a recorded proposal changes nothing until approved; after approval `create_version` makes version 2 under test, proposed by "Round 1", approved by Dana, version 1 still current; a repeat returns it; a model outside the models allowed 422; `record_review` refuses Marcus
-- [ ] pytest: reviewing a proposal that isn't the one waiting 409, another round's 404, asking nothing of the service
-- [ ] pytest: `start_round`, `stop_round`, `approve_proposal` and `reject_proposal` are in the handler list and refuse Marcus with why; `create_round` refuses while one is open
-- [ ] pytest, spending: with Luna's highest cost per claim at $0.002, $0.10 left refuses the evaluations, "about $0.15, and $0.10 of the round's limit is left", and the verdict rolls back, "the round couldn't afford to evaluate it"; a Gemini version with no runs is estimated at 5 times Luna's; a spent limit refuses the next copy's start and stops the evaluation
-- [ ] pytest: a round keeps its settings row after a change; stopping with a version under test leaves version 1 current and refuses the round's later records; stopped after its verdict keeps the version
-- [ ] pytest: `get_improvement` gives each stage at the point a round reaches it, with "2 of 3"
-- [ ] Stub model test, through the service: on a fresh database a round runs its three first evaluations and the improver proposes; the round waits at `change_waiting` with the lock free
-- [ ] Stub model test: a rejection's reason reaches the improver, which proposes again; an approval makes version 2, evaluated once and twice at the round's agents at once, and kept; the recipe approved; the round's cost is the improver's calls, the evaluations' model calls and the judge
-- [ ] Stub model test: a proposal of `openai/gpt-7` goes back with "isn't allowed" and records nothing
-- [ ] Stub model test: an approval while a dispatch runs is 409 "A dispatch is running", recording nothing; a round start while an evaluation runs is refused; a dispatch while a round waits starts
-- [ ] Stub model test: a waiting round survives the service's lifespan running again and resumes from its saved progress on approval; one in its first evaluations is stopped
-- [ ] Stub model test: stopping during evaluations starts no more claims or model calls and frees the lock; the improver stops after 20 calls across an approval; a round with no proposal finishes with none tried; a spending limit spent by the first evaluation stops the round before the improver runs
-- [ ] Stub model test: the round's evaluation claims are tagged with the run and the round, and each stretch is traced in the round's session
-- [ ] A test checks that `agent/api.py` has nothing under `/api/rounds`, `/api/improvement`, `/api/configuration` or `/api/settings`, nor the evaluation reads; that `tools`, `graph` and `harness` don't import `improver_api`; and that `improver` imports neither `harness` nor `dispatcher`
-- [ ] Postman: every new operation
-- [ ] Live, through the API: a round created by the service's operations shows at `first_evaluations`; `start_round` as Dana is 409 while it's open; `stop_rounds` stops it; with the service stopped, approving a recorded proposal is 503 and a made-up one 404. `npm run seed` afterwards
-- [ ] `npm run check` passes
+- [x] pytest, `verdict.py`, against an old version at 0.60, 1.50, $0.0010 and 20 s with the lab's noise and tolerance: 0.72, 1.50, $0.0019, 24 s kept, "accuracy improved"; $0.0021 rolled back, "cost_per_claim got worse"; 0.60, 1.50, $0.0008, 20 s kept, "cost_per_claim improved"; 0.68, 1.60 rolled back, "no score improved by more than the noise"; grade 0.90 rolled back, "it missed the objectives on grade"; no grade rolled back
+- [x] pytest: a version's scores average only its rounds' finished whole-set evaluations, leaving out a Scoreboard one and a stopped one
+- [x] pytest: `get_improver_view` holds what the brief lists, and no held-out claim id, summary or reason
+- [x] pytest: a recorded proposal changes nothing until approved; after approval `create_version` makes version 2 under test, proposed by "Round 1", approved by Dana, version 1 still current; a repeat returns it; a model outside the models allowed 422; `record_review` refuses Marcus
+- [x] pytest: reviewing a proposal that isn't the one waiting 409, another round's 404, asking nothing of the service
+- [x] pytest: `start_round`, `stop_round`, `approve_proposal` and `reject_proposal` are in the handler list and refuse Marcus with why; `create_round` refuses while one is open
+- [x] pytest, spending: with Luna's highest cost per claim at $0.002, $0.10 left refuses the evaluations, "about $0.15, and $0.10 of the round's limit is left", and the verdict rolls back, "the round couldn't afford to evaluate it"; a Gemini version with no runs is estimated at 5 times Luna's; a spent limit refuses the next copy's start and stops the evaluation
+- [x] pytest: a round keeps its settings row after a change; stopping with a version under test leaves version 1 current and refuses the round's later records; stopped after its verdict keeps the version
+- [x] pytest: `get_improvement` gives each stage at the point a round reaches it, with "2 of 3"
+- [x] Stub model test, through the service: on a fresh database a round runs its three first evaluations and the improver proposes; the round waits at `change_waiting` with the lock free
+- [x] Stub model test: a rejection's reason reaches the improver, which proposes again; an approval makes version 2, evaluated once and twice at the round's agents at once, and kept; the recipe approved; the round's cost is the improver's calls, the evaluations' model calls and the judge
+- [x] Stub model test: a proposal of `openai/gpt-7` goes back with "isn't allowed" and records nothing
+- [x] Stub model test: an approval while a dispatch runs is 409 "A dispatch is running", recording nothing; a round start while an evaluation runs is refused; a dispatch while a round waits starts
+- [x] Stub model test: a waiting round survives the service's lifespan running again and resumes from its saved progress on approval; one in its first evaluations is stopped
+- [x] Stub model test: stopping during evaluations starts no more claims or model calls and frees the lock; the improver stops after 20 calls across an approval; a round with no proposal finishes with none tried; a spending limit spent by the first evaluation stops the round before the improver runs
+- [x] Stub model test: the round's evaluation claims are tagged with the run and the round, and each stretch is traced in the round's session
+- [x] A test checks that `agent/api.py` has nothing under `/api/rounds`, `/api/improvement`, `/api/configuration` or `/api/settings`, nor the evaluation reads; that `tools`, `graph` and `harness` don't import `improver_api`; and that `improver` imports neither `harness` nor `dispatcher`
+- [x] Postman: every new operation
+- [x] Live, through the API: a round created by the service's operations shows at `first_evaluations`; `start_round` as Dana is 409 while it's open; `stop_rounds` stops it; with the service stopped, approving a recorded proposal is 503 and a made-up one 404. `npm run seed` afterwards
+- [x] `npm run check` passes
 
 ## Phase 6: The Improvement page
 

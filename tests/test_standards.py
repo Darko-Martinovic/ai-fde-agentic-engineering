@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from agent import api
+from agent import api, improver_api
 from backend.main import app
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -109,11 +109,12 @@ def test_nothing_reaches_the_answer_key():
 
 
 def test_only_the_api_modules_call_the_backend():
-    """The agent reaches the backend only through its client, agent/api.py, on
-    the one connection in agent/connection.py, which names its address once
-    (standards 7, 15)."""
+    """The agent reaches the backend only through its clients, agent/api.py and
+    the improver's agent/improver_api.py, on the one connection in
+    agent/connection.py, which names its address once (standards 7, 15)."""
     connection = ("agent/connection.py",)
-    assert offending(API_PATH, ("agent",), ("agent/api.py",)) == []
+    clients = ("agent/api.py", "agent/improver_api.py")
+    assert offending(API_PATH, ("agent",), clients) == []
     assert offending(HTTP_CLIENT, ("agent",), connection) == []
     assert offending(re.compile("UNDERCOVER_API"), ("agent",), connection) == []
 
@@ -134,12 +135,14 @@ def test_only_one_module_calls_the_agents_service():
     assert offending(re.compile(r"UNDERCOVER_AGENT"), ("backend",), allowed) == []
 
 
-def test_agent_api_is_named_after_the_operations():
-    """Each function in agent/api.py is a backend operation, by name (standard 16)."""
+@pytest.mark.parametrize("client", [api, improver_api], ids=lambda m: m.__name__)
+def test_agent_api_is_named_after_the_operations(client):
+    """Each function in the agent's clients is a backend operation, by name
+    (standard 16)."""
     functions = {
         name
-        for name, member in inspect.getmembers(api, inspect.isfunction)
-        if member.__module__ == api.__name__ and name not in {"client", "send"}
+        for name, member in inspect.getmembers(client, inspect.isfunction)
+        if member.__module__ == client.__name__
     }
     assert functions <= operation_ids()
 
@@ -237,3 +240,30 @@ def test_the_agent_cannot_read_the_scoreboard_or_start_runs():
     assert not kept_out & set(dir(api))
     reads = re.compile(r"[\"']/api/(evaluations|dispatches|configuration)")
     assert offending(reads, ("agent",), ("agent/service.py",)) == []
+
+
+def imports(module: str) -> set[str]:
+    """The agent's modules a module of the agent imports."""
+    tree = ast.parse((ROOT / f"agent/{module}.py").read_text(encoding="utf-8"))
+    found = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "agent":
+            found |= {alias.name for alias in node.names}
+        elif isinstance(node, ast.ImportFrom) and (node.module or "").startswith(
+            "agent."
+        ):
+            found.add((node.module or "").removeprefix("agent."))
+    return found
+
+
+def test_the_claim_agent_has_no_way_to_the_improvers_operations():
+    """The claim agent's client reaches nothing of rounds, improvement, the
+    configuration's history, the settings or the evaluations' scores; the claim
+    agent's modules never import the improver's client; and the improver
+    reaches claim agents only through the function the service hands it."""
+    source = (ROOT / "agent/api.py").read_text(encoding="utf-8")
+    kept_out = r"/api/(rounds|improvement|configuration|settings|evaluations)"
+    assert re.search(kept_out, source) is None
+    for module in ("tools", "graph", "harness"):
+        assert "improver_api" not in imports(module), module
+    assert not {"harness", "dispatcher"} & imports("improver")

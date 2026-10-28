@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from sqlalchemy import Connection, RowMapping, func, insert, select
+from sqlalchemy import Connection, RowMapping, func, insert, select, update
 
 from backend.db_improvement import versions
 from backend.version_models import Verdict
@@ -46,3 +46,15 @@ def run_on(conn: Connection, number: int) -> dict[str, Any]:
         versions.c.reasoning_effort,
     ).where(versions.c.number == number)
     return dict(conn.execute(found).mappings().one())
+
+
+def decide(
+    conn: Connection, number: int, verdict: Verdict, reason: str, at: str
+) -> None:
+    """Record the verdict on a version a round tried: kept, when it becomes the
+    current version, or rolled back."""
+    conn.execute(
+        update(versions)
+        .where(versions.c.number == number)
+        .values(verdict=verdict, verdict_reason=reason, decided_at=at)
+    )

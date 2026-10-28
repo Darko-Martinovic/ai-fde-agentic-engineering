@@ -13,7 +13,14 @@ from sqlalchemy import Connection, Engine
 from backend import db
 from backend.free_model import free_model
 from backend.settings_models import SettingsIn
-from backend.store import claims, evaluations, platform_settings, records, versions
+from backend.store import (
+    claims,
+    evaluations,
+    platform_settings,
+    records,
+    rounds,
+    versions,
+)
 from backend.version_models import CLAIMS_TEAM, NO_EFFORT, Verdict
 
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -109,6 +116,23 @@ def seed_configuration(conn: Connection, now: str) -> None:
     )
 
 
+def seed_recipe(conn: Connection, now: str) -> None:
+    """Store version 1 of the improver's recipe, the lab's first."""
+    rounds.add_recipe(
+        conn,
+        {
+            "recipe": (INSTRUCTIONS / "recipe.md").read_text(encoding="utf-8"),
+            "based_on": None,
+            "reason": "The lab's first recipe, which fixes mistakes one at a time.",
+            "proposed_by": CLAIMS_TEAM,
+            "round_id": None,
+            "approved_by": None,
+            "approved_at": None,
+            "created_at": now,
+        },
+    )
+
+
 def seed(conn: Connection) -> str:
     """Load every record, with each claim waiting in the queue, and version 1
     of the claim agent's configuration, and say what the answer key holds."""
@@ -125,7 +149,9 @@ def seed(conn: Connection) -> str:
             "claims_manual": read("claims_manual.md"),
         },
     )
-    seed_configuration(conn, datetime.now(UTC).isoformat())
+    seeded_at = datetime.now(UTC).isoformat()
+    seed_configuration(conn, seeded_at)
+    seed_recipe(conn, seeded_at)
     return seed_answer_key(conn)
 
 
@@ -157,5 +183,5 @@ if __name__ == "__main__":
     answer_key = reset()
     print(
         f"Reset {db.where(db.engine())}, with {answer_key} for evaluations,"
-        " and version 1 of the configuration"
+        " and version 1 of the configuration and of the improver's recipe"
     )

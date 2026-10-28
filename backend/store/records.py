@@ -28,6 +28,12 @@ def handlers(conn: Connection) -> list[str]:
     return list(conn.execute(found).scalars())
 
 
+def handler(conn: Connection, handler_id: str) -> str | None:
+    """Return the record, as JSON, of the handler with this id, or None."""
+    found = select(db.handlers.c.data).where(db.handlers.c.handler_id == handler_id)
+    return conn.execute(found).scalar_one_or_none()
+
+
 def handler_by_email(conn: Connection, email: str) -> str | None:
     """Return the record, as JSON, of the handler with this email, or None."""
     found = select(db.handlers.c.data).where(db.handlers.c.email == email.lower())

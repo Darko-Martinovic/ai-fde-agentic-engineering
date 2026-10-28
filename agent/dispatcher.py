@@ -5,6 +5,7 @@ finishes the run once every claim has come back. It saves no progress of its
 own: each claim saves its own on its own thread, and the next dispatch finishes
 what a stopped one left."""
 
+import contextvars
 import logging
 import operator
 import threading
@@ -17,7 +18,7 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.runtime import ExecutionInfo, Runtime
 from langgraph.types import RetryPolicy, Send
 
-from agent import api, harness
+from agent import api, harness, tracing
 from agent.reports import IN_PROGRESS, WAITING
 
 STATUS = "status"
@@ -164,11 +165,19 @@ def work_run(
     stop: threading.Event,
 ) -> list[str]:
     """Work a dispatch with up to its N claim agents at once, and return each
-    claim's report line."""
+    claim's report line. It runs in a fresh context, so it's a root run wherever
+    it's called, as inside the improver's tool, with a round's evaluation's
+    claims tagged with the round."""
     context = DispatchContext(run=run, work=work, resuming=resuming, stop=stop)
-    finished = dispatcher().invoke(
-        {"claims": [], "reports": []},
-        context=context,
-        config={"max_concurrency": run["agents"]},
-    )
-    return finished["reports"]
+
+    def in_fresh_context() -> list[str]:
+        if run.get("round_id") is not None:
+            tracing.RUN_TAGS.set((f"round-{run['round_id']}",))
+        finished = dispatcher().invoke(
+            {"claims": [], "reports": []},
+            context=context,
+            config={"max_concurrency": run["agents"]},
+        )
+        return finished["reports"]
+
+    return contextvars.Context().run(in_fresh_context)

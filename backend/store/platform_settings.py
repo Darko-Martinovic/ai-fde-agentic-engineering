@@ -52,15 +52,25 @@ def add(
     )
 
 
+def row(conn: Connection, number: int) -> dict[str, Any]:
+    """One row of the settings' history, as a round keeps it."""
+    found = select(platform_settings).where(platform_settings.c.number == number)
+    return settings_of(conn.execute(found).mappings().one())
+
+
 def current(conn: Connection) -> dict[str, Any]:
     """The settings as they stand, the newest row, with its number and who
     changed them when."""
     found = (
         select(platform_settings).order_by(platform_settings.c.number.desc()).limit(1)
     )
-    row = conn.execute(found).mappings().one()
-    return json.loads(row["settings"]) | {
-        "number": row["number"],
-        "changed_by": row["changed_by"],
-        "changed_at": row["changed_at"],
+    return settings_of(conn.execute(found).mappings().one())
+
+
+def settings_of(found: RowMapping) -> dict[str, Any]:
+    """A row of settings, with its number and who changed them when."""
+    return json.loads(found["settings"]) | {
+        "number": found["number"],
+        "changed_by": found["changed_by"],
+        "changed_at": found["changed_at"],
     }

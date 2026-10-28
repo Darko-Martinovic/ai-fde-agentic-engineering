@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from backend import agent_service, grading
 from backend.api import Db, found, now, transaction
+from backend.round_views import cut_short
 from backend.run_models import (
     DISPATCH,
     DispatchIn,
@@ -73,14 +74,17 @@ def record_run_claims(run_id: int, listed: RunClaimsIn, conn: Db) -> Run:
 
 @router.post("/runs/{run_id}/finish", operation_id="finish_run")
 def finish_run(run_id: int, finish: FinishIn) -> Run:
-    """Finish a running run, grading an evaluation, or mark it stopped."""
+    """Finish a running run, grading an evaluation, or mark it stopped, as an
+    evaluation its round cut short is."""
     with transaction() as conn:
-        cases = grading.cases(conn, require_running(conn, run_id), finish.stopped)
+        run = require_running(conn, run_id)
+        stopped = finish.stopped or bool(run.round_id and cut_short(conn, run.round_id))
+        cases = grading.cases(conn, run, stopped)
     # The judge answers on threads of its own while no connection is held
     graded = grading.grade_all(cases)
     with transaction() as conn:
         left = summary(run_claims(conn, run_id)).model_dump_json()
-        status = "stopped" if finish.stopped else "finished"
+        status = "stopped" if stopped else "finished"
         # Only a run still running finishes, once, whatever else happened
         # while the judge answered
         if not runs.finish(conn, run_id, status, left, now()):

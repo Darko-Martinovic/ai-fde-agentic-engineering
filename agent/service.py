@@ -1,24 +1,47 @@
 """The agent's service: a small web service, the agent's entry point beside the
-command line. The backend asks it to start a dispatch, to stop one, and to pick
-a claim back up after a handler's review. One dispatch runs at a time, in the
-background. In the cloud the agent will run as a service like this. `uv run -m
-agent.service` runs it on AGENT_HOST and AGENT_PORT."""
+command line. The backend asks it to start a dispatch, an evaluation or a round
+of improvement, to stop a run, to carry a round on after a handler's review of
+the improver's proposal, and to pick a claim back up after a handler's review.
+One run or round works at a time, in the background; a round waiting for a
+handler holds nothing. In the cloud the agent will run as a service like this.
+`uv run -m agent.service` runs it on AGENT_HOST and AGENT_PORT."""
 
 import logging
 import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from functools import partial
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
+from uuid import uuid4
 
 import uvicorn
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from pydantic import BaseModel, Field
 
-from agent import api, checkpoints, dispatcher, harness, versions
+from agent import (
+    api,
+    checkpoints,
+    dispatcher,
+    harness,
+    improver_api,
+    rounds,
+    versions,
+)
 from agent.connection import Refused
 from agent.reports import IN_PROGRESS
+from agent.run_lock import RunLock
+from agent.service_models import (
+    Accepted,
+    DispatchIn,
+    EvaluationIn,
+    ReviewIn,
+    Reviewing,
+    RoundStarted,
+    RoundStartIn,
+    Started,
+    Stopping,
+)
+from agent.versions import Model
 from settings import setting
 
 log = logging.getLogger(__name__)
@@ -28,12 +51,12 @@ Carrier = Callable[[str], str]
 # A checkpointer of its own for each claim run, on the service's pool
 Savers = Callable[[], BaseCheckpointSaver[Any]]
 
-ALREADY_RUNNING = "A dispatch or an evaluation is already running"
 NOTHING_RUNNING = "No dispatch or evaluation is running"
-MAX_AGENTS = int(setting("MAX_AGENTS"))
-# One run at a time; a handler's request to stop it; and the claims being
-# carried on after a review, which a dispatch leaves alone
-RUNNING = threading.Lock()
+
+
+# One run or round at a time; a handler's request to stop a run; and the claims
+# being carried on after a review, which a dispatch leaves alone
+RUNNING = RunLock()
 STOP = threading.Event()
 RESUMING: set[str] = set()
 
@@ -41,10 +64,13 @@ RESUMING: set[str] = set()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Keep the process's pool open for as long as the service runs, and mark
-    any run a stopped service left running as stopped."""
+    any run a stopped service left running as stopped, and any round, unless
+    it waits for a handler: its proposal is in the backend and the improver's
+    progress is saved, so a review carries it on."""
     with checkpoints.pool() as connections:
         app.state.pool = connections
         api.stop_runs()
+        improver_api.stop_rounds()
         yield
 
 
@@ -68,27 +94,6 @@ def carrier(new_saver: Annotated[Savers, Depends(savers)]) -> Carrier:
     return lambda claim_id: harness.carry_on(
         claim_id, None, harness.current_version(), new_saver()
     )
-
-
-class Accepted(BaseModel):
-    claim_id: str
-
-
-class DispatchIn(BaseModel):
-    agents: int = Field(ge=1, le=MAX_AGENTS)
-
-
-class EvaluationIn(DispatchIn):
-    evaluation_set: Literal["evaluation", "held_out"]
-    tiny: bool
-
-
-class Started(BaseModel):
-    agents: int
-
-
-class Stopping(BaseModel):
-    stopping: bool
 
 
 @router.get("/health", operation_id="health")
@@ -118,9 +123,9 @@ def start_evaluation(
 
 
 def begin(start: DispatchIn, new_saver: Savers) -> None:
-    """Start a run in the background, or refuse while one runs."""
-    if not RUNNING.acquire(blocking=False):
-        raise HTTPException(409, ALREADY_RUNNING)
+    """Start a run in the background, or refuse while one works."""
+    kind = "An evaluation" if isinstance(start, EvaluationIn) else "A dispatch"
+    RUNNING.take(f"{kind} is running")
     STOP.clear()
     in_background(work_a_run, start, new_saver)
 
@@ -150,11 +155,93 @@ def work_a_run(start: DispatchIn, new_saver: Savers) -> None:
         RUNNING.release()
 
 
+def round_workers(new_saver: Annotated[Savers, Depends(savers)]) -> rounds.RoundWorkers:
+    """How a round works: the improver on the model the round names, with a
+    saver of its own, and each evaluation through the dispatcher, with claim
+    agents built from the version it records."""
+
+    def evaluate(run: dict[str, Any]) -> None:
+        version = versions.version(api.get_version(run["version"]))
+        work = partial(harness.work_in_run, version=version, new_saver=new_saver)
+        dispatcher.work_run(run, work, RESUMING, STOP)
+
+    return rounds.RoundWorkers(
+        model_for=lambda model: harness.chat_model(
+            Model(
+                name=model["model"],
+                provider=model["provider"],
+                options=model["options"],
+            )
+        ),
+        new_saver=new_saver,
+        evaluate=evaluate,
+    )
+
+
+Workers = Annotated[rounds.RoundWorkers, Depends(round_workers)]
+
+
+def or_let_go[T](record: Callable[[], T]) -> T:
+    """Record something through the backend while holding the lock, letting go
+    of it, and passing the backend's refusal on, when that fails."""
+    try:
+        return record()
+    except Refused as refused:
+        RUNNING.release()
+        raise HTTPException(refused.status, refused.detail) from refused
+    except Exception:
+        RUNNING.release()
+        raise
+
+
+def holding(work: Callable[..., None], *args: Any) -> None:
+    """Do a round's work, letting go of the lock when it pauses for a handler
+    or ends."""
+    try:
+        work(*args)
+    finally:
+        RUNNING.release()
+
+
+@router.post("/rounds", operation_id="start_round", status_code=202)
+def start_round(start: RoundStartIn, workers: Workers) -> RoundStarted:
+    """Start a round of improvement: its first evaluations, then the improver."""
+    RUNNING.take("A round is starting", round_=True)
+    thread_id = f"improver-{uuid4().hex[:8]}"
+    worked = or_let_go(lambda: improver_api.create_round(start.handler_id, thread_id))
+    RUNNING.holder = f"Round {worked['round_id']} is running"
+    STOP.clear()
+    in_background(holding, rounds.work_round, worked, workers)
+    return RoundStarted(round_id=worked["round_id"])
+
+
+@router.post(
+    "/rounds/{round_id}/proposals/{proposal_id}/review",
+    operation_id="review_proposal",
+    status_code=202,
+)
+def review_proposal(
+    round_id: int, proposal_id: int, review: ReviewIn, workers: Workers
+) -> Reviewing:
+    """Record a handler's review of the improver's proposal and carry the round on."""
+    RUNNING.take(f"Round {round_id} is running", round_=True)
+    or_let_go(
+        lambda: improver_api.record_review(round_id, proposal_id, review.model_dump())
+    )
+    STOP.clear()
+    in_background(
+        holding, rounds.resume_round, round_id, review.approved, review.note, workers
+    )
+    return Reviewing(round_id=round_id, proposal_id=proposal_id)
+
+
 @router.post("/runs/stop", operation_id="stop_run", status_code=202)
 def stop_run() -> Stopping:
     """Ask the running dispatch to start no more claims and finish as stopped."""
     if not RUNNING.locked():
         raise HTTPException(409, NOTHING_RUNNING)
+    if RUNNING.round:
+        raise HTTPException(409, f"{RUNNING.holder}: stop it on the Improvement page")
     STOP.set()
     return Stopping(stopping=True)
 

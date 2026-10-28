@@ -4,9 +4,12 @@ from functools import partial
 from langchain_core.messages import AIMessage
 
 import agent.__main__ as cli
-from agent import api, dispatcher, harness
+from agent import api, dispatcher, harness, improver, improver_api, rounds
+from agent.tests.round_stubs import claim_agents, declines, says
+from agent.tests.round_stubs import improver as improver_model
 from agent.tests.stub import FREE, ByClaim, StubModel, decide, stub, tool_call
 from backend.tests.direct_changes import set_status
+from backend.tests.round_steps import CHANGE
 from backend.tests.sign_ins import DANA, headers
 
 # Every waiting claim but CLM-1001 and CLM-1004, so a dispatch works those two
@@ -155,3 +158,46 @@ def test_a_dispatchs_claims_are_traces_of_their_own_tagged_with_it(
     agents = named(spans, "claim-agent")
     assert len(agents) == 2
     assert all(a.attributes[TAGS] == (f"run-{run['run_id']}",) for a in agents)
+
+
+def test_a_rounds_evaluation_claims_are_tagged_with_the_run_and_the_round(
+    backend, memory_saver, traces
+):
+    round_id = improver_api.create_round("HND-01", "improver-t")["round_id"]
+    run = improver_api.create_round_evaluation(round_id, "evaluation")
+    work = partial(
+        harness.work_in_run,
+        version=FREE,
+        new_saver=lambda: memory_saver,
+        llm=claim_agents(declines),
+    )
+    dispatcher.work_run(run, work, (), threading.Event())
+    agents = named(traces(), "claim-agent")
+    assert len(agents) == 25
+    tags = (f"run-{run['run_id']}", f"round-{round_id}")
+    # Langfuse merges the trace's tags as a set, in no order of its own
+    assert [sorted(agent.attributes[TAGS]) for agent in agents] == [sorted(tags)] * 25
+
+
+def test_each_stretch_of_the_improver_is_a_trace_in_the_rounds_session(
+    backend, memory_saver, traces
+):
+    round_id = improver_api.create_round("HND-01", "improver-t")["round_id"]
+    model = improver_model(says("propose_change", **CHANGE), says())
+    workers = rounds.RoundWorkers(
+        model_for=lambda chosen: model,
+        new_saver=lambda: memory_saver,
+        evaluate=lambda run: None,
+    )
+    rounds.stretch(round_id, workers, None)
+    review = {"handler_id": "HND-01", "approved": False, "note": "No."}
+    improver_api.record_review(round_id, 1, review)
+    rounds.stretch(round_id, workers, improver.resume(False, "No."))
+    spans = traces()
+    stretches = roots(spans)
+    assert [root.name for root in stretches] == ["improver", "improver"]
+    assert len({root.context.trace_id for root in stretches}) == 2
+    assert all(span.attributes[SESSION] == "improver-t" for span in spans)
+    agents = [s for s in named(spans, "improver") if s not in stretches]
+    assert agents
+    assert all(agent.attributes[TAGS] == (f"round-{round_id}",) for agent in agents)
