@@ -274,3 +274,28 @@ it("tells a handler who can't sign off over the limit why there's no review", as
   expect(screen.queryByRole("button", { name: /Sign off|Reject/ })).toBeNull();
   expect(screen.queryByLabelText("Note for the agent")).toBeNull();
 });
+
+it("tells a handler who can't sign off over the limit why they can't approve over it", async () => {
+  mockFetch(
+    claimRoutes({
+      "GET /api/claims/CLM-1001": claim({
+        status: "referred",
+        decisions: [decision({ decision: "refer", payout: 0 })],
+      }),
+    }),
+  );
+  renderAs(<ClaimPage claimId="CLM-1001" />, MARCUS);
+  fireEvent.change(await screen.findByLabelText("Payout in US dollars"), {
+    target: { value: "900" },
+  });
+  expect(
+    screen.getByRole("button", { name: "Approve and pay $900.00" }),
+  ).toBeDefined();
+  fireEvent.change(screen.getByLabelText("Payout in US dollars"), {
+    target: { value: "1350" },
+  });
+  expect(
+    await screen.findByText(/can approve a payout over the limit\./),
+  ).toBeDefined();
+  expect(screen.queryByRole("button", { name: /Approve and pay/ })).toBeNull();
+});

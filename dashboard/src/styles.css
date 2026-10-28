@@ -25,6 +25,8 @@
   --radius: 18px;
   --radius-small: 10px;
   --shadow: 0 1px 2px rgb(7 59 76 / 6%), 0 8px 24px rgb(7 59 76 / 6%);
+  --shadow-modal: 0 24px 64px rgb(7 59 76 / 30%);
+  --backdrop: rgb(4 35 46 / 55%);
 
   --sans: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
   --serif: "Instrument Serif", Georgia, serif;
@@ -47,6 +49,8 @@
     --cerulean-ink: #6dcbea;
     --raspberry-ink: #ff8fa9;
     --shadow: none;
+    --shadow-modal: 0 0 0 1px var(--line);
+    --backdrop: rgb(0 0 0 / 65%);
     color-scheme: dark;
   }
 }
@@ -64,6 +68,8 @@
   --cerulean-ink: #6dcbea;
   --raspberry-ink: #ff8fa9;
   --shadow: none;
+  --shadow-modal: 0 0 0 1px var(--line);
+  --backdrop: rgb(0 0 0 / 65%);
   color-scheme: dark;
 }
 
@@ -1704,4 +1710,104 @@ main {
 
 .data-table th.numeric {
   font-family: var(--sans);
+}
+
+/* The dashboard's own confirmation */
+
+.confirm {
+  width: min(520px, calc(100vw - 32px));
+  padding: 24px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--shadow-modal);
+}
+
+.confirm::backdrop {
+  background: var(--backdrop);
+}
+
+.confirm h2 {
+  margin: 0 0 12px;
+  font-size: 20px;
+}
+
+.confirm__buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.changes {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.changes th,
+.changes td {
+  padding: 6px 8px;
+  border-top: 1px solid var(--line);
+  text-align: left;
+}
+
+.changes .numeric {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Settings */
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.field__unit {
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+.field input[type="number"] {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.last-change {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.settings-group {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.settings-group p {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.settings-group__fields {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.changes th.numeric {
+  font-family: var(--sans);
+}
+
+.form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
 }

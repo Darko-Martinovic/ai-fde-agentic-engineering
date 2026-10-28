@@ -8,7 +8,12 @@ import {
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { ScoreboardPage } from "./Scoreboard";
-import { CONFIGURATION, evaluation, mockFetch } from "../testing";
+import {
+  CONFIGURATION,
+  SETTINGS_VIEW,
+  evaluation,
+  mockFetch,
+} from "../testing";
 
 afterEach(() => {
   cleanup();
@@ -23,6 +28,7 @@ it("lists the evaluations newest first with their measures", async () => {
       evaluation({ evaluation_set: "evaluation", tiny: false }),
     ],
     "GET /api/configuration": CONFIGURATION,
+    "GET /api/settings": SETTINGS_VIEW,
   });
   render(<ScoreboardPage />);
   const table = await screen.findByRole("table", { name: "Evaluations" });
@@ -48,6 +54,7 @@ it("says when there is no evaluation yet", async () => {
   mockFetch({
     "GET /api/evaluations": [],
     "GET /api/configuration": CONFIGURATION,
+    "GET /api/settings": SETTINGS_VIEW,
   });
   render(<ScoreboardPage />);
   expect(await screen.findByText("No evaluation yet.")).toBeDefined();
@@ -57,6 +64,7 @@ it("starts with the evaluation set, all 25 and 3 agents, and posts the choices",
   const fetchMock = mockFetch({
     "GET /api/evaluations": [],
     "GET /api/configuration": CONFIGURATION,
+    "GET /api/settings": SETTINGS_VIEW,
     "POST /api/evaluations": { agents: 5 },
   });
   render(<ScoreboardPage />);
@@ -102,6 +110,7 @@ it.each([
   mockFetch({
     "GET /api/evaluations": [],
     "GET /api/configuration": CONFIGURATION,
+    "GET /api/settings": SETTINGS_VIEW,
     "POST /api/evaluations": Response.json({ detail }, { status }),
   });
   render(<ScoreboardPage />);
@@ -110,7 +119,10 @@ it.each([
 });
 
 it("shows when the evaluations can't load", async () => {
-  mockFetch({ "GET /api/configuration": CONFIGURATION });
+  mockFetch({
+    "GET /api/configuration": CONFIGURATION,
+    "GET /api/settings": SETTINGS_VIEW,
+  });
   render(<ScoreboardPage />);
   expect(
     await screen.findByText("No route for GET /api/evaluations"),

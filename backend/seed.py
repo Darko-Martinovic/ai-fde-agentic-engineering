@@ -12,6 +12,7 @@ from sqlalchemy import Connection, Engine
 
 from backend import db
 from backend.free_model import free_model
+from backend.settings_models import SettingsIn
 from backend.store import claims, evaluations, platform_settings, records, versions
 from backend.version_models import CLAIMS_TEAM, NO_EFFORT, Verdict
 
@@ -19,6 +20,9 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 INSTRUCTIONS = Path(__file__).parent / "instructions"
 # The models the claim agent may use, and the one version 1 runs on
 MODELS = "models.json"
+# What a round of improvement works to, which with the approval limit in
+# company.json make the first settings
+IMPROVEMENT = "improvement.json"
 
 # The files the backend serves its records from. data/security/ stays out of
 # reach, and of data/evals/ only the answer key below is read, by seeding alone.
@@ -32,6 +36,7 @@ SEED_FILES = (
     "policy_wording.md",
     "claims_manual.md",
     MODELS,
+    IMPROVEMENT,
 )
 # The answer key, which only seeding reads, into tables no claim operation reads:
 # the held-out claims, and the handlers' decisions on each labelled set
@@ -82,8 +87,11 @@ def first_model() -> dict[str, str]:
 
 
 def seed_configuration(conn: Connection, now: str) -> None:
-    """Store the models allowed and version 1 of the claim agent's
-    configuration, kept: today's instructions on its first model."""
+    """Store the first settings, the models allowed and version 1 of the claim
+    agent's configuration, kept: today's instructions on its first model."""
+    limit = read("company.json")["payout_approval_limit"]
+    first = SettingsIn.model_validate({"approval_limit": limit} | read(IMPROVEMENT))
+    platform_settings.add(conn, first.model_dump(), None, now)
     platform_settings.add_models(conn, models_allowed())
     versions.add(
         conn,

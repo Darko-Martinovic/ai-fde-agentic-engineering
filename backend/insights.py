@@ -12,7 +12,6 @@ from pydantic import BaseModel
 from sqlalchemy import Connection, RowMapping
 
 from backend.api import Db
-from backend.claim_rules import approval_limit
 from backend.models import FOR_A_HANDLER, ClaimStatus, DecisionKind
 from backend.store import claims, steps
 
@@ -83,7 +82,6 @@ class Records:
     claims: dict[str, dict[str, Any]]
     decisions: dict[str, RowMapping]
     payments: dict[str, RowMapping]
-    limit: float
 
     @classmethod
     def load(cls, conn: Connection) -> "Records":
@@ -96,7 +94,6 @@ class Records:
             claims=queue,
             decisions=in_queue(queue, claims.agent_decisions(conn)),
             payments=in_queue(queue, claims.payments(conn)),
-            limit=approval_limit(conn),
         )
 
     def straight_through(self, claim_id: str) -> bool:
@@ -203,7 +200,7 @@ def totals(records: Records, work: list[ClaimWork]) -> Totals:
         claims=len(records.claims),
         decided=len(decided),
         straight_through=sum(records.straight_through(c) for c in decided),
-        sign_offs=sum(d["payout"] > records.limit for d in records.approvals()),
+        sign_offs=sum(d["payout"] > d["approval_limit"] for d in records.approvals()),
         referred=sum(d["decision"] == "refer" for d in decided.values()),
         waiting_for_handler=sum(
             in_state[s] for s in ("awaiting_sign_off", *FOR_A_HANDLER)

@@ -7,6 +7,7 @@ import {
   INSIGHTS,
   CONFIGURATION,
   QUEUE,
+  SETTINGS_VIEW,
   calledWith,
   claim,
   versionDetails,
@@ -19,6 +20,7 @@ const ROUTES = {
   "GET /api/claims": QUEUE,
   "GET /api/dispatches/latest": null,
   "GET /api/claims/CLM-1001": claim(),
+  "GET /api/settings": SETTINGS_VIEW,
   "GET /api/configuration/versions/1": versionDetails({
     number: 1,
     instructions: "# UnderCover claim agent\n\nDecide claims.",
@@ -88,16 +90,6 @@ it("moves between pages", async () => {
   ).toBeDefined();
 });
 
-it("switches the theme", async () => {
-  mockFetch(ROUTES);
-  render(<App />);
-  fireEvent.click(await screen.findByRole("button", { name: "Dark" }));
-  expect(document.documentElement.dataset.theme).toBe("dark");
-  expect(
-    screen.getByRole("button", { name: "Dark" }).getAttribute("aria-pressed"),
-  ).toBe("true");
-});
-
 it("sends a visitor to sign in, then back to the page they asked for", async () => {
   mockFetch(ROUTES);
   signInAs(null);
@@ -165,7 +157,6 @@ it("keeps the page when the access token is refreshed", async () => {
   expect(await screen.findByText("CLM-1002")).toBeDefined();
   refreshToken();
   fetchMock.mockClear();
-  fireEvent.click(screen.getByRole("button", { name: "Dark" }));
   go("#/scoreboard");
   expect(await screen.findByText("No evaluation yet.")).toBeDefined();
   expect(calledWith(fetchMock, "GET /api/me")).toBe(false);

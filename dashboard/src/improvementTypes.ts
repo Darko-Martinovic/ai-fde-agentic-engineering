@@ -53,3 +53,37 @@ export interface Configuration {
   versions: Version[];
   models_allowed: ModelAllowed[];
 }
+
+/** The floors a new version must reach on the held-out set. */
+export interface Objectives {
+  accuracy: number;
+  grade: number;
+}
+
+/** How far each measure must move to count, or may move the wrong way. */
+export interface Margins {
+  accuracy: number;
+  grade: number;
+  cost_per_claim: number;
+  seconds_per_claim: number;
+}
+
+export interface SettingsIn {
+  approval_limit: number;
+  objectives: Objectives;
+  noise: Margins;
+  tolerance: Margins;
+  spending_limit: number;
+  agents: number;
+}
+
+export interface PlatformSettings extends SettingsIn {
+  number: number;
+  changed_by: string | null;
+  changed_at: string;
+}
+
+export interface SettingsView {
+  settings: PlatformSettings;
+  models_allowed: ModelAllowed[];
+}

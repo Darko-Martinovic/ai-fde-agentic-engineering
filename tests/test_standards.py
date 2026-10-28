@@ -80,6 +80,14 @@ def test_only_one_module_reads_the_free_model():
     assert offending(model_name, PARTS, ("backend/free_model.py",)) == []
 
 
+def test_the_approval_limit_comes_from_the_settings():
+    """The approval limit is a setting: seeding alone reads the company's, and
+    no amount of it is written in the backend."""
+    company_limit = re.compile(r"payout_approval_limit")
+    assert offending(company_limit, ("backend",), ("backend/seed.py",)) == []
+    assert offending(re.compile(r"\b1_?000\b"), ("backend",)) == []
+
+
 def test_nothing_is_left_of_the_model_list_before_versions():
     """The instructions, the model list and the model comparison gave way to
     the versions of the configuration and data/models.json."""

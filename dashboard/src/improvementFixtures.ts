@@ -1,4 +1,9 @@
-import type { Configuration, Version, VersionDetails } from "./api";
+import type {
+  Configuration,
+  SettingsView,
+  Version,
+  VersionDetails,
+} from "./api";
 
 /* Test fixtures for improving the claim agent: its configuration's versions
  * and the models it may use. */
@@ -99,4 +104,30 @@ export const CONFIGURATION: Configuration = {
       output_price: 2.5,
     },
   ],
+};
+
+/** The settings as Dana Whitfield last changed them, and the models allowed. */
+export const SETTINGS_VIEW: SettingsView = {
+  settings: {
+    number: 2,
+    approval_limit: 1000,
+    objectives: { accuracy: 0.6, grade: 1 },
+    noise: {
+      accuracy: 0.1,
+      grade: 0.15,
+      cost_per_claim: 0.15,
+      seconds_per_claim: 0.15,
+    },
+    tolerance: {
+      accuracy: 0.1,
+      grade: 0.15,
+      cost_per_claim: 1,
+      seconds_per_claim: 0.25,
+    },
+    spending_limit: 0.5,
+    agents: 25,
+    changed_by: "HND-01",
+    changed_at: "2026-10-28T09:30:00Z",
+  },
+  models_allowed: CONFIGURATION.models_allowed,
 };

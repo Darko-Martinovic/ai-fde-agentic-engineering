@@ -1,9 +1,22 @@
-"""The tables for improving the claim agent: the models it may use and the
-versions of its configuration."""
+"""The tables for improving the claim agent: the platform's settings, the
+models it may use and the versions of its configuration."""
 
 from sqlalchemy import Column, Float, Integer, Table, Text
 
-from backend.schema import metadata, text_column
+from backend.schema import counter, metadata, text_column
+
+# The platform's settings, one row for each change: the approval limit and what
+# a round of improvement works to, as JSON, with who changed them and when
+# (nobody for the first, seeded row). The newest row is the settings now.
+platform_settings = Table(
+    "platform_settings",
+    metadata,
+    counter("number"),
+    text_column("settings"),
+    text_column("changed_by", nullable=True),
+    text_column("changed_at"),
+    sqlite_autoincrement=True,
+)
 
 # The models the claim agent may use, from data/models.json, or the free model
 # in MODEL_NAME alone. The reasoning efforts and the build options are JSON.

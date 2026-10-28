@@ -106,6 +106,8 @@ class Decision(BaseModel):
     reviewed_by: str | None
     reviewed_at: datetime | None
     review_note: str | None
+    # The approval limit it was recorded under
+    approval_limit: float
 
 
 class PaymentIn(BaseModel):

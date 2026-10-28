@@ -2721,6 +2721,215 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Settings",
+      "item": [
+        {
+          "name": "Get the settings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ]
+            },
+            "description": "`get_settings`: the platform's settings as they stand, with who changed them last, and the models the claim agent may use."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const view = pm.response.json();",
+                  "pm.test(\"has the approval limit and the models allowed\", () => {",
+                  "  pm.expect(view.settings.approval_limit).to.be.above(0);",
+                  "  pm.expect(view.models_allowed).to.have.lengthOf(3);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change the settings as Marcus Oyelaran",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{marcusToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ]
+            },
+            "description": "`change_settings`: only a handler who can sign off payouts over the limit changes the settings; Marcus Oyelaran is refused with why.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approval_limit\": 1000.0,\n  \"objectives\": {\n    \"accuracy\": 0.6,\n    \"grade\": 1.0\n  },\n  \"noise\": {\n    \"accuracy\": 0.1,\n    \"grade\": 0.15,\n    \"cost_per_claim\": 0.15,\n    \"seconds_per_claim\": 0.15\n  },\n  \"tolerance\": {\n    \"accuracy\": 0.1,\n    \"grade\": 0.15,\n    \"cost_per_claim\": 1.0,\n    \"seconds_per_claim\": 0.25\n  },\n  \"spending_limit\": 0.75,\n  \"agents\": 25\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"says why\", () => pm.expect(pm.response.json().detail).to.include(\"change the settings\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change the settings without signing in",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ]
+            },
+            "description": "`change_settings`: 401 without a signed-in handler.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approval_limit\": 1000.0,\n  \"objectives\": {\n    \"accuracy\": 0.6,\n    \"grade\": 1.0\n  },\n  \"noise\": {\n    \"accuracy\": 0.1,\n    \"grade\": 0.15,\n    \"cost_per_claim\": 0.15,\n    \"seconds_per_claim\": 0.15\n  },\n  \"tolerance\": {\n    \"accuracy\": 0.1,\n    \"grade\": 0.15,\n    \"cost_per_claim\": 1.0,\n    \"seconds_per_claim\": 0.25\n  },\n  \"spending_limit\": 0.5,\n  \"agents\": 25\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change the settings to an approval limit of 0",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{danaToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ]
+            },
+            "description": "`change_settings`: 422 for a setting out of range, such as a limit of 0.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approval_limit\": 0,\n  \"objectives\": {\n    \"accuracy\": 0.6,\n    \"grade\": 1.0\n  },\n  \"noise\": {\n    \"accuracy\": 0.1,\n    \"grade\": 0.15,\n    \"cost_per_claim\": 0.15,\n    \"seconds_per_claim\": 0.15\n  },\n  \"tolerance\": {\n    \"accuracy\": 0.1,\n    \"grade\": 0.15,\n    \"cost_per_claim\": 1.0,\n    \"seconds_per_claim\": 0.25\n  },\n  \"spending_limit\": 0.5,\n  \"agents\": 25\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change the spending limit as Dana Whitfield",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{danaToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ]
+            },
+            "description": "`change_settings`: a new row of settings, with who changed them and when; the old rows are kept.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approval_limit\": 1000.0,\n  \"objectives\": {\n    \"accuracy\": 0.6,\n    \"grade\": 1.0\n  },\n  \"noise\": {\n    \"accuracy\": 0.1,\n    \"grade\": 0.15,\n    \"cost_per_claim\": 0.15,\n    \"seconds_per_claim\": 0.15\n  },\n  \"tolerance\": {\n    \"accuracy\": 0.1,\n    \"grade\": 0.15,\n    \"cost_per_claim\": 1.0,\n    \"seconds_per_claim\": 0.25\n  },\n  \"spending_limit\": 0.75,\n  \"agents\": 25\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const settings = pm.response.json().settings;",
+                  "pm.test(\"recorded as Dana's change\", () => {",
+                  "  pm.expect(settings.spending_limit).to.eql(0.75);",
+                  "  pm.expect(settings.changed_by).to.eql(\"HND-01\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "variable": [

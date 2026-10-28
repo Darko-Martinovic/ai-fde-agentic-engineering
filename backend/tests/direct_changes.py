@@ -2,7 +2,6 @@
 workflow takes too long to reach. Each change goes through the store, in a
 transaction of its own, on the database the backend uses."""
 
-import json
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -10,7 +9,8 @@ from sqlalchemy import Connection
 
 from backend import db
 from backend.seed import ready
-from backend.store import claims, records, steps
+from backend.settings_models import SettingsIn
+from backend.store import claims, platform_settings, steps
 
 
 @contextmanager
@@ -30,11 +30,12 @@ def set_status(status, *claim_ids):
 
 
 def set_approval_limit(amount):
-    """Change the payout approval limit stored with the company's rules."""
+    """Change the payout approval limit in the settings, as nobody."""
     with records_in_use() as conn:
-        rules = json.loads(records.stored(conn, "company"))
-        rules["payout_approval_limit"] = amount
-        records.store(conn, "company", json.dumps(rules))
+        settings = platform_settings.current(conn)
+        changed = SettingsIn.model_validate(settings).model_dump()
+        changed["approval_limit"] = amount
+        platform_settings.add(conn, changed, None, settings["changed_at"])
 
 
 def add_steps(claim_id, thread_id, timed_steps):

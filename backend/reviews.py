@@ -73,7 +73,7 @@ def decide_as_handler(
     limit = approval_limit(conn)
     if resolution.decision == "approve" and resolution.payout > limit:
         refuse_unless_senior(handler, "approve this payout", limit)
-    add_decision(conn, claim_id, handler.handler_id, resolution, None)
+    add_decision(conn, claim_id, handler.handler_id, resolution, limit)
     if resolution.decision == "approve":
         add_payment(conn, claim_id, resolution.payout, handler.handler_id, None)
     claims.set_status(conn, claim_id, "decided")

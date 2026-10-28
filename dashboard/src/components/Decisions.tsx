@@ -8,8 +8,10 @@ import {
 } from "../api";
 import { DecisionBadge, Panel } from "./elements";
 import { clock, date, money } from "../format";
+import { useHandler } from "../handler";
 import { who } from "../handlerNames";
-import { useAction } from "../hooks";
+import { useAction, useSettings } from "../hooks";
+import { NotAllowed } from "./NotAllowed";
 import { ReviewForm } from "./ReviewForm";
 
 /** A handler's review of the decision's payout: who signed it off, or who
@@ -94,6 +96,27 @@ function submitLabel(decision: HandlerDecision, amount: number): string {
     : "Record the decision";
 }
 
+function SubmitDecision({
+  label,
+  disabled,
+}: Readonly<{ label: string; disabled: boolean }>) {
+  return (
+    <button
+      type="submit"
+      className="button button--primary"
+      disabled={disabled}
+    >
+      {label}
+    </button>
+  );
+}
+
+/** Whether an approval is over the approval limit as the settings stand. */
+function useOverLimit(decision: HandlerDecision, amount: number): boolean {
+  const limit = useSettings()?.settings.approval_limit;
+  return decision === "approve" && limit !== undefined && amount > limit;
+}
+
 function ReferralForm({
   claim,
   onDone,
@@ -102,8 +125,10 @@ function ReferralForm({
   const [payout, setPayout] = useState("");
   const [reasons, setReasons] = useState("");
   const { busy, error, run } = useAction(onDone);
+  const handler = useHandler();
   const amount = Number(payout);
   const valid = reasons.trim() !== "" && (decision === "decline" || amount > 0);
+  const overLimit = useOverLimit(decision, amount);
 
   const submit = (event: SyntheticEvent) => {
     event.preventDefault();
@@ -150,13 +175,14 @@ function ReferralForm({
         />
       </label>
       {error && <p className="form-error">{error}</p>}
-      <button
-        type="submit"
-        className="button button--primary"
-        disabled={busy || !valid}
-      >
-        {submitLabel(decision, amount)}
-      </button>
+      {overLimit && !handler.can_approve_over_limit ? (
+        <NotAllowed action="approve a payout over the limit" />
+      ) : (
+        <SubmitDecision
+          label={submitLabel(decision, amount)}
+          disabled={busy || !valid}
+        />
+      )}
     </form>
   );
 }

@@ -33,6 +33,18 @@ export function cost(amount: number): string {
   return spend.format(amount);
 }
 
+// A price per million tokens: cents, or finer when it has them
+const prices = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 4,
+});
+
+export function price(amount: number): string {
+  return prices.format(amount);
+}
+
 const counts = new Intl.NumberFormat("en-US");
 
 export function count(amount: number): string {

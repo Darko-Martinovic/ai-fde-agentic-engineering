@@ -133,6 +133,7 @@ def decisions(conn: Connection, claim_id: str) -> list[dict[str, Any]]:
             decision.reviewed_by,
             decision.reviewed_at,
             decision.review_note,
+            decision.approval_limit,
         )
         .where(decision.claim_id == claim_id)
         .order_by(decision.decision_id)
@@ -148,6 +149,7 @@ def agent_decisions(conn: Connection) -> list[RowMapping]:
             decision.decision,
             decision.payout,
             decision.policy_section,
+            decision.approval_limit,
         )
         .where(decision.decided_by == "agent")
         .order_by(decision.decision_id)

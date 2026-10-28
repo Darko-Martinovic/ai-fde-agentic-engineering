@@ -10,7 +10,7 @@ import type {
   Policy,
 } from "./api";
 import { HandlerContext } from "./handler";
-import { CONFIGURATION } from "./improvementFixtures";
+import { CONFIGURATION, SETTINGS_VIEW } from "./improvementFixtures";
 
 export * from "./agentFixtures";
 export * from "./improvementFixtures";
@@ -225,6 +225,7 @@ export function decision(overrides: Partial<Decision> = {}): Decision {
     reviewed_by: null,
     reviewed_at: null,
     review_note: null,
+    approval_limit: 1000,
     ...overrides,
   };
 }
@@ -238,6 +239,7 @@ export function claimRoutes(overrides: Routes = {}): Routes {
     "GET /api/handlers": HANDLERS,
     "GET /api/me": DANA,
     "GET /api/configuration": CONFIGURATION,
+    "GET /api/settings": SETTINGS_VIEW,
     ...overrides,
   };
 }

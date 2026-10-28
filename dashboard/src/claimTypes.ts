@@ -50,6 +50,8 @@ export interface Decision {
   reviewed_by: string | null;
   reviewed_at: string | null;
   review_note: string | null;
+  /** The approval limit it was recorded under */
+  approval_limit: number;
 }
 
 export interface Payment {

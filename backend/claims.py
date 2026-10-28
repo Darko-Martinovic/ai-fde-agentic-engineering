@@ -5,6 +5,7 @@ import json
 from fastapi import APIRouter
 
 from backend.api import Db, company, found, load_claim, load_policy, queue_line
+from backend.claim_rules import approval_limit
 from backend.models import Claim, ClaimSummary
 from backend.payout import Payout, PayoutIn, work_out_payout
 from backend.store import claims
@@ -28,10 +29,9 @@ def get_claim(claim_id: str, conn: Db) -> Claim:
 def calculate_payout(claim_id: str, request: PayoutIn, conn: Db) -> Payout:
     """Work out a claim's payout with UnderCover's payout rules, recording nothing."""
     claim = json.loads(found(claims.claim(conn, claim_id), "Claim", claim_id)["data"])
-    rules = company(conn)
     return work_out_payout(
         load_policy(conn, claim["policy_id"]),
         request,
-        rules["meal_allowance_without_receipts"]["amount"],
-        rules["payout_approval_limit"],
+        company(conn)["meal_allowance_without_receipts"]["amount"],
+        approval_limit(conn),
     )

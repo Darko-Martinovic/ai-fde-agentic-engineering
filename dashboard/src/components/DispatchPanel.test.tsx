@@ -1,7 +1,13 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { DispatchPanel } from "./DispatchPanel";
-import { CONFIGURATION, mockFetch, run, runClaim } from "../testing";
+import {
+  CONFIGURATION,
+  SETTINGS_VIEW,
+  mockFetch,
+  run,
+  runClaim,
+} from "../testing";
 
 afterEach(() => {
   cleanup();
@@ -16,6 +22,7 @@ it("says when there has been no dispatch", async () => {
   mockFetch({
     "GET /api/dispatches/latest": null,
     "GET /api/configuration": CONFIGURATION,
+    "GET /api/settings": SETTINGS_VIEW,
   });
   render(<DispatchPanel />);
   expect(await screen.findByText("No dispatch yet.")).toBeDefined();
@@ -25,6 +32,7 @@ it("follows a running dispatch, claim by claim", async () => {
   mockFetch({
     "GET /api/dispatches/latest": run(),
     "GET /api/configuration": CONFIGURATION,
+    "GET /api/settings": SETTINGS_VIEW,
   });
   render(<DispatchPanel />);
   expect(await screen.findByText("Running")).toBeDefined();
@@ -61,6 +69,7 @@ it("shows a finished dispatch's time and what it left", async () => {
   mockFetch({
     "GET /api/dispatches/latest": finished,
     "GET /api/configuration": CONFIGURATION,
+    "GET /api/settings": SETTINGS_VIEW,
   });
   render(<DispatchPanel />);
   expect(await screen.findByText("Finished")).toBeDefined();
@@ -82,6 +91,7 @@ it("shows a stopped dispatch", async () => {
   mockFetch({
     "GET /api/dispatches/latest": run({ status: "stopped", claims: [] }),
     "GET /api/configuration": CONFIGURATION,
+    "GET /api/settings": SETTINGS_VIEW,
   });
   render(<DispatchPanel />);
   expect(await screen.findByText("Stopped")).toBeDefined();

@@ -21,7 +21,12 @@ import type {
 
 import { accessToken } from "./auth";
 
-import type { Configuration, VersionDetails } from "./improvementTypes";
+import type {
+  Configuration,
+  SettingsIn,
+  SettingsView,
+  VersionDetails,
+} from "./improvementTypes";
 
 export type * from "./agentTypes";
 export * from "./claimTypes";
@@ -36,6 +41,17 @@ export class ApiError extends Error {
   }
 }
 
+/** The backend's reason for a refusal: its message, or for input it can't
+ *  take (422) the first field's problem. */
+function refusal(detail: unknown): string | null {
+  if (typeof detail === "string") return detail;
+  if (!Array.isArray(detail)) return null;
+  const [first] = detail as ({ loc?: unknown[]; msg?: string } | undefined)[];
+  if (!first?.msg) return null;
+  const field = first.loc?.slice(1).join(" ");
+  return field ? `${field}: ${first.msg}` : first.msg;
+}
+
 /** Send a request, with the signed-in handler's access token, and throw the
  *  backend's refusal. */
 async function send(path: string, init: RequestInit = {}): Promise<Response> {
@@ -48,9 +64,7 @@ async function send(path: string, init: RequestInit = {}): Promise<Response> {
       detail?: unknown;
     };
     const detail =
-      typeof body.detail === "string"
-        ? body.detail
-        : `Request failed (${String(response.status)})`;
+      refusal(body.detail) ?? `Request failed (${String(response.status)})`;
     throw new ApiError(response.status, detail);
   }
   return response;
@@ -64,13 +78,21 @@ async function getText(path: string, signal?: AbortSignal): Promise<string> {
   return (await send(path, { signal })).text();
 }
 
-async function post<T>(path: string, body: object = {}): Promise<T> {
+async function sendJson<T>(
+  method: "POST" | "PUT",
+  path: string,
+  body: object,
+): Promise<T> {
   const response = await send(path, {
-    method: "POST",
+    method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   return (await response.json()) as T;
+}
+
+function post<T>(path: string, body: object = {}): Promise<T> {
+  return sendJson<T>("POST", path, body);
 }
 
 export const api = {
@@ -108,6 +130,10 @@ export const api = {
       `/api/configuration/versions/${String(number)}`,
       signal,
     ),
+  getSettings: (signal?: AbortSignal) =>
+    getJson<SettingsView>("/api/settings", signal),
+  changeSettings: (settings: SettingsIn) =>
+    sendJson<SettingsView>("PUT", "/api/settings", settings),
   startDispatch: (agents: number) =>
     post<Started>("/api/dispatches", { agents }),
   stopRun: () => post<Stopping>("/api/runs/stop-request"),

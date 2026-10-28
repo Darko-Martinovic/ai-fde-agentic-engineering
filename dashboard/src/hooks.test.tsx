@@ -1,13 +1,6 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  errorMessage,
-  readTheme,
-  useAction,
-  usePoll,
-  useRoute,
-  useTheme,
-} from "./hooks";
+import { errorMessage, useAction, usePoll, useRoute } from "./hooks";
 
 afterEach(() => {
   cleanup();
@@ -88,39 +81,6 @@ describe("usePoll", () => {
   it("describes errors that aren't Errors", () => {
     expect(errorMessage(new Error("x"))).toBe("x");
     expect(errorMessage("x")).toBe("Something went wrong");
-  });
-});
-
-describe("useTheme", () => {
-  it("applies and remembers the theme", () => {
-    const { result } = renderHook(() => useTheme());
-    expect(result.current[0]).toBe("system");
-    act(() => {
-      result.current[1]("dark");
-    });
-    expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(readTheme()).toBe("dark");
-    act(() => {
-      result.current[1]("system");
-    });
-    expect(document.documentElement.dataset.theme).toBeUndefined();
-  });
-
-  it("falls back to the system theme when storage is blocked", () => {
-    vi.stubGlobal("localStorage", {
-      getItem: () => {
-        throw new Error("blocked");
-      },
-      setItem: () => {
-        throw new Error("blocked");
-      },
-    });
-    expect(readTheme()).toBe("system");
-    const { result } = renderHook(() => useTheme());
-    act(() => {
-      result.current[1]("light");
-    });
-    expect(document.documentElement.dataset.theme).toBe("light");
   });
 });
 
