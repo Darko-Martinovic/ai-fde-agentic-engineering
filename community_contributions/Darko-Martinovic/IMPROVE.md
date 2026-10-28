@@ -2,7 +2,7 @@
 
 Darko Martinovic
 
-My build of the self-improvement brief in `docs/IMPROVE.md`, on top of my swarm build ([PR #67](https://github.com/ed-donner/undercover/pull/67)) rather than on Ed's `week2day5-start`. I read Ed's `week2day5-end` after building and compare the two below. The code is in my fork:
+My build of the self-improvement brief in `docs/IMPROVE.md`, on top of my swarm build ([PR #67](https://github.com/ed-donner/undercover/pull/67)) rather than on Ed's `week2day5-start`. I read Ed's `week2day5-end` before planning and followed his design where it fit my code, and compare the two below. The code is in my fork:
 
 - The build as delivered: [week2day5-end](https://github.com/Darko-Martinovic/ai-fde-agentic-engineering/tree/week2day5-end)
 - The plan I built it from, in seven phases, with where the build differs from it: [docs/PLAN_IMPROVE.md](https://github.com/Darko-Martinovic/ai-fde-agentic-engineering/blob/week2day5-end/docs/PLAN_IMPROVE.md)
