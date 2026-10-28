@@ -1,3 +1,5 @@
+import { PageHeader } from "../components/PageHeader";
+import { StateMessage } from "../components/StateMessage";
 import { useCallback } from "react";
 import {
   api,
@@ -5,12 +7,7 @@ import {
   type Evaluation,
   type EvaluationClaim,
 } from "../api";
-import {
-  DecisionBadge,
-  ErrorNote,
-  Loading,
-  Panel,
-} from "../components/elements";
+import { DecisionBadge, Panel } from "../components/elements";
 import { cost, duration, money, when } from "../format";
 import { useModelLabel, usePoll } from "../hooks";
 import { measureCells, modelWithEffort, whichClaims } from "../evaluations";
@@ -62,10 +59,14 @@ function CopyRow({ copy }: Readonly<{ copy: EvaluationClaim }>) {
       <td>
         <GradeChip copy={copy} />
       </td>
-      <td className="mono">{money(copy.mistake_cost)}</td>
-      <td className="mono">{cost(copy.model_cost)}</td>
-      <td className="mono">{duration(copy.seconds)}</td>
-      <td className="reasons">{copy.reasons ?? ""}</td>
+      <td className="mono numeric">{money(copy.mistake_cost)}</td>
+      <td className="mono numeric">{cost(copy.model_cost)}</td>
+      <td className="mono numeric">{duration(copy.seconds)}</td>
+      <td className="reasons">
+        <span className="reasons__text" title={copy.reasons ?? ""}>
+          {copy.reasons ?? ""}
+        </span>
+      </td>
     </tr>
   );
 }
@@ -115,11 +116,7 @@ function EvaluationFacts({ evaluation }: Readonly<{ evaluation: Evaluation }>) {
 function EvaluationView({ evaluation }: Readonly<{ evaluation: Evaluation }>) {
   return (
     <>
-      <Panel
-        title={`Evaluation #${String(evaluation.run_id)}`}
-        className="panel--run"
-        actions={<RunBadge status={evaluation.status} />}
-      >
+      <Panel title="What it measured" className="panel--run">
         <EvaluationFacts evaluation={evaluation} />
       </Panel>
       <div className="table-scroll">
@@ -132,9 +129,9 @@ function EvaluationView({ evaluation }: Readonly<{ evaluation: Evaluation }>) {
               <th>Agent</th>
               <th>Verdict</th>
               <th>Grade</th>
-              <th>Mistake cost</th>
-              <th>Model cost</th>
-              <th>Time</th>
+              <th className="numeric">Mistake cost</th>
+              <th className="numeric">Model cost</th>
+              <th className="numeric">Time</th>
               <th>The agent's reasons</th>
             </tr>
           </thead>
@@ -164,11 +161,23 @@ export function EvaluationPage({ runId }: Readonly<{ runId: number }>) {
       <a className="back" href={paths.scoreboard}>
         Back to the scoreboard
       </a>
+      <PageHeader
+        title={`Evaluation #${String(runId)}`}
+        purpose="Each copy the claim agents worked, beside the handler's decision on the claim it copies, with the judge's grade of the agent's reasons."
+        action={evaluation.data && <RunBadge status={evaluation.data.status} />}
+      />
       {evaluation.error && (
-        <ErrorNote message={evaluation.error} onRetry={evaluation.reload} />
+        <StateMessage
+          kind="error"
+          message={evaluation.error}
+          onRetry={evaluation.reload}
+        />
       )}
       {evaluation.data === null && !evaluation.error && (
-        <Loading label={`Loading evaluation #${String(runId)}`} />
+        <StateMessage
+          kind="loading"
+          message={`Loading evaluation #${String(runId)}`}
+        />
       )}
       {evaluation.data && <EvaluationView evaluation={evaluation.data} />}
     </div>

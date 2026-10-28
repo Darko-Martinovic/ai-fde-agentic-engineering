@@ -1,3 +1,4 @@
+import { StateMessage } from "../components/StateMessage";
 import { useState } from "react";
 import {
   api,
@@ -6,7 +7,7 @@ import {
   type SettingsIn,
 } from "../api";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { ErrorNote, Loading, Panel } from "../components/elements";
+import { Panel } from "../components/elements";
 import { ModelsAllowed } from "../components/ModelsAllowed";
 import { NotAllowed } from "../components/NotAllowed";
 import { PageHeader } from "../components/PageHeader";
@@ -61,7 +62,7 @@ function LastChange({
     <p className="last-change">
       {settings.changed_by
         ? `Last changed by ${who(settings.changed_by, handlers)}, ${at}.`
-        : `As seeded from data/, ${at}.`}
+        : `The defaults, set when the data was loaded, ${at}.`}
     </p>
   );
 }
@@ -224,9 +225,11 @@ export function SettingsPage() {
         title="Settings"
         purpose="What the platform works to: the approval limit, and what each round of improvement aims for and may spend. Each change is kept with who made it."
       />
-      {view.error && <ErrorNote message={view.error} onRetry={view.reload} />}
+      {view.error && (
+        <StateMessage kind="error" message={view.error} onRetry={view.reload} />
+      )}
       {view.data === null && !view.error && (
-        <Loading label="Loading the settings" />
+        <StateMessage kind="loading" message="Loading the settings" />
       )}
       {view.data && (
         <>

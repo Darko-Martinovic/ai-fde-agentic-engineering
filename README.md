@@ -132,6 +132,32 @@ dashboard ──/api──> backend ──> Supabase: claims, model calls, work 
 
 The live trial on GPT-6 Luna: a dispatch at N=3 killed partway with every process on port 8002, then one at N=25 that carried on the three claims left in progress as the same attempts and worked the other 19, all 22 starting within 3.6 seconds and finishing in 77 seconds against 1,221 seconds of claim work, for $0.02. Its first try stalled the backend: requests waiting for the 4 database connections took every thread, so the backend now keeps 200. The evaluation set at N=25 scored 84% on decisions and accuracy, and the held-out set's five tiny claims 100%. Every run of the day cost about $0.11. The plan is [docs/PLAN_SWARM.md](docs/PLAN_SWARM.md), and the runs are in [docs/STATUS.md](docs/STATUS.md).
 
+### Day 5: an improver that improves the claim agent
+
+![The Improvement page after two live rounds: version 2 kept, version 3 rolled back](docs/screenshots/w2d5/improvement-light.png)
+
+The brief turns the lab's self-improvement loop into part of the product. The claim agent's instructions, model and reasoning effort become versions; a second agent, the improver, follows a recipe in rounds: it reads the evaluation set's mistakes beside the handlers' reasons, proposes a change, waits for a senior handler to approve or reject it, and runs the evaluations. The backend keeps or rolls the change back by the business's rule on the held-out claims, which the improver never sees, and the improver ends each round by proposing a better recipe. A judge, Jev, grades each of the agent's explanations against the handler's reason. Handlers now sign in through Supabase Auth, and only a senior handler approves the improver's work, changes the settings or signs off a large payout.
+
+```
+dashboard ──/api──> backend ── rounds, proposals, versions, recipes, settings, grades ──> Supabase
+   │ Supabase Auth     │  start_round / review_proposal              judge.py ──> Jev on OpenRouter
+   v                   v
+handler signs in   agent's service ── rounds.py ── improver (create_agent, human in the loop)
+                                          │ run_evaluation
+                                          v
+                                       dispatcher ── claim agents on the version under test
+```
+
+| | Ed's build | Mine |
+|---|---|---|
+| A handler's review | Sign-off only | Sign-off or rejection with a note, both now senior actions, and the graceful Stop kept |
+| Finishing an evaluation | Grades while holding its database connection | Lets go of the connection first, then grades on threads of its own, from the swarm's thread and connection stall |
+| Models | `MODEL_NAME` and a model picker | The configuration fixes the model; `MODEL_NAME` only for a student on free models; `bench/` retired |
+| Tracing checks | Langfuse's traces list, which answers 410 from November | `GET /api/public/v2/observations`, filtered by session and tag |
+| Structure and tests | | One router per resource, SQL in `backend/store/`, the round's work in `agent/rounds.py`; every operation in Postman; stand-ins for Supabase Auth, the judge and the agent's service in the end-to-end tests |
+
+The live rounds on GPT-6 Luna: in round 1, version 1 scored 82% on the held-out set; I rejected the improver's first change, five rules with the manual's numbers written in, and approved its second, two checks that point the agent at the right sections. Version 2 scored 94% on the held-out set, with a better grade, and was kept. In round 2 the improver's next change scored 92% and was rolled back as no better than the noise. Each round's recipe was approved. Both rounds and a dispatch of 25 claims cost $0.25. The plan is [docs/PLAN_IMPROVE.md](docs/PLAN_IMPROVE.md), and the runs are in [docs/STATUS.md](docs/STATUS.md).
+
 ## How it's built
 
 - **Standards checked by tests.** Ed's code standards 1 to 14 plus eight more in [docs/CODE_STANDARDS.md](docs/CODE_STANDARDS.md), enforced by `tests/test_standards.py`, `dashboard/src/standards.test.ts`, ESLint and ruff, or by review: one owner for each service's address, one name for each operation, all SQL in `backend/store/`, functions under 40 lines and modules under 300, complexity limits, and no configuration in code.
@@ -145,7 +171,7 @@ Install [uv](https://docs.astral.sh/uv/) and Node, then from the repo root:
 ```
 uv sync
 npm install
-cp settings/.env.example .env     # add a model key, DATABASE_URL and, for traces, the Langfuse keys
+cp settings/.env.example .env     # add a model key, DATABASE_URL, the Supabase project the handlers sign in through and, for traces, the Langfuse keys
 uv run -m backend.seed   # load data/ into Supabase
 npm run dev              # backend on 8000, the agent's service on 8002, dashboard on http://localhost:5173
 ```
@@ -154,7 +180,8 @@ npm run dev              # backend on 8000, the agent's service on 8002, dashboa
 
 | Task | Command |
 |---|---|
-| A dispatch of the queue, or an evaluation | The queue page's Start a dispatch, or the Scoreboard's Start an evaluation, with `npm run dev` running |
+| A dispatch of the queue, or an evaluation | The queue page's Start a dispatch, or the Scoreboard's Start an evaluation, with `npm run dev` running, signed in |
+| A round of improvement | The Improvement page's Start a round, signed in as a senior handler |
 | One claim, as the current version of the claim agent's configuration | `uv run -m agent CLM-1001` |
 | Reset the data | `uv run -m backend.seed` |
 | Every check | `npm run check` |

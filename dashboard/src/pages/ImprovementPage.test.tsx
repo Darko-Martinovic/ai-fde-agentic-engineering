@@ -55,9 +55,8 @@ function posts(fetchMock: ReturnType<typeof mockFetch>, path: string) {
 it("says there are no rounds yet and what starting one does", async () => {
   mockFetch(routes([]));
   renderAs(<ImprovementPage />);
-  expect(
-    await screen.findByText(/^No rounds yet\. Start a round/),
-  ).toBeDefined();
+  expect(await screen.findByText("No rounds yet.")).toBeDefined();
+  expect(screen.getByText(/^Start a round to have the improver/)).toBeDefined();
   expect(screen.getByRole("button", { name: "Start a round" })).toBeDefined();
 });
 

@@ -1,7 +1,8 @@
+import { StateMessage } from "../components/StateMessage";
 import { useState } from "react";
 import { api, type HandlerName, type Improvement, type Round } from "../api";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { ErrorNote, Loading, Panel } from "../components/elements";
+import { Panel } from "../components/elements";
 import { NotAllowed } from "../components/NotAllowed";
 import { PageHeader } from "../components/PageHeader";
 import { ProposalReview } from "../components/ProposalReview";
@@ -88,8 +89,8 @@ function Recipes({
               <span className="badge badge--version-current">Current</span>
             )}
             <span className="cell-note">
-              {recipe.approved_by
-                ? `${recipe.proposed_by}, approved by ${who(recipe.approved_by, handlers)}, ${when(recipe.created_at)}`
+              {recipe.approved_by && recipe.approved_at
+                ? `${recipe.proposed_by}, approved by ${who(recipe.approved_by, handlers)}, ${when(recipe.approved_at)}`
                 : recipe.proposed_by}
             </span>
           </li>
@@ -121,11 +122,11 @@ function ImprovementView({
       )}
       {improvement.rounds.length === 0 ? (
         <Panel title="Rounds">
-          <p className="muted">
-            No rounds yet. Start a round to have the improver evaluate the
-            current version, propose a change for a handler to review, and keep
-            it only if the held-out claims say it&apos;s better.
-          </p>
+          <StateMessage
+            kind="empty"
+            message="No rounds yet."
+            next="Start a round to have the improver evaluate the current version, propose a change for a handler to review, and keep it only if the held-out claims say it's better."
+          />
         </Panel>
       ) : (
         <>
@@ -158,10 +159,14 @@ export function ImprovementPage() {
         }
       />
       {improvement.error && (
-        <ErrorNote message={improvement.error} onRetry={improvement.reload} />
+        <StateMessage
+          kind="error"
+          message={improvement.error}
+          onRetry={improvement.reload}
+        />
       )}
       {improvement.data === null && !improvement.error && (
-        <Loading label="Loading the rounds" />
+        <StateMessage kind="loading" message="Loading the rounds" />
       )}
       {improvement.data && (
         <ImprovementView

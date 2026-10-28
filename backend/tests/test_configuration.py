@@ -1,6 +1,11 @@
+import pytest
+
+from backend import db
 from backend.seed import INSTRUCTIONS
 from backend.tests.new_versions import GEMINI, add_version
+from backend.tests.round_steps import a_round, evaluate
 from backend.version_models import Verdict
+from backend.version_scores import version_scores
 
 CLAIM_INSTRUCTIONS = (INSTRUCTIONS / "claim.md").read_text(encoding="utf-8")
 LUNA = "openai/gpt-6-luna"
@@ -117,3 +122,23 @@ def test_a_version_on_a_model_no_longer_allowed_says_so(client):
         409,
         "Version 2's model, openai/gpt-7, isn't one allowed",
     )
+
+
+def test_a_version_shows_its_held_out_scores_once_a_round_has_evaluated_it(
+    client,
+):
+    first = client.get("/api/configuration").json()["versions"][0]
+    assert (first["held_out_accuracy"], first["held_out_grade"]) == (None, None)
+    round_id = a_round(client)
+    evaluate(client, round_id, "evaluation", right=0.8)
+    evaluate(client, round_id, "held_out", right=0.2)
+    evaluate(client, round_id, "held_out", right=0.4)
+    scored = client.get("/api/configuration").json()["versions"][0]
+    with db.engine().connect() as conn:
+        held_out = version_scores(conn, 1)["held_out"]
+        evaluation = version_scores(conn, 1)["evaluation"]
+    assert held_out is not None
+    assert evaluation is not None
+    assert scored["held_out_accuracy"] == pytest.approx(held_out.accuracy)
+    assert scored["held_out_grade"] == pytest.approx(held_out.grade)
+    assert held_out.accuracy != evaluation.accuracy

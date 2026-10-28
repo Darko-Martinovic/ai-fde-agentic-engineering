@@ -7,9 +7,12 @@ from statistics import mean
 
 from sqlalchemy import Connection
 
+from backend import scoring
 from backend.evaluation_views import load_evaluation
 from backend.round_models import Scores
-from backend.store import runs
+from backend.store import evaluations, grades, runs
+
+HELD_OUT = "held_out"
 
 # What a version needs before a round can judge a change against it: one
 # evaluation of the evaluation set and two of the held-out set
@@ -70,3 +73,34 @@ def evaluations_needed(conn: Connection, version: int) -> list[str]:
         for name, needed in NEEDED.items()
         for _ in range(max(0, needed - done.count(name)))
     ]
+
+
+def held_out_accuracy_and_grade(
+    conn: Connection, version: int
+) -> tuple[float, float | None] | None:
+    """A version's held-out accuracy and grade, averaged as `version_scores`
+    averages them, from each run's answers and grades alone, for a page that
+    lists every version; or none before a round has evaluated it there."""
+    held_out = [
+        r for r in runs.scored_on(conn, version) if r["evaluation_set"] == HELD_OUT
+    ]
+    if not held_out:
+        return None
+    key = evaluations.handler_decisions(conn, HELD_OUT)
+    accuracies, run_grades = [], []
+    for run in held_out:
+        answers = evaluations.agents_answers(conn, run["run_id"]).values()
+        right = [
+            scoring.is_right(
+                scoring.agents_answer(a["decision"], a["payout"]),
+                scoring.Answer(
+                    key[a["copy_of"]]["decision"], key[a["copy_of"]]["payout"]
+                ),
+            )
+            for a in answers
+        ]
+        accuracies.append(sum(right) / len(right) if right else 0.0)
+        graded = [g["grade"] for g in grades.of_run(conn, run["run_id"]).values()]
+        if graded:
+            run_grades.append(mean(graded))
+    return mean(accuracies), mean(run_grades) if run_grades else None

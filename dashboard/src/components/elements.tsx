@@ -125,38 +125,6 @@ export function LiveBadge() {
   );
 }
 
-export function ErrorNote({
-  message,
-  onRetry,
-}: Readonly<{
-  message: string;
-  onRetry?: () => void;
-}>) {
-  return (
-    <div className="note note--error" role="alert">
-      <span>{message}</span>
-      {onRetry && (
-        <button
-          type="button"
-          className="button button--quiet"
-          onClick={onRetry}
-        >
-          Try again
-        </button>
-      )}
-    </div>
-  );
-}
-
-export function Loading({ label }: Readonly<{ label: string }>) {
-  return (
-    <div className="loading" role="status">
-      <span className="spinner" aria-hidden="true" />
-      {label}
-    </div>
-  );
-}
-
 export function Markdown({ text }: Readonly<{ text: string }>) {
   return (
     <div className="markdown">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, type SettingsView } from "./api";
 import { modelLabel } from "./configuration";
 import { parseRoute, type Route } from "./paths";
@@ -38,26 +38,41 @@ export function useAction(onDone: () => void) {
 /** How long a load that failed waits before it tries again, so data loaded
  *  once (an interval of null) comes back after the backend restarts. */
 const RETRY_MS = 5000;
+// How many intervals a load may take before the next tick gives up on it and
+// loads afresh, so a request that never answers never stops the polling
+const PATIENCE = 3;
 
 /** Load data now, then again every `interval` ms while the page is visible,
- *  or, with no interval, every RETRY_MS until a load succeeds.
- *  Pass a stable `load` (from useCallback); a new one loads afresh. */
+ *  or, with no interval, every RETRY_MS until a load succeeds. A load slower
+ *  than the interval finishes before the next starts, rather than being cut
+ *  short by it. Pass a stable `load` (from useCallback); a new one loads
+ *  afresh. */
 export function usePoll<T>(load: Loader<T>, interval: number | null): Poll<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  // The load in flight, if any, and when it started; a load cut short by a
+  // new one, as React's strict mode does on mount, never clears it
+  const loading = useRef<AbortController | null>(null);
+  const loadStarted = useRef(0);
 
   useEffect(() => {
     const controller = new AbortController();
-    load(controller.signal).then(
-      (value) => {
-        setData(value);
-        setError(null);
-      },
-      (reason: unknown) => {
-        if (!controller.signal.aborted) setError(errorMessage(reason));
-      },
-    );
+    loading.current = controller;
+    loadStarted.current = Date.now();
+    load(controller.signal)
+      .then(
+        (value) => {
+          setData(value);
+          setError(null);
+        },
+        (reason: unknown) => {
+          if (!controller.signal.aborted) setError(errorMessage(reason));
+        },
+      )
+      .finally(() => {
+        if (loading.current === controller) loading.current = null;
+      });
     return () => {
       controller.abort();
     };
@@ -66,7 +81,9 @@ export function usePoll<T>(load: Loader<T>, interval: number | null): Poll<T> {
   useEffect(() => {
     if (interval === null) return;
     const timer = setInterval(() => {
-      if (!document.hidden) setTick((t) => t + 1);
+      const waited = Date.now() - loadStarted.current;
+      const free = loading.current === null || waited > PATIENCE * interval;
+      if (!document.hidden && free) setTick((t) => t + 1);
     }, interval);
     return () => {
       clearInterval(timer);

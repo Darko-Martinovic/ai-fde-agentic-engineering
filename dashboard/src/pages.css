@@ -1,0 +1,65 @@
+/* What every page shares beyond styles.css: what a page or panel shows
+   before it has anything to show (loading, empty with what to do, or an
+   error with what to do and a way to try again), and number columns that
+   keep their width. */
+
+.state {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-radius: var(--radius-small);
+}
+
+.state p {
+  margin: 0;
+}
+
+.state--loading {
+  gap: 8px;
+  padding: 8px 0;
+  color: var(--ink-soft);
+}
+
+.state--empty {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 24px;
+  background: var(--panel-soft);
+  color: var(--ink);
+}
+
+.state--error {
+  justify-content: space-between;
+  padding: 16px;
+  background: color-mix(in srgb, var(--raspberry) 14%, var(--panel));
+  color: var(--raspberry-ink);
+}
+
+.state__next {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.state--error .state__next {
+  color: inherit;
+}
+
+/* A number's column keeps its width as its numbers change while a run
+   works, so nothing beside it moves */
+.queue-table td.numeric,
+.data-table td.numeric {
+  min-width: 11ch;
+}
+
+/* Names, models and versions on one line in the tables that list them */
+.data-table td:first-child,
+.data-table th:first-child,
+.data-table .nowrap {
+  white-space: nowrap;
+}
+
+/* A reason written by the rule starts with a capital, like any sentence */
+.sentence::first-letter {
+  text-transform: uppercase;
+}

@@ -1,6 +1,6 @@
 # Process
 
-`uv sync` and `npm install` at the repo root install everything, including a git pre-commit hook. `npm run dev` starts the backend, the agent's service and the dashboard. With `DATABASE_URL` in `.env`, the records and the agent's saved progress are on Supabase, and `uv run -m backend.seed` reseeds Supabase. The tests never read `.env` and need no network: they use SQLite and save the agent's progress in memory.
+`uv sync` and `npm install` at the repo root install everything, including a git pre-commit hook. `npm run dev` starts the backend, the agent's service and the dashboard. With `DATABASE_URL` in `.env`, the records and the agent's saved progress are on Supabase, and `uv run -m backend.seed` reseeds Supabase. The tests never read `.env` and need no network: they use SQLite and save the agent's progress in memory, sign handlers in with a key made for the test run, stand in a fixed grade for the judge, and run the improver and the claim agents on stub models. The end-to-end tests start stand-ins for the agent's service, Supabase Auth and the judge (`e2e/agent-stand-in.ts`, `auth-stand-in.ts`, `judge-stand-in.ts`), so they reach none of the real ones.
 
 `npm run check` runs every check:
 
@@ -45,7 +45,8 @@ The checks show that the code works, but not that it is fit to merge. Every code
 - Outside a plan, commit each change once you have checked and reviewed it.
 - Run `npm run check` before you hand work over.
 - Never use `git commit --no-verify`.
-- Runs on a real model: estimate the cost first, reseed once, then start a dispatch from the dashboard; evaluations work copies and need no reseed. Keep to the runs a brief asks for.
+- Runs on a real model: estimate the cost first, reseed once, then start a dispatch or a round of improvement from the dashboard, signed in; evaluations and rounds work copies and need no reseed. Keep to the runs a brief asks for, with `MODEL_NAME` out of `.env`, and report what they spent, from the backend's records and the OpenRouter key's usage. Don't edit `backend/` or `agent/` while a run works: `npm run dev` reloads them, and a reload stops the run.
+- Browser checks sign in on the dashboard as one of the handlers in Supabase Auth, with `HANDLER_PASSWORD` from `.env` (Dana Whitfield can sign off over the limit, Marcus Oyelaran can't). API checks get a handler's access token from Supabase Auth's password grant the same way. Never print the password or a token.
 - Never lower a threshold, turn off a rule or exclude a file to get a green run. If a rule looks wrong, stop and ask.
 - Keep `docs/STATUS.md` up to date.
 - Never push.

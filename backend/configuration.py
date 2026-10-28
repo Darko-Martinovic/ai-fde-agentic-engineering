@@ -1,6 +1,6 @@
 """The claim agent's configuration, in versions: the version the claim agent
 runs as, which holds no scores, and for the Configuration page every version
-with what it changed from the one it was based on."""
+with what it changed from the one it was based on and its held-out scores."""
 
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import Connection, RowMapping
@@ -18,6 +18,7 @@ from backend.version_models import (
     VersionDetails,
     VersionStatus,
 )
+from backend.version_scores import held_out_accuracy_and_grade
 
 router = APIRouter(prefix="/api")
 
@@ -53,12 +54,15 @@ def summary(
     here unless given."""
     if changes is None:
         changes = diffs.changes(instructions_before(conn, row), row["instructions"])
+    accuracy, grade = held_out_accuracy_and_grade(conn, row["number"]) or (None, None)
     return Version.model_validate(
         dict(row)
         | {
             "status": status(row, current),
             "lines_added": diffs.counted(changes, "added"),
             "lines_removed": diffs.counted(changes, "removed"),
+            "held_out_accuracy": accuracy,
+            "held_out_grade": grade,
         }
     )
 

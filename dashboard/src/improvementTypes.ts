@@ -29,6 +29,9 @@ export interface Version {
   status: VersionStatus;
   lines_added: number;
   lines_removed: number;
+  /** Its scores on the held-out set, averaged over its rounds' evaluations */
+  held_out_accuracy: number | null;
+  held_out_grade: number | null;
 }
 
 export interface DiffLine {

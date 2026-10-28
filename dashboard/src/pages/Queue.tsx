@@ -1,12 +1,8 @@
+import { PageHeader } from "../components/PageHeader";
+import { StateMessage } from "../components/StateMessage";
 import { useMemo, useState } from "react";
 import { api, type ClaimStatus, type ClaimSummary } from "../api";
-import {
-  ClaimType,
-  DecisionBadge,
-  ErrorNote,
-  Loading,
-  StatusBadge,
-} from "../components/elements";
+import { ClaimType, DecisionBadge, StatusBadge } from "../components/elements";
 import { STATUSES, STATUS_LABELS, date, humanize, money } from "../format";
 import { usePoll } from "../hooks";
 import {
@@ -169,12 +165,20 @@ export function QueuePage() {
 
   return (
     <div className="page">
+      <PageHeader
+        title="Queue"
+        purpose="Every claim with where it stands, what the agent decided and what was paid. Dispatch the agent to work the claims waiting."
+      />
       <DispatchPanel />
       {claims.error && (
-        <ErrorNote message={claims.error} onRetry={claims.reload} />
+        <StateMessage
+          kind="error"
+          message={claims.error}
+          onRetry={claims.reload}
+        />
       )}
       {claims.data === null && !claims.error && (
-        <Loading label="Loading the queue" />
+        <StateMessage kind="loading" message="Loading the queue" />
       )}
       {claims.data !== null && (
         <>
@@ -219,7 +223,11 @@ export function QueuePage() {
             </p>
           </div>
           {shown.length === 0 ? (
-            <p className="empty">No claims match these filters.</p>
+            <StateMessage
+              kind="empty"
+              message="No claims match these filters."
+              next="Clear the search, choose All types, or pick another status above."
+            />
           ) : (
             <ClaimTable
               claims={shown}

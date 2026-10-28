@@ -1,7 +1,8 @@
+import { StateMessage } from "../components/StateMessage";
 import { useCallback } from "react";
 import { api, type RecipeDetails } from "../api";
 import { DiffView } from "../components/DiffView";
-import { ErrorNote, Loading, Markdown, Panel } from "../components/elements";
+import { Markdown, Panel } from "../components/elements";
 import { PageHeader } from "../components/PageHeader";
 import { when } from "../format";
 import { who } from "../handlerNames";
@@ -31,7 +32,7 @@ function RecipeView({ recipe }: Readonly<{ recipe: RecipeDetails }>) {
             <dd>{recipe.reason}</dd>
           </div>
           <div>
-            <dt>Proposed by</dt>
+            <dt>Made by</dt>
             <dd>
               {recipe.proposed_by}, {when(recipe.created_at)}
             </dd>
@@ -79,10 +80,17 @@ export function RecipePage({ number }: Readonly<{ number: number }>) {
         purpose="One version of the steps the improver follows in a round, beside the version it was based on."
       />
       {recipe.error && (
-        <ErrorNote message={recipe.error} onRetry={recipe.reload} />
+        <StateMessage
+          kind="error"
+          message={recipe.error}
+          onRetry={recipe.reload}
+        />
       )}
       {recipe.data === null && !recipe.error && (
-        <Loading label={`Loading recipe ${String(number)}`} />
+        <StateMessage
+          kind="loading"
+          message={`Loading recipe ${String(number)}`}
+        />
       )}
       {recipe.data && <RecipeView recipe={recipe.data} />}
     </div>

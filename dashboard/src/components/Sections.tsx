@@ -1,6 +1,7 @@
+import { StateMessage } from "./StateMessage";
 import { useCallback, useState } from "react";
 import { api, sectionOf, type SectionTitle, type Step } from "../api";
-import { ErrorNote, Loading, Markdown, Panel } from "./elements";
+import { Markdown, Panel } from "./elements";
 import { sectionName } from "../format";
 import { usePoll } from "../hooks";
 
@@ -27,8 +28,11 @@ function SectionText({ section }: Readonly<{ section: SectionTitle }>) {
     null,
   );
   if (text.error)
-    return <ErrorNote message={text.error} onRetry={text.reload} />;
-  if (text.data === null) return <Loading label="Loading the section" />;
+    return (
+      <StateMessage kind="error" message={text.error} onRetry={text.reload} />
+    );
+  if (text.data === null)
+    return <StateMessage kind="loading" message="Loading the section" />;
   return <Markdown text={text.data.text} />;
 }
 

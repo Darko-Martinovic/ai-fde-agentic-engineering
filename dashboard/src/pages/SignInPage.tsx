@@ -64,7 +64,7 @@ export function SignInPage({ next }: Readonly<{ next: string }>) {
           />
         </label>
         {error && (
-          <p className="note note--error" role="alert">
+          <p className="form-error" role="alert">
             {error}
           </p>
         )}

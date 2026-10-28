@@ -1,3 +1,4 @@
+import { StateMessage } from "./StateMessage";
 import type { Round, Scores } from "../api";
 import { Panel } from "./elements";
 
@@ -194,10 +195,11 @@ export function VersionChart({ rounds }: Readonly<{ rounds: Round[] }>) {
   return (
     <Panel title="Versions tried">
       {judged.length === 0 ? (
-        <p className="muted">
-          No version has been tried yet. Each round&apos;s version shows here
-          once its verdict is in.
-        </p>
+        <StateMessage
+          kind="empty"
+          message="No version has been tried yet."
+          next="Each round's version shows here once its verdict is in."
+        />
       ) : (
         <>
           <div className="version-charts">

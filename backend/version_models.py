@@ -67,6 +67,9 @@ class Version(BaseModel):
     status: VersionStatus
     lines_added: int
     lines_removed: int
+    # Its scores on the held-out set, averaged over its rounds' evaluations
+    held_out_accuracy: float | None
+    held_out_grade: float | None
 
 
 class VersionDetails(Version):
