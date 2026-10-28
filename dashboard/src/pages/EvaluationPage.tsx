@@ -15,6 +15,7 @@ import { cost, duration, money, when } from "../format";
 import { useModelLabel, usePoll } from "../hooks";
 import { measureCells, modelWithEffort, whichClaims } from "../evaluations";
 import { paths } from "../paths";
+import { GradeChip } from "../components/GradeChip";
 import { RunBadge } from "../components/RunBadge";
 
 function Answer({
@@ -58,6 +59,9 @@ function CopyRow({ copy }: Readonly<{ copy: EvaluationClaim }>) {
       <td>
         <Verdict right={copy.right} />
       </td>
+      <td>
+        <GradeChip copy={copy} />
+      </td>
       <td className="mono">{money(copy.mistake_cost)}</td>
       <td className="mono">{cost(copy.model_cost)}</td>
       <td className="mono">{duration(copy.seconds)}</td>
@@ -100,6 +104,10 @@ function EvaluationFacts({ evaluation }: Readonly<{ evaluation: Evaluation }>) {
           <dd>{cell.value}</dd>
         </div>
       ))}
+      <div>
+        <dt>Judge cost</dt>
+        <dd>{cost(evaluation.measures.judge_cost)}</dd>
+      </div>
     </dl>
   );
 }
@@ -123,6 +131,7 @@ function EvaluationView({ evaluation }: Readonly<{ evaluation: Evaluation }>) {
               <th>Handler</th>
               <th>Agent</th>
               <th>Verdict</th>
+              <th>Grade</th>
               <th>Mistake cost</th>
               <th>Model cost</th>
               <th>Time</th>

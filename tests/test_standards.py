@@ -20,7 +20,7 @@ MAX_LINES = 300
 MAX_FUNCTION_LINES = 40
 
 ADDRESS = re.compile(r"https?://|localhost|127\.0\.0\.1")
-MODEL_ID = re.compile(r"deepseek|claude-|qwen|gemma|gpt-\d")
+MODEL_ID = re.compile(r"deepseek|claude-|qwen|gemma|gpt-\d|jev-")
 ANSWER_KEY = re.compile(r"[\"'][^\"']*evals")
 API_PATH = re.compile(r"[\"']/api/")
 RUNS_SQL = re.compile(r"\.execute(many|script)?\(")
@@ -86,6 +86,13 @@ def test_the_approval_limit_comes_from_the_settings():
     company_limit = re.compile(r"payout_approval_limit")
     assert offending(company_limit, ("backend",), ("backend/seed.py",)) == []
     assert offending(re.compile(r"\b1_?000\b"), ("backend",)) == []
+
+
+def test_only_one_module_calls_the_judge():
+    """The judge, its address and the Decisions call are written once, in
+    backend/judge.py (standards 7, 15)."""
+    judge = re.compile(r"jev-|JUDGE_URL|decisions\.create|from openrouter")
+    assert offending(judge, PARTS, ("backend/judge.py",)) == []
 
 
 def test_nothing_is_left_of_the_model_list_before_versions():

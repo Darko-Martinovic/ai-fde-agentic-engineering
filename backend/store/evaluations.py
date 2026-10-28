@@ -34,6 +34,8 @@ def add_handler_decisions(
                 "decision": d["decision"],
                 "payout": d["payout"],
                 "tiny": d["tiny"],
+                "reason": d["reason"],
+                "reference": d["reference"],
             }
             for d in decisions
         ],
@@ -49,6 +51,25 @@ def handler_decisions(conn: Connection, evaluation_set: str) -> dict[str, RowMap
     return {row["claim_id"]: row for row in conn.execute(found).mappings()}
 
 
+def handlers_reasons(
+    conn: Connection, evaluation_set: str
+) -> dict[str, dict[str, Any]]:
+    """The handlers' decisions on a set with their reasons and references, by
+    the claim they decided, for the judge."""
+    decision = db.handler_decisions.c
+    found = select(
+        decision.claim_id, decision.decision, decision.reason, decision.reference
+    ).where(decision.evaluation_set == evaluation_set)
+    return {
+        row["claim_id"]: {
+            "decision": row["decision"],
+            "reason": row["reason"],
+            "reference": row["reference"],
+        }
+        for row in conn.execute(found).mappings()
+    }
+
+
 def originals(conn: Connection, evaluation_set: str) -> list[dict[str, Any]]:
     """A set's claim records: the queue's own claims for the evaluation set,
     the held-out claims for the held-out set, oldest submitted first."""
@@ -62,10 +83,17 @@ def originals(conn: Connection, evaluation_set: str) -> list[dict[str, Any]]:
 
 def agents_answers(conn: Connection, run_id: int) -> dict[str, RowMapping]:
     """Each copy in an evaluation, by its id: the claim it copies, and the
-    agent's latest decision on it, its payout and its reasons, or none."""
+    agent's latest decision on it, its payout, its reasons and the section they
+    rest on, or none."""
     decision = db.decisions.c
     latest = (
-        select(decision.claim_id, decision.decision, decision.payout, decision.reasons)
+        select(
+            decision.claim_id,
+            decision.decision,
+            decision.payout,
+            decision.reasons,
+            decision.policy_section,
+        )
         .where(
             decision.decision_id.in_(
                 select(func.max(decision.decision_id))
@@ -82,6 +110,7 @@ def agents_answers(conn: Connection, run_id: int) -> dict[str, RowMapping]:
             latest.c.decision,
             latest.c.payout,
             latest.c.reasons,
+            latest.c.policy_section,
         )
         .outerjoin(latest, latest.c.claim_id == db.claims.c.claim_id)
         .where(db.claims.c.evaluation_id == run_id)

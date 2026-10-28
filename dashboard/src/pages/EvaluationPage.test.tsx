@@ -4,6 +4,7 @@ import { EvaluationPage } from "./EvaluationPage";
 import {
   CONFIGURATION,
   SETTINGS_VIEW,
+  copy,
   evaluation,
   mockFetch,
 } from "../testing";
@@ -65,4 +66,38 @@ it("shows when the evaluation can't load", async () => {
   expect(
     await screen.findByText("No route for GET /api/evaluations/9"),
   ).toBeDefined();
+});
+
+it("shows each copy's grade with its checks, and the judge's cost", async () => {
+  mockFetch({
+    "GET /api/evaluations/4": evaluation({
+      claims: [
+        copy(),
+        copy({
+          claim_id: "CLM-1114-E4",
+          copy_of: "CLM-1114",
+          grade: null,
+          letter: null,
+          same_grounds: null,
+          same_section: null,
+          judge_cost: 0,
+        }),
+      ],
+    }),
+    "GET /api/settings": SETTINGS_VIEW,
+  });
+  render(<EvaluationPage runId={4} />);
+  const table = await screen.findByRole("table", {
+    name: "The evaluation's claims",
+  });
+  const [, graded, ungraded] = within(table).getAllByRole("row");
+  expect(within(graded).getByText("B").className).toContain("badge--grade-B");
+  expect(within(graded).getByText("2.20")).toBeDefined();
+  expect(
+    within(graded).getByText(/Same grounds: Yes\. Same section: No\./),
+  ).toBeDefined();
+  expect(within(ungraded).getByText("Not graded")).toBeDefined();
+  expect(screen.getByText("Judge cost").nextSibling?.textContent).toBe(
+    "$0.0001",
+  );
 });

@@ -291,17 +291,19 @@ Built on 2026-10-28. Each decision records the approval limit it was recorded un
 
 The handlers' reasons and references in seeding, `judge.py`, `grades`, grading in `finish_run`, the grade and the judge cost in the measures, the judge's stand-in, and the grade on the Scoreboard and an evaluation's page.
 
-- [ ] pytest: seeding stores a reason and reference for all 50 decisions; nothing the claim agent's client reads holds either
-- [ ] pytest, with an httpx `MockTransport`: the request goes to `JUDGE_URL` with Jev's id, the state and the three questions, with a 10 second timeout and no retries
-- [ ] pytest: score 1.5 with probabilities 0.4, 0.05, 0.2, 0.35 for F, C, B, A gives F; the checks keep their probabilities and show yes from 0.5
-- [ ] pytest: a judge that times out, answers 500 or answers without the grade leaves the claim not graded after one request, and the evaluation finishes
-- [ ] pytest: 25 copies with a judge taking 0.3 s a call finish in under 2 s, and the grading holds no database connection while it waits (checked through the engine's checked-out count)
-- [ ] pytest: an undecided copy is F without a call; the evaluation's grade leaves out an ungraded copy; with none graded it has no grade; the judge cost is apart from the model cost; a stopped evaluation isn't graded; with `MODEL_NAME` set, no call
-- [ ] Jev's id, `JUDGE_URL` and the Decisions call appear only in `backend/judge.py` and its tests
-- [ ] vitest, e2e: the Scoreboard shows the grade as 2.20 or "Not graded"; an evaluation's page shows each claim's chip, score and the two checks, with the judge cost
-- [ ] Live, judge only: the lab's four explanations for CLM-1001 give the handler's reason B or A, CLM-1003's F, the vague one C or F and the clearer one A, for under $0.001
-- [ ] Live, judge only: the held-out tiny claims played out through the API with one left undecided finish in under 20 s with four graded and one F, shown in light and dark. `npm run seed` afterwards
-- [ ] Postman, `npm run check` passes
+Built on 2026-10-28. `backend/grading.py` gathers what an evaluation's copies need and asks the judge in parallel; an evaluation's view moved to `backend/evaluation_views.py`, beside `run_views.py`. `finish_run` reads in one short transaction, grades with no connection held, then finishes the run in a second. Live: the lab's four explanations for CLM-1001 graded B (2.02), F (0.01), C (0.96) and A (2.89) for $0.0001 in all; the held-out tiny claims played out through the API, four decided with made-up reasons and one left undecided, finished in 1.7 seconds with four graded (F, as the made-up reasons give other grounds) and the undecided one an F without a call. The review moved Jev's id to `JUDGE_MODEL` in the settings and OpenRouter's host to `OPENROUTER_URL`, once; finishing is now the guard (a run stopped while the judge answers is refused with a 409 and nothing is graded), and the whole grading waits at most 15 seconds however each call goes. For phase 5: a finish refused after the judge answered leaves the judge's cost unrecorded, which the spending limit must allow for.
+
+- [x] pytest: seeding stores a reason and reference for all 50 decisions; nothing the claim agent's client reads holds either
+- [x] pytest, with an httpx `MockTransport`: the request goes to `JUDGE_URL` with Jev's id, the state and the three questions, with a 10 second timeout and no retries
+- [x] pytest: score 1.5 with probabilities 0.4, 0.05, 0.2, 0.35 for F, C, B, A gives F; the checks keep their probabilities and show yes from 0.5
+- [x] pytest: a judge that times out, answers 500 or answers without the grade leaves the claim not graded after one request, and the evaluation finishes
+- [x] pytest: 25 copies with a judge taking 0.3 s a call finish in under 2 s, and the grading holds no database connection while it waits (checked through the engine's checked-out count)
+- [x] pytest: an undecided copy is F without a call; the evaluation's grade leaves out an ungraded copy; with none graded it has no grade; the judge cost is apart from the model cost; a stopped evaluation isn't graded; with `MODEL_NAME` set, no call
+- [x] Jev's id, `JUDGE_URL` and the Decisions call appear only in `backend/judge.py` and its tests
+- [x] vitest, e2e: the Scoreboard shows the grade as 2.20 or "Not graded"; an evaluation's page shows each claim's chip, score and the two checks, with the judge cost
+- [x] Live, judge only: the lab's four explanations for CLM-1001 give the handler's reason B or A, CLM-1003's F, the vague one C or F and the clearer one A, for under $0.001
+- [x] Live, judge only: the held-out tiny claims played out through the API with one left undecided finish in under 20 s with four graded and one F, shown in light and dark. `npm run seed` afterwards
+- [x] Postman, `npm run check` passes
 
 ## Phase 5: The improver
 

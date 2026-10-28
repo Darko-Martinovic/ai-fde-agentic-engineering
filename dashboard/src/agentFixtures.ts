@@ -86,6 +86,11 @@ export function copy(
     handler_payout: 250,
     right: true,
     mistake_cost: 0,
+    grade: 2.2,
+    letter: "B",
+    same_grounds: 0.8,
+    same_section: 0.3,
+    judge_cost: 0.00002,
     ...overrides,
   };
 }
@@ -107,6 +112,8 @@ export function evaluation(overrides: Partial<Evaluation> = {}): Evaluation {
       model_cost_per_claim: 0.0125,
       seconds_per_claim: 40,
       run_seconds: 161,
+      grade: 2.2,
+      judge_cost: 0.0001,
     },
     claims: [
       copy(),

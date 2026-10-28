@@ -11,6 +11,18 @@ export const SET_LABELS: Record<EvaluationSet, string> = {
   held_out: "Held-out set",
 };
 
+export const NOT_GRADED = "Not graded";
+
+/** The judge's grade from 0 to 3, to two places, or that it has none. */
+export function gradeOf(grade: number | null): string {
+  return grade === null ? NOT_GRADED : grade.toFixed(2);
+}
+
+/** A check's probability as the answer it most likely is. */
+export function yesOrNo(probability: number): string {
+  return probability >= 0.5 ? "Yes" : "No";
+}
+
 /** A share, such as 0.8, as a whole percentage: 80%. */
 function share(fraction: number): string {
   return percent(fraction, 1);
@@ -35,6 +47,7 @@ export function measureCells(
   return [
     { label: "Decision accuracy", value: share(measures.decision_accuracy) },
     { label: "Accuracy", value: share(measures.accuracy) },
+    { label: "Grade", value: gradeOf(measures.grade) },
     { label: "Cost of mistakes", value: money(measures.cost_of_mistakes) },
     { label: "Straight through", value: share(measures.straight_through) },
     {

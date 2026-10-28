@@ -60,12 +60,14 @@ def claims_of(conn: Connection, run_id: int) -> list[str]:
 
 def finish(
     conn: Connection, run_id: int, status: str, summary: str | None, at: str
-) -> None:
-    conn.execute(
+) -> bool:
+    """Finish a run that is still running; say whether it was."""
+    finished = conn.execute(
         update(db.runs)
-        .where(db.runs.c.run_id == run_id)
+        .where(db.runs.c.run_id == run_id, db.runs.c.status == "running")
         .values(status=status, summary=summary, finished_at=at)
     )
+    return finished.rowcount == 1
 
 
 def stop_running(conn: Connection, at: str) -> list[int]:

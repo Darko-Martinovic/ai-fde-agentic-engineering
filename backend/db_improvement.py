@@ -18,6 +18,20 @@ platform_settings = Table(
     sqlite_autoincrement=True,
 )
 
+# The judge's grade on each copy in an evaluation it could grade: its score
+# from 0 (F) to 3 (A), its most likely level, the probability of each check,
+# and what the call cost
+grades = Table(
+    "grades",
+    metadata,
+    Column("run_id", Integer, primary_key=True),
+    text_column("claim_id", primary_key=True),
+    Column("grade", Float, nullable=False),
+    text_column("letter"),
+    Column("same_grounds", Float, nullable=False),
+    Column("same_section", Float, nullable=False),
+    Column("judge_cost", Float, nullable=False),
+)
 # The models the claim agent may use, from data/models.json, or the free model
 # in MODEL_NAME alone. The reasoning efforts and the build options are JSON.
 models_allowed = Table(

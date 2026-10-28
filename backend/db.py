@@ -64,6 +64,10 @@ handler_decisions = Table(
     text_column("decision"),
     Column("payout", Float, nullable=False),
     Column("tiny", Boolean, nullable=False),
+    # The handler's reason and the part of the policy wording it rests on,
+    # which the judge grades the agent's explanation against
+    text_column("reason"),
+    text_column("reference"),
 )
 policies = Table(
     "policies",

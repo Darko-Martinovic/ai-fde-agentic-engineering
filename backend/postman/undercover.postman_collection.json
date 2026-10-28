@@ -2588,7 +2588,7 @@
                 "{{evaluationId}}"
               ]
             },
-            "description": "`get_evaluation`: the evaluation with its measures, each copy beside the handler's decision."
+            "description": "`get_evaluation`: the evaluation with its measures, each copy beside the handler's decision. Each copy carries the judge's grade, and the measures the evaluation's grade and the judge's cost."
           },
           "event": [
             {
@@ -2599,7 +2599,13 @@
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "const evaluation = pm.response.json();",
                   "pm.test(\"nothing decided, so every copy is a referral\", () => pm.expect(evaluation.measures.straight_through).to.eql(0));",
-                  "pm.test(\"five copies beside the handlers\", () => pm.expect(evaluation.claims.map((c) => c.handler_decision).length).to.eql(5));"
+                  "pm.test(\"five copies beside the handlers\", () => pm.expect(evaluation.claims.map((c) => c.handler_decision).length).to.eql(5));",
+                  "pm.test(\"nothing decided: every copy an F from the judge, with no call\", () => {",
+                  "  const evaluation = pm.response.json();",
+                  "  evaluation.claims.forEach((copy) => { pm.expect(copy.letter).to.eql(\"F\"); pm.expect(copy.grade).to.eql(0); });",
+                  "  pm.expect(evaluation.measures.grade).to.eql(0);",
+                  "  pm.expect(evaluation.measures.judge_cost).to.eql(0);",
+                  "});"
                 ]
               }
             }

@@ -1,6 +1,7 @@
 """The shapes of the agent's runs in the API: a dispatch, its claims, what its
 model calls used, and its summary once it finishes."""
 
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
@@ -118,6 +119,10 @@ class Measures(BaseModel):
     seconds_per_claim: float
     # From its start to its finish, once it has finished
     run_seconds: float | None
+    # The judge's average grade from 0 (F) to 3 (A) over the copies it graded,
+    # none with none graded, and what its grading cost, apart from the agents'
+    grade: float | None
+    judge_cost: float
 
 
 class EvaluationClaim(RunClaim):
@@ -130,6 +135,13 @@ class EvaluationClaim(RunClaim):
     handler_payout: float
     right: bool
     mistake_cost: float
+    # The judge's grade on the agent's explanation, its most likely level and
+    # the probability of each check, or none when it couldn't grade it
+    grade: float | None
+    letter: str | None
+    same_grounds: float | None
+    same_section: float | None
+    judge_cost: float
 
 
 class Evaluation(RunFacts):
@@ -138,6 +150,19 @@ class Evaluation(RunFacts):
 
     measures: Measures
     claims: list[EvaluationClaim]
+
+
+@dataclass(frozen=True)
+class Grade:
+    """The judge's grade on a copy: its score from 0 (F) to 3 (A), its most
+    likely level as a letter, never the score rounded, the probability of each
+    check, and what the call cost."""
+
+    grade: float
+    letter: str
+    same_grounds: float
+    same_section: float
+    judge_cost: float
 
 
 class Stopped(BaseModel):

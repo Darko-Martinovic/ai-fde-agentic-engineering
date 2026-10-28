@@ -1,5 +1,10 @@
 import { expect, it } from "vitest";
-import { measureCells, modelWithEffort, whichClaims } from "./evaluations";
+import {
+  measureCells,
+  modelWithEffort,
+  whichClaims,
+  yesOrNo,
+} from "./evaluations";
 import { evaluation } from "./testing";
 
 it("formats the measures as the scoreboard shows them", () => {
@@ -7,6 +12,7 @@ it("formats the measures as the scoreboard shows them", () => {
   expect(cells.map((c) => c.value)).toEqual([
     "80%",
     "40%",
+    "2.20",
     "$1,600.00",
     "60%",
     "$0.0125",
@@ -15,6 +21,15 @@ it("formats the measures as the scoreboard shows them", () => {
   ]);
   const unfinished = { ...evaluation().measures, run_seconds: null };
   expect(measureCells(unfinished).at(-1)?.value).toBe("—");
+});
+
+it("says when nothing was graded, and reads a check as yes from 0.5", () => {
+  const ungraded = { ...evaluation().measures, grade: null };
+  expect(measureCells(ungraded)[2]).toEqual({
+    label: "Grade",
+    value: "Not graded",
+  });
+  expect([yesOrNo(0.5), yesOrNo(0.49)]).toEqual(["Yes", "No"]);
 });
 
 it("names the claims an evaluation worked", () => {
