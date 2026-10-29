@@ -52,6 +52,15 @@ class VersionConfig(BaseModel):
     options: dict[str, Any]
 
 
+class ScreeningModel(BaseModel):
+    """The model the security check runs on, and how to build it."""
+
+    model: str
+    reasoning_effort: str
+    provider: str
+    options: dict[str, Any]
+
+
 class Version(BaseModel):
     number: int
     model: str

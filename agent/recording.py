@@ -1,5 +1,6 @@
-"""What the claim agents record on the backend as they work, on the claim: each
-reply, tool call, tool result and section read as a step, and each model call,
+"""What the claim agents record on the backend as they work, on the claim: the
+security check's result and each reply, tool call, tool result and section
+read as a step, and each model call,
 with its tokens, cost and time, and each spell of work, with its run."""
 
 import json
@@ -30,6 +31,12 @@ def reply(context: ClaimContext, message: AIMessage) -> None:
         record(context, kind, text)
 
 
+def check(context: ClaimContext, flagged: bool, reason: str) -> None:
+    """Record the security check's result as a step on the claim."""
+    found = "Found an instruction" if flagged else "Nothing found"
+    record(context, "check", f"{found}. {reason}")
+
+
 def tool_result(context: ClaimContext, message: ToolMessage) -> None:
     record(context, "tool_result", str(message.text))
 
@@ -57,7 +64,8 @@ def cost(message: AIMessage) -> float:
 def model_call(
     context: ClaimContext, model: Model, message: AIMessage, seconds: float
 ) -> None:
-    """Record one of a claim agent's model calls on the claim, with its run."""
+    """Record one model call on the claim, the claim agent's or the security
+    check's, with its run."""
     tokens_in, tokens_out = tokens(message)
     api.record_model_call(
         context.claim_id,

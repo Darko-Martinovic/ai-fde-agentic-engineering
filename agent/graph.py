@@ -1,8 +1,10 @@
 """The claim agent as a LangGraph graph of our own, as in labs/week2day3.ipynb:
-its state, its nodes and its edges. The agent works the claim with its tools; the
-graph pays an approval, straight after the decision or after a handler's
-sign-off, which it waits for with interrupt() when the backend says a claim
-needs one. Its nodes record each step and each model call on the claim."""
+its state, its nodes and its edges. A security check reads the claim first and
+refers one that tries to instruct whoever handles it; otherwise the agent works
+the claim with its tools, and the graph pays an approval, straight after the
+decision or after a handler's sign-off, which it waits for with interrupt()
+when the backend says a claim needs one. Its nodes record each step and each
+model call on the claim."""
 
 import time
 from collections.abc import Callable
@@ -29,7 +31,7 @@ from langgraph.prebuilt.tool_node import ToolCallRequest, ToolInvocationError
 from langgraph.runtime import Runtime
 from langgraph.types import Command, interrupt
 
-from agent import api, recording
+from agent import api, recording, screening
 from agent.connection import Refused
 from agent.reports import IN_PROGRESS
 from agent.tools import CLAIM_TOOLS, ClaimContext, read_section
@@ -65,6 +67,38 @@ Reply = Runnable[LanguageModelInput, BaseMessage]
 
 class TooManyModelCalls(Exception):
     """The claim agent reached its limit of model calls without deciding."""
+
+
+def screen(
+    state: ClaimState,
+    runtime: Runtime[ClaimContext],
+    *,
+    check: screening.Check,
+    model: Model,
+) -> dict[str, Any]:
+    """Run the security check on the claim before the agent's model sees it,
+    recording each of the check's model calls and its result. A claim that tries
+    to instruct whoever handles it is referred with the check's reason, and the
+    agent's model never sees it. As the graph's first node, it runs once for each
+    thread: a carry-on from saved progress starts after it."""
+    context = runtime.context
+    claim = api.get_claim(context.claim_id)
+    found = screening.screen_claim(
+        check, claim, partial(recording.model_call, context, model)
+    )
+    recording.check(context, found.instructions_found, found.reason)
+    if not found.instructions_found:
+        return {}
+    referred = api.decide_claim(
+        context.claim_id,
+        {
+            "decision": "refer",
+            "payout": 0,
+            "reasons": found.reason,
+            "policy_section": screening.SECURITY_CHECK,
+        },
+    )
+    return {"decision": "refer", "status": referred["status"]}
 
 
 def agent(
@@ -147,6 +181,11 @@ def pay(state: ClaimState, runtime: Runtime[ClaimContext]) -> dict[str, Any]:
     return {"status": api.pay_claim(claim_id, payout)["status"]}
 
 
+def after_screen(state: ClaimState) -> str:
+    """End on the check's referral, or let the agent work the claim."""
+    return END if state.get("decision") else "agent"
+
+
 def after_agent(state: ClaimState) -> str:
     """Run the tools the model asked for. A reply with none ends the work, and
     the harness fails a claim left undecided."""
@@ -167,14 +206,28 @@ def after_tools(state: ClaimState) -> str:
     return END
 
 
-def claim_graph(
-    llm: BaseChatModel, model: Model, saver: BaseCheckpointSaver[Any], prompt: str
-) -> ClaimGraph:
-    """Build the claim graph on a model, saving its progress with `saver`."""
-    builder = StateGraph(ClaimState, context_schema=ClaimContext)
-    replies = llm.bind_tools(CLAIM_TOOLS).with_retry(
+def retried[In, Out](model: Runnable[In, Out]) -> Runnable[In, Out]:
+    """A model call retried when it fails at the provider."""
+    return model.with_retry(
         stop_after_attempt=MODEL_RETRIES + 1,
         exponential_jitter_params={"initial": RETRY_DELAY, "jitter": 0},
+    )
+
+
+def claim_graph(
+    llm: BaseChatModel,
+    model: Model,
+    saver: BaseCheckpointSaver[Any],
+    prompt: str,
+    check: tuple[screening.Check, Model],
+) -> ClaimGraph:
+    """Build the claim graph on a model, with the security check's model and
+    what it runs on, saving its progress with `saver`."""
+    builder = StateGraph(ClaimState, context_schema=ClaimContext)
+    replies = retried(llm.bind_tools(CLAIM_TOOLS))
+    check_model, check_runs_on = check
+    builder.add_node(
+        "screen", partial(screen, check=retried(check_model), model=check_runs_on)
     )
     builder.add_node(
         "agent",
@@ -188,7 +241,8 @@ def claim_graph(
         "wait_for_sign_off", wait_for_sign_off, destinations=("pay", "agent")
     )
     builder.add_node("pay", pay)
-    builder.add_edge(START, "agent")
+    builder.add_edge(START, "screen")
+    builder.add_conditional_edges("screen", after_screen, ["agent", END])
     builder.add_conditional_edges("agent", after_agent, ["tools", END])
     builder.add_conditional_edges(
         "tools", after_tools, ["agent", "wait_for_sign_off", "pay", END]

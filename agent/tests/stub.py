@@ -1,10 +1,13 @@
 from collections.abc import Iterator
+from itertools import repeat
 
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
+from agent import screening
 from agent.versions import Model, Version
+from backend.tests.usage_rows import model_calls
 
 # A version of the claim agent to work claims as in tests, on a free model the
 # tests never call
@@ -40,6 +43,33 @@ def calls(*tool_calls):
 def tool_call(name, **args):
     """A reply that makes one tool call."""
     return calls(call(name, **args))
+
+
+# What the security check runs on in the tests, and what it finds unless a test
+# says otherwise
+CHECK_MODEL = Model(name="security-check-stub", provider="openrouter", options={})
+NOTHING_FOUND = "Nothing in the claim tries to instruct whoever handles it."
+
+
+def screened(found, reason=NOTHING_FOUND):
+    """The security check's reply, as Structured Outputs gives it: a call to the
+    answer's tool."""
+    return tool_call("Screening", reason=reason, instructions_found=found)
+
+
+def check(*replies):
+    """The security check on a stub model that gives these replies, in order."""
+    return screening.screener(stub(*replies)), CHECK_MODEL
+
+
+def claim_agent_calls(claim_id):
+    """The claim agent's own model calls on a claim, leaving out the check's."""
+    return [call for call in model_calls(claim_id) if call["model"] != CHECK_MODEL.name]
+
+
+def check_finding_nothing():
+    """The security check as most tests have it: it finds nothing, every time."""
+    return screening.screener(StubModel(messages=repeat(screened(False)))), CHECK_MODEL
 
 
 # The reasons every decision in the tests gives

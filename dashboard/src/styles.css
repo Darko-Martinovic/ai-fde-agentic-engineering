@@ -1348,6 +1348,11 @@ main {
   color: var(--raspberry-ink);
 }
 
+.step__check {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 /* The latest dispatch, on the queue page */
 
 .run-form {

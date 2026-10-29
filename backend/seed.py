@@ -31,8 +31,14 @@ MODELS = "models.json"
 # company.json make the first settings
 IMPROVEMENT = "improvement.json"
 
-# The files the backend serves its records from. data/security/ stays out of
-# reach, and of data/evals/ only the answer key below is read, by seeding alone.
+# CLM-1901, the security team's claim with an instruction hidden in its story,
+# seeded into the queue from data/security/ with its policy and customer, beside
+# the files below, and never its handler's decision
+SECURITY = "security"
+SECURITY_FILES = ("claims.json", "policies.json", "customers.json")
+
+# The files the backend serves its records from. Of data/evals/ only the answer
+# key below is read, by seeding alone.
 SEED_FILES = (
     "claims.json",
     "policies.json",
@@ -55,9 +61,10 @@ HANDLER_DECISIONS = {
 }
 
 
-def read(name: str, folder: Path = DATA_DIR) -> Any:
-    """Read one seed file, parsing JSON files."""
-    text = (folder / name).read_text(encoding="utf-8")
+def read(name: str, folder: Path | None = None) -> Any:
+    """Read one seed file, from data/ unless another folder is named, parsing
+    JSON files."""
+    text = ((folder or DATA_DIR) / name).read_text(encoding="utf-8")
     return json.loads(text) if name.endswith(".json") else text
 
 
@@ -136,11 +143,12 @@ def seed_recipe(conn: Connection, now: str) -> None:
 def seed(conn: Connection) -> str:
     """Load every record, with each claim waiting in the queue, and version 1
     of the claim agent's configuration, and say what the answer key holds."""
-    claims.insert(conn, read("claims.json"))
+    security = {name: read(name, DATA_DIR / SECURITY) for name in SECURITY_FILES}
+    claims.insert(conn, read("claims.json") + security["claims.json"])
     records.insert(
         conn,
-        policies=read("policies.json"),
-        customers=read("customers.json"),
+        policies=read("policies.json") + security["policies.json"],
+        customers=read("customers.json") + security["customers.json"],
         handler_records=read("handlers.json"),
         settings={
             "plans": json.dumps(read("plans.json")),

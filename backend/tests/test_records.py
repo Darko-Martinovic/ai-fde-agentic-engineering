@@ -5,7 +5,7 @@ def test_list_claims(client):
     response = client.get("/api/claims")
     assert response.status_code == 200
     claims = response.json()
-    assert len(claims) == 25
+    assert len(claims) == 26  # the queue's 25 and CLM-1901
     assert {c["status"] for c in claims} == {"waiting"}
     assert claims[0] == {
         "claim_id": "CLM-1001",
@@ -85,6 +85,7 @@ def test_operations_are_documented(client):
         "get_signed_in_handler",
         "get_policy_wording",
         "get_current_version",
+        "get_screening_model",
         "get_version",
         "get_configuration",
         "get_version_details",

@@ -15,7 +15,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.types import Command
 
-from agent import api, graph, recording, tracing, versions
+from agent import api, graph, recording, screening, tracing, versions
 from agent.reports import AWAITING_SIGN_OFF, IN_PROGRESS, report
 from agent.tools import ClaimContext
 from agent.versions import Model, Version
@@ -85,12 +85,27 @@ def current_version() -> Version:
     return versions.version(api.get_current_version())
 
 
+def security_check() -> tuple[screening.Check, Model]:
+    """The security check's model, which the backend names outside any version,
+    and what it runs on."""
+    fetched = api.get_screening_model()
+    model = Model(
+        name=fetched["model"], provider=fetched["provider"], options=fetched["options"]
+    )
+    return screening.screener(chat_model(model)), model
+
+
 def claim_graph(
     version: Version, saver: BaseCheckpointSaver[Any], llm: BaseChatModel | None = None
 ) -> graph.ClaimGraph:
-    """The claim graph as a version builds it, saving its progress with `saver`."""
+    """The claim graph as a version builds it, with the security check, saving
+    its progress with `saver`."""
     return graph.claim_graph(
-        llm or chat_model(version.model), version.model, saver, instructions(version)
+        llm or chat_model(version.model),
+        version.model,
+        saver,
+        instructions(version),
+        security_check(),
     )
 
 

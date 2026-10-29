@@ -71,10 +71,15 @@ def handlers_reasons(
 
 
 def originals(conn: Connection, evaluation_set: str) -> list[dict[str, Any]]:
-    """A set's claim records: the queue's own claims for the evaluation set,
-    the held-out claims for the held-out set, oldest submitted first."""
+    """A set's claim records: those with a handler's decision in the set, from
+    the queue for the evaluation set and from the held-out claims for the
+    held-out set, oldest submitted first. A claim in the queue without one, as
+    CLM-1901, is in neither set."""
     table = db.claims if evaluation_set == "evaluation" else db.held_out_claims
-    found = select(table.c.data)
+    decided = select(db.handler_decisions.c.claim_id).where(
+        db.handler_decisions.c.evaluation_set == evaluation_set
+    )
+    found = select(table.c.data).where(table.c.claim_id.in_(decided))
     if table is db.claims:
         found = found.where(db.claims.c.evaluation_id.is_(None))
     records = [json.loads(data) for data in conn.execute(found).scalars()]

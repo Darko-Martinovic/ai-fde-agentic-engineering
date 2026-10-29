@@ -7,7 +7,8 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
 
-from agent import api, connection, dispatcher, graph
+from agent import api, connection, dispatcher, graph, harness
+from agent.tests.stub import check_finding_nothing
 from backend import agent_service
 from backend.main import app
 from backend.tests.sign_ins import both_sides
@@ -23,6 +24,13 @@ def backend(tmp_path, monkeypatch):
     monkeypatch.setattr(graph, "RETRY_DELAY", 0)
     monkeypatch.setattr(agent_service, "resume_claim", lambda claim_id: None)
     return TestClient(app, headers=both_sides())
+
+
+@pytest.fixture(autouse=True)
+def security_check(monkeypatch):
+    """The security check finds nothing on any claim, unless a test sets its
+    own, and never reaches a model."""
+    monkeypatch.setattr(harness, "security_check", check_finding_nothing)
 
 
 @pytest.fixture(autouse=True)

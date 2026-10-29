@@ -3,11 +3,18 @@ import { FIRST_STEP, LiveBadge, Panel } from "./elements";
 import { clock, pretty, sectionName } from "../format";
 
 const KIND_LABELS: Record<StepKind, string> = {
+  check: "Security check",
   tool_call: "Calls a tool",
   tool_result: "Tool result",
   reply: "Agent",
   section: "Reads a section",
   failure: "This attempt failed",
+};
+
+// The steps shown as their text alone, each in its own style
+const TEXT_CLASSES: Partial<Record<StepKind, string>> = {
+  check: "step__check",
+  failure: "step__failure",
 };
 
 function StepBody({ step }: Readonly<{ step: Step }>) {
@@ -38,10 +45,9 @@ function StepBody({ step }: Readonly<{ step: Step }>) {
   if (step.kind === "section") {
     return <p className="step__section">{sectionName(sectionOf(step))}</p>;
   }
-  if (step.kind === "failure") {
-    return <p className="step__failure">{step.text}</p>;
-  }
-  return <p className="step__reply">{step.text}</p>;
+  return (
+    <p className={TEXT_CLASSES[step.kind] ?? "step__reply"}>{step.text}</p>
+  );
 }
 
 /** The agent's steps on a claim, in order, announced as they arrive. */

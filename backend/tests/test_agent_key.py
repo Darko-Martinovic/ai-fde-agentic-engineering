@@ -33,6 +33,7 @@ GUARDS = {
             "search_documents",
             "get_version",
             "get_current_version",
+            "get_screening_model",
             "create_dispatch",
             "create_evaluation",
             "create_round_evaluation",

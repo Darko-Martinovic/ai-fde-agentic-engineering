@@ -16,7 +16,7 @@ ClaimStatus = Literal[
 # The states a handler decides a claim from: the agent referred it, or it failed
 # twice and was left for a handler
 FOR_A_HANDLER: tuple[ClaimStatus, ...] = ("referred", "left_for_handler")
-StepKind = Literal["tool_call", "tool_result", "reply", "section", "failure"]
+StepKind = Literal["check", "tool_call", "tool_result", "reply", "section", "failure"]
 DecisionKind = Literal["approve", "decline", "refer"]
 Review = Literal["signed_off", "rejected"]
 

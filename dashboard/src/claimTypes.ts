@@ -156,7 +156,7 @@ export interface Handler extends HandlerName {
 }
 
 export type StepKind =
-  "tool_call" | "tool_result" | "reply" | "section" | "failure";
+  "check" | "tool_call" | "tool_result" | "reply" | "section" | "failure";
 
 export type DocumentName = "wording" | "manual";
 

@@ -137,7 +137,8 @@ def test_the_limit_of_model_calls_holds_across_a_restart(backend, run, memory_sa
     forever = StubModel(messages=(tool_call("get_claim") for _ in range(40)))
     report = harness.carry_on("CLM-1001", run, FREE, memory_saver, forever)
     assert "TooManyModelCalls" in report
-    assert backend.get("/api/dispatches/latest").json()["usage"]["model_calls"] == 30
+    # The claim agent's 30, and the security check's one at the claim's start
+    assert backend.get("/api/dispatches/latest").json()["usage"]["model_calls"] == 31
 
 
 def test_an_error_while_carrying_on_starts_the_claim_afresh(backend, run, memory_saver):

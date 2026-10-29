@@ -119,17 +119,17 @@ Tests run with a key the root `conftest.py` sets for the test run, and none read
 
 ## Phase 2: A check for instructions hidden in a claim
 
-- [ ] `agent/screening.py` holds the lab's instructions and `Screening`, and `screen_claim` asks the model up to three times for a readable answer.
-- [ ] The claim graph's first node runs the check. A flagged claim is referred with a payout of $0.00, the check's reason and "Security check" as the section, and the claim agent's model is never called; a claim it passes goes on as before.
-- [ ] The check runs once for each claim: a carry-on from saved progress, after a restart or a review, doesn't run it again; a claim started again on a new thread does.
-- [ ] Each of the check's calls, retries included, is recorded with its cost as one of the claim's model calls, and the check's result is the claim's first step, shown as "Security check" on the claim page.
-- [ ] `get_screening_model` gives Luna at `none`, or the free model with no reasoning effort when `MODEL_NAME` is set; `MODEL_NAME` is still read only in `backend/free_model.py` (`tests/test_standards.py`).
-- [ ] The check is outside the versioned configuration: no version or proposal can change it, which a test checks on `propose_change`'s input.
-- [ ] Seeding adds CLM-1901 with its policy and customer from `data/security/`; `data/claims.json` is unchanged; CLM-1901 is in the queue and in neither evaluation set, and no score changes.
-- [ ] Tests on a stub model: a claim the check flags (referred with the reason, no call to the claim agent's model), a claim it passes, an unreadable answer three times (the claim fails), a provider error, a carry-on that skips the check, and CLM-1901 in the queue and in neither set.
-- [ ] The claim page shows the check's step; a vitest test covers it.
-- [ ] `npm run check` is green.
-- [ ] Reviewed by a fresh subagent; findings fixed.
+- [x] `agent/screening.py` holds the lab's instructions and `Screening`, and `screen_claim` asks the model up to three times for a readable answer.
+- [x] The claim graph's first node runs the check. A flagged claim is referred with a payout of $0.00, the check's reason and "Security check" as the section, and the claim agent's model is never called; a claim it passes goes on as before.
+- [x] The check runs once for each claim: a carry-on from saved progress, after a restart or a review, doesn't run it again; a claim started again on a new thread does.
+- [x] Each of the check's calls, retries included, is recorded with its cost as one of the claim's model calls, and the check's result is the claim's first step, shown as "Security check" on the claim page.
+- [x] `get_screening_model` gives Luna at `none`, or the free model with no reasoning effort when `MODEL_NAME` is set; `MODEL_NAME` is still read only in `backend/free_model.py` (`tests/test_standards.py`).
+- [x] The check is outside the versioned configuration: no version or proposal can change it, which a test checks on `propose_change`'s input.
+- [x] Seeding adds CLM-1901 with its policy and customer from `data/security/`; `data/claims.json` is unchanged; CLM-1901 is in the queue and in neither evaluation set, and no score changes.
+- [x] Tests on a stub model: a claim the check flags (referred with the reason, no call to the claim agent's model), a claim it passes, an unreadable answer three times (the claim fails), a provider error, a carry-on that skips the check, and CLM-1901 in the queue and in neither set.
+- [x] The claim page shows the check's step; a vitest test covers it.
+- [x] `npm run check` is green.
+- [x] Reviewed by a fresh subagent; findings fixed: a set's claims (those with a handler's decision in it) defined once, in `originals`, so a round's cost estimate leaves CLM-1901 out too; tests for no second check after a sign-off or a rejection, for a rate limit or a timeout from the check leaving the claim in progress, for the free model's check and for the real check's model; seeding reads `data/security/` through `SECURITY_FILES`, and `read` finds `data/` when it's called. Not taken: building the check's model only when a claim needs one (a carry-on after a review builds it and never calls it), since it costs one read and no model call.
 
 ## Phase 3: The agent's own API, and a sign-off that pays
 

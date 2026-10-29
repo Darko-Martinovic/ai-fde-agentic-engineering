@@ -2,17 +2,21 @@
 runs as, which holds no scores, and for the Configuration page every version
 with what it changed from the one it was based on and its held-out scores."""
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import Connection, RowMapping
 
 from backend import diffs
 from backend.api import Db, found
 from backend.callers import AGENT, HANDLER
+from backend.free_model import free_model
 from backend.store import platform_settings, versions
 from backend.version_models import (
     NO_EFFORT,
     Configuration,
     ModelAllowed,
+    ScreeningModel,
     Verdict,
     Version,
     VersionConfig,
@@ -20,6 +24,7 @@ from backend.version_models import (
     VersionStatus,
 )
 from backend.version_scores import held_out_accuracy_and_grade
+from settings import setting
 
 router = APIRouter(prefix="/api")
 
@@ -72,25 +77,31 @@ def models_allowed(conn: Connection) -> list[ModelAllowed]:
     return [ModelAllowed(**model) for model in platform_settings.models(conn)]
 
 
-def runs_as(conn: Connection, number: int) -> VersionConfig:
-    """A version as the claim agent runs it, with how to build its model: its
-    options, with its reasoning effort unless it runs with none of its own."""
-    row = load(conn, number)
-    model = platform_settings.model(conn, row["model"])
+def how_to_build(
+    conn: Connection, name: str, effort: str, whose: str
+) -> tuple[str, dict[str, Any]]:
+    """A model allowed's provider and options, with its reasoning effort unless
+    it runs with none of its own, or a 409 naming whose model isn't allowed."""
+    model = platform_settings.model(conn, name)
     if model is None:
-        raise HTTPException(
-            409, f"Version {number}'s model, {row['model']}, isn't one allowed"
-        )
-    effort = row["reasoning_effort"]
+        raise HTTPException(409, f"{whose} model, {name}, isn't one allowed")
     options = model["options"] | (
         {} if effort == NO_EFFORT else {"reasoning_effort": effort}
     )
+    return model["provider"], options
+
+
+def runs_as(conn: Connection, number: int) -> VersionConfig:
+    """A version as the claim agent runs it, with how to build its model."""
+    row = load(conn, number)
+    effort = row["reasoning_effort"]
+    provider, options = how_to_build(conn, row["model"], effort, f"Version {number}'s")
     return VersionConfig(
         number=number,
         instructions=row["instructions"],
         model=row["model"],
         reasoning_effort=effort,
-        provider=model["provider"],
+        provider=provider,
         options=options,
     )
 
@@ -107,6 +118,23 @@ def get_current_version(conn: Db) -> VersionConfig:
 def get_version(number: int, conn: Db) -> VersionConfig:
     """Get one version of the claim agent's configuration, as it runs."""
     return runs_as(conn, number)
+
+
+@router.get(
+    "/screening-model", operation_id="get_screening_model", dependencies=[AGENT]
+)
+def get_screening_model(conn: Db) -> ScreeningModel:
+    """Get the model the security check runs on, which no version changes."""
+    free = free_model()
+    name, effort = (
+        (free["model"], NO_EFFORT)
+        if free
+        else (setting("SCREEN_MODEL"), setting("SCREEN_REASONING_EFFORT"))
+    )
+    provider, options = how_to_build(conn, name, effort, "The security check's")
+    return ScreeningModel(
+        model=name, reasoning_effort=effort, provider=provider, options=options
+    )
 
 
 @router.get("/configuration", operation_id="get_configuration", dependencies=[HANDLER])
