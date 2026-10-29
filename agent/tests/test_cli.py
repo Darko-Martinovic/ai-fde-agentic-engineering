@@ -3,7 +3,7 @@ from langchain_core.messages import AIMessage
 
 import agent.__main__ as cli
 from agent import harness
-from agent.tests.stub import StubModel, decide, stub, tool_call
+from agent.tests.stub import StubModel, claim_agent_calls, decide, stub, tool_call
 from backend.tests.direct_changes import set_status
 from backend.tests.new_versions import GEMINI, add_version
 from backend.tests.usage_rows import model_calls, work_times
@@ -41,7 +41,7 @@ def test_the_claim_is_worked_as_the_current_version(backend, monkeypatch):
     cli.main(["CLM-1006"])
     assert built == [("openai/gpt-6-luna", "low")]
     assert then == [(GEMINI, "minimal")]
-    assert [c["model"] for c in model_calls("CLM-1006")] == [GEMINI]
+    assert [c["model"] for c in claim_agent_calls("CLM-1006")] == [GEMINI]
 
 
 def test_a_claim_in_progress_is_carried_on(backend, monkeypatch, capsys):

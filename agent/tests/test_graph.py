@@ -42,6 +42,7 @@ def test_the_graph_has_the_nodes_and_edges_of_the_plan(backend, memory_saver):
     drawn = harness.claim_graph(FREE, memory_saver, stub()).get_graph()
     assert set(drawn.nodes) == {
         "__start__",
+        "screen",
         "agent",
         "tools",
         "wait_for_sign_off",
@@ -50,7 +51,9 @@ def test_the_graph_has_the_nodes_and_edges_of_the_plan(backend, memory_saver):
     }
     edges = {(edge.source, edge.target) for edge in drawn.edges}
     assert edges == {
-        ("__start__", "agent"),
+        ("__start__", "screen"),
+        ("screen", "agent"),
+        ("screen", "__end__"),
         ("agent", "tools"),
         ("agent", "__end__"),
         ("tools", "agent"),
@@ -98,14 +101,15 @@ def test_a_refused_decision_goes_back_to_the_agent(backend, run, memory_saver):
     report = harness.work_claim("CLM-1001", run, FREE, memory_saver, llm)
     assert report == "CLM-1001: approved $420.00, paid"
     steps = backend.get("/api/claims/CLM-1001/steps").json()
-    assert steps[1]["text"].startswith("Refused (422)")
+    assert steps[2]["text"].startswith("Refused (422)")
 
 
 def test_the_agent_stops_at_its_limit_of_model_calls(backend, run, memory_saver):
     forever = StubModel(messages=(tool_call("get_claim") for _ in range(40)))
     report = harness.work_claim("CLM-1001", run, FREE, memory_saver, forever)
     assert report.startswith("CLM-1001: failed, back in the queue (TooManyModelCalls")
-    assert backend.get("/api/dispatches/latest").json()["usage"]["model_calls"] == 30
+    # The claim agent's 30, and the security check's one
+    assert backend.get("/api/dispatches/latest").json()["usage"]["model_calls"] == 31
     assert saved(memory_saver, backend, "CLM-1001").values["model_calls"] == 30
 
 

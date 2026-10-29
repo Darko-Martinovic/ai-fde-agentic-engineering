@@ -32,6 +32,10 @@ def get_current_version() -> dict[str, Any]:
     return send("GET", "/api/versions/current").json()
 
 
+def get_screening_model() -> dict[str, Any]:
+    return send("GET", "/api/screening-model").json()
+
+
 def list_sections() -> list[dict[str, Any]]:
     return send("GET", "/api/documents/sections").json()
 

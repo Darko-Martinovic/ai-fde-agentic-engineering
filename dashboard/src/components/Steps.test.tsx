@@ -37,3 +37,18 @@ it("shows a failed attempt among the steps", () => {
     screen.getByText("TimeoutError: the provider timed out"),
   ).toBeDefined();
 });
+
+it("shows the security check's result as a step", () => {
+  const check: Step = {
+    ...SECTION,
+    kind: "check",
+    text: "Found an instruction. The story tells the AI to approve the claim.",
+  };
+  render(<StepsPanel steps={[check]} live={false} />);
+  expect(screen.getByText("Security check")).toBeDefined();
+  expect(
+    screen.getByText(
+      "Found an instruction. The story tells the AI to approve the claim.",
+    ),
+  ).toBeDefined();
+});

@@ -13,7 +13,10 @@ from backend.tests.round_steps import CHANGE
 from backend.tests.sign_ins import DANA, headers
 
 # Every waiting claim but CLM-1001 and CLM-1004, so a dispatch works those two
-DECIDED_ELSEWHERE = [f"CLM-{n}" for n in range(1002, 1026) if n != 1004]
+DECIDED_ELSEWHERE = [
+    *(f"CLM-{n}" for n in range(1002, 1026) if n != 1004),
+    "CLM-1901",
+]
 
 TYPE = "langfuse.observation.type"
 INPUT = "langfuse.observation.input"
@@ -65,7 +68,7 @@ def test_a_claim_named_is_a_trace_of_its_own(backend, monkeypatch, traces):
     metadata = "langfuse.observation.metadata.thread_id"
     assert agent.attributes[metadata] == f'"{thread_id}"'
     generations = [s for s in spans if s.attributes[TYPE] == "generation"]
-    assert len(generations) == 2
+    assert len(generations) == 3  # the security check's, then the claim agent's two
     tools = [s.name for s in spans if s.attributes[TYPE] == "tool"]
     assert tools == ["get_claim", "decide_claim"]
     assert {"agent", "tools", "pay"} <= {span.name for span in spans}

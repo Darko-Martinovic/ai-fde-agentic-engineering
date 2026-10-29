@@ -38,8 +38,8 @@ def test_the_agent_works_out_the_payout_with_the_rules(backend, run, memory_save
     )
     assert harness.work_claim("CLM-1001", run, FREE, memory_saver, llm).endswith("paid")
     steps = backend.get("/api/claims/CLM-1001/steps").json()
-    assert steps[0]["text"].startswith("calculate_payout ")
-    worked_out = json.loads(steps[1]["text"])
+    assert steps[1]["text"].startswith("calculate_payout ")
+    worked_out = json.loads(steps[2]["text"])
     assert worked_out["payout"] == 420.0
     assert worked_out["needs_sign_off"] is False
 

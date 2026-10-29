@@ -4,7 +4,11 @@ import pytest
 from sqlalchemy import Column, Integer, MetaData, Table, delete, func, inspect, select
 
 from backend import db, seed
+from backend.store import evaluations
 from backend.tests.direct_changes import count_claims, set_status
+
+# The queue's 25 claims and CLM-1901, the security team's
+QUEUE = 26
 
 
 def test_seeds_from_the_seed_files_alone(tmp_path, monkeypatch):
@@ -12,13 +16,34 @@ def test_seeds_from_the_seed_files_alone(tmp_path, monkeypatch):
     data.mkdir()
     for name in seed.SEED_FILES:
         shutil.copy(seed.DATA_DIR / name, data / name)
+    (data / seed.SECURITY).mkdir()
+    for name in seed.SECURITY_FILES:
+        shutil.copy(seed.DATA_DIR / seed.SECURITY / name, data / seed.SECURITY / name)
     monkeypatch.setattr(seed, "DATA_DIR", data)
     seed.reset()
-    assert count_claims() == 25
+    assert count_claims() == QUEUE
 
 
 def test_seed_files_leave_out_the_answer_key():
-    assert not any("evals" in name or "security" in name for name in seed.SEED_FILES)
+    assert not any("evals" in name for name in seed.SEED_FILES)
+    assert "decisions.json" not in seed.SECURITY_FILES
+
+
+def test_clm_1901_is_in_the_queue_and_in_neither_evaluation_set(client):
+    queued = {claim["claim_id"] for claim in client.get("/api/claims").json()}
+    assert "CLM-1901" in queued
+    for evaluation_set in ("evaluation", "held_out"):
+        made = client.post(
+            "/api/runs/evaluations",
+            json={"evaluation_set": evaluation_set, "tiny": False, "agents": 3},
+        )
+        copied = {copy["claim_id"] for copy in made.json()["claims"]}
+        assert not any(copy.startswith("CLM-1901") for copy in copied)
+        assert len(copied) == 25
+    with db.engine().connect() as conn:
+        originals = evaluations.originals(conn, "evaluation")
+    assert len(originals) == 25
+    assert "CLM-1901" not in {record["claim_id"] for record in originals}
 
 
 def test_seeds_only_once(client):
@@ -26,7 +51,7 @@ def test_seeds_only_once(client):
     set_status("decided", "CLM-1001")
     claim = client.get("/api/claims/CLM-1001").json()
     assert claim["status"] == "decided"
-    assert count_claims() == 25
+    assert count_claims() == QUEUE
 
 
 def test_reset(client):
@@ -45,7 +70,7 @@ def test_a_database_with_no_claims_is_seeded_again(client):
     with db.engine().begin() as conn:
         conn.execute(delete(db.claims))
     seed.ready.cache_clear()
-    assert len(client.get("/api/claims").json()) == 25
+    assert len(client.get("/api/claims").json()) == QUEUE
 
 
 def test_seeding_drops_the_tables_earlier_builds_made(client):
@@ -64,7 +89,7 @@ def test_seeding_stores_the_answer_key_apart(tmp_path):
         assert held_out.scalar_one() == 25
         tiny = select(func.count()).where(db.handler_decisions.c.tiny)
         assert conn.execute(tiny).scalar_one() == 10
-    assert count_claims() == 25
+    assert count_claims() == QUEUE
 
 
 def test_seeding_makes_version_1_and_the_models_allowed(client):

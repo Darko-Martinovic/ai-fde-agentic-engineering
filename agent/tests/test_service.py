@@ -375,7 +375,9 @@ def test_an_evaluation_works_copies_and_leaves_the_queue_alone(
     assert evaluation["measures"]["cost_of_mistakes"] == pytest.approx(2850)
     assert evaluation["measures"]["straight_through"] == pytest.approx(0.8)
     assert evaluation["measures"]["model_cost_per_claim"] == 0
-    assert evaluation["measures"]["seconds_per_claim"] < 1
+    # Stub models answer at once; five claims at a time share SQLite's one
+    # writer, and each claim's security check adds three calls to the backend
+    assert evaluation["measures"]["seconds_per_claim"] < 2
     assert evaluation["measures"]["run_seconds"] < 30
     left = backend.get("/api/claims/CLM-1021-E1").json()
     assert left["status"] == "left_for_handler"

@@ -24,11 +24,12 @@ async function agentDecides(
   expect(response.ok()).toBe(true);
 }
 
-test("the queue shows all 25 claims waiting", async ({ page }) => {
+// The queue's 25 claims and CLM-1901, the security team's
+test("the queue shows all 26 claims waiting", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "25 Waiting" })).toBeVisible();
-  await expect(page.getByRole("row")).toHaveCount(26);
-  await expect(page.getByText("25 of 25 claims")).toBeVisible();
+  await expect(page.getByRole("button", { name: "26 Waiting" })).toBeVisible();
+  await expect(page.getByRole("row")).toHaveCount(27);
+  await expect(page.getByText("26 of 26 claims")).toBeVisible();
 });
 
 test("a claim opens from the queue", async ({ page }) => {

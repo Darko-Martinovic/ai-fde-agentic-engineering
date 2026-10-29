@@ -8,7 +8,15 @@ from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 
 from agent import api, connection, harness, versions
-from agent.tests.stub import FREE, REASONS, StubModel, decide, stub, tool_call
+from agent.tests.stub import (
+    FREE,
+    REASONS,
+    StubModel,
+    claim_agent_calls,
+    decide,
+    stub,
+    tool_call,
+)
 from agent.tools import CLAIM_TOOLS
 from agent.versions import Model
 from backend.tests.new_versions import GEMINI, add_version
@@ -29,11 +37,12 @@ def test_work_claim_approves_and_the_graph_pays(backend, run, memory_saver):
     assert claim["status"] == "decided"
     assert claim["payment"]["amount"] == 420.0
     steps = backend.get("/api/claims/CLM-1001/steps").json()
-    assert [s["kind"] for s in steps] == ["tool_call", "tool_result"] * 4
+    assert [s["kind"] for s in steps] == ["check"] + ["tool_call", "tool_result"] * 4
     assert not any(s["text"].startswith("pay_claim") for s in steps)
-    assert backend.get("/api/dispatches/latest").json()["usage"]["model_calls"] == 4
-    assert steps[0]["text"] == "get_claim {}"
-    assert '"story"' in steps[1]["text"]
+    # The security check's call, then the claim agent's four
+    assert backend.get("/api/dispatches/latest").json()["usage"]["model_calls"] == 5
+    assert steps[1]["text"] == "get_claim {}"
+    assert '"story"' in steps[2]["text"]
     assert len({s["thread_id"] for s in steps}) == 1
     assert steps[0]["thread_id"].startswith("CLM-1001-")
 
@@ -146,7 +155,7 @@ def test_usage_is_recorded_on_the_run(backend, run, memory_saver):
         "CLM-1001", run, FREE, memory_saver, stub(reply, AIMessage(content="."))
     )
     usage = backend.get("/api/dispatches/latest").json()["usage"]
-    assert usage["model_calls"] == 2
+    assert usage["model_calls"] == 3  # the security check's, then the agent's two
     assert usage["input_tokens"] == 20000
     assert usage["cost"] == pytest.approx(0.003)
 
@@ -325,7 +334,7 @@ def costing(cost=None, tokens=(1200, 300)):
 def test_the_cost_openrouter_reports_is_recorded(backend, memory_saver):
     llm = stub(costing(cost=0.0042), decide("approve", 420.0))
     harness.work_claim("CLM-1001", None, FREE, memory_saver, llm)
-    first, second = model_calls("CLM-1001")
+    first, second = claim_agent_calls("CLM-1001")
     assert (first["input_tokens"], first["output_tokens"]) == (1200, 300)
     assert first["cost"] == 0.0042
     assert second["cost"] == 0.0
@@ -334,7 +343,7 @@ def test_the_cost_openrouter_reports_is_recorded(backend, memory_saver):
 def test_a_call_with_no_cost_reported_costs_nothing(backend, memory_saver):
     llm = stub(costing(tokens=(20000, 1000)), decide("approve", 420.0))
     harness.work_claim("CLM-1001", None, FREE, memory_saver, llm)
-    first, _ = model_calls("CLM-1001")
+    first, _ = claim_agent_calls("CLM-1001")
     assert (first["cost"], first["input_tokens"]) == (0, 20000)
     assert first["model"] == "openrouter/free"
 
@@ -346,7 +355,7 @@ def test_a_claim_worked_alone_records_its_calls_and_its_spell_with_no_run(
     harness.work_claim("CLM-1001", None, FREE, memory_saver, llm)
     thread_id = backend.get("/api/claims/CLM-1001").json()["thread_id"]
     calls = model_calls("CLM-1001")
-    assert len(calls) == 3
+    assert len(claim_agent_calls("CLM-1001")) == 3
     assert {(c["run_id"], c["thread_id"]) for c in calls} == {(None, thread_id)}
     [spell] = work_times("CLM-1001")
     assert (spell["run_id"], spell["thread_id"]) == (None, thread_id)
@@ -360,11 +369,12 @@ def test_both_attempts_of_a_claim_count_on_its_run(backend, run, memory_saver):
     harness.work_claim(
         "CLM-1001", run, FREE, memory_saver, stub(decide("approve", 420.0))
     )
-    calls, spells = model_calls("CLM-1001"), work_times("CLM-1001")
+    calls, spells = claim_agent_calls("CLM-1001"), work_times("CLM-1001")
     assert len({c["thread_id"] for c in calls}) == 2
     assert [c["run_id"] for c in calls] == [run, run]
     assert [s["run_id"] for s in spells] == [run, run]
-    assert backend.get("/api/dispatches/latest").json()["usage"]["model_calls"] == 2
+    # Each attempt is checked on its new thread
+    assert backend.get("/api/dispatches/latest").json()["usage"]["model_calls"] == 4
 
 
 @pytest.fixture
@@ -407,7 +417,7 @@ def test_a_carry_on_after_a_rejection_makes_its_calls_with_no_run(
     review(backend, approved=False, note="The deductible is $100.00.")
     llm = stub(tool_call("get_claim"), decide("approve", 1250.0))
     harness.carry_on("CLM-1002", None, FREE, memory_saver, llm)
-    calls = model_calls("CLM-1002")
+    calls = claim_agent_calls("CLM-1002")
     assert [c["run_id"] for c in calls] == [run, None, None]
     before, after = work_times("CLM-1002")
     assert (before["run_id"], after["run_id"]) == (run, None)
@@ -425,6 +435,6 @@ def test_a_spell_that_ends_in_an_error_is_still_recorded(backend, run, memory_sa
     llm = BreaksAfterOne(messages=iter([tool_call("get_claim")]))
     report = harness.work_claim("CLM-1001", run, FREE, memory_saver, llm)
     assert report.startswith("CLM-1001: failed, back in the queue")
-    assert len(model_calls("CLM-1001")) == 1
+    assert len(claim_agent_calls("CLM-1001")) == 1
     [spell] = work_times("CLM-1001")
     assert spell["run_id"] == run

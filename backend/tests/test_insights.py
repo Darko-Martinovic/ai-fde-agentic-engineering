@@ -75,7 +75,7 @@ def worked(client):
 def test_before_any_work(client):
     assert insights(client) == {
         "totals": {
-            "claims": 25,
+            "claims": 26,
             "decided": 0,
             "straight_through": 0,
             "sign_offs": 0,

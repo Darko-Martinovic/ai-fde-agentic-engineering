@@ -922,6 +922,42 @@
           ]
         },
         {
+          "name": "The security check's model",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/screening-model",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "screening-model"
+              ]
+            },
+            "description": "`get_screening_model`: the model the security check runs on, GPT-6 Luna with no reasoning, which no version changes."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const model = pm.response.json();",
+                  "pm.test(\"GPT-6 Luna with no reasoning\", () => pm.expect([model.model, model.reasoning_effort]).to.eql([\"openai/gpt-6-luna\", \"none\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Get version 1",
           "request": {
             "method": "GET",

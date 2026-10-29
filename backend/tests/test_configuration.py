@@ -1,6 +1,6 @@
 import pytest
 
-from backend import db
+from backend import db, seed
 from backend.seed import INSTRUCTIONS
 from backend.tests.new_versions import GEMINI, add_version
 from backend.tests.round_steps import a_round, evaluate
@@ -142,3 +142,25 @@ def test_a_version_shows_its_held_out_scores_once_a_round_has_evaluated_it(
     assert scored["held_out_accuracy"] == pytest.approx(held_out.accuracy)
     assert scored["held_out_grade"] == pytest.approx(held_out.grade)
     assert held_out.accuracy != evaluation.accuracy
+
+
+def test_the_security_check_runs_on_luna_with_no_reasoning(client):
+    chosen = client.get("/api/screening-model").json()
+    assert chosen == {
+        "model": "openai/gpt-6-luna",
+        "reasoning_effort": "none",
+        "provider": "openrouter",
+        "options": {"max_tokens": 16000, "reasoning_effort": "none"},
+    }
+
+
+def test_on_a_free_model_the_security_check_runs_on_it(client, monkeypatch):
+    monkeypatch.setenv("MODEL_NAME", "openrouter:openrouter/free")
+    seed.reset()
+    chosen = client.get("/api/screening-model").json()
+    assert chosen == {
+        "model": "openrouter/free",
+        "reasoning_effort": "default",
+        "provider": "openrouter",
+        "options": {},
+    }
