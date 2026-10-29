@@ -1,3 +1,5 @@
+import pytest
+from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool, QueuePool
 
 from backend import db
@@ -41,3 +43,41 @@ def test_an_empty_database_url_is_sqlite(monkeypatch):
 def test_a_postgres_url_gets_psycopg_whatever_its_scheme(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgres://someone:secret@db.example/x")
     assert db.postgres_url() == "postgresql+psycopg://someone:secret@db.example/x"
+
+
+POOLER = "postgresql+psycopg://undercover:secret@pooler.example:6543/postgres"
+
+
+@pytest.fixture
+def made(monkeypatch):
+    """What each engine is made with, in place of making one."""
+    calls = []
+
+    def record(url, **options):
+        calls.append(options)
+        return create_engine("sqlite://", poolclass=options.get("poolclass", NullPool))
+
+    monkeypatch.setattr(db, "create_engine", record)
+    db.engine_for.cache_clear()
+    yield calls
+    db.engine_for.cache_clear()
+
+
+def test_on_lambda_each_request_opens_its_own_connection_without_prepared_statements(
+    monkeypatch, made
+):
+    monkeypatch.setenv("AWS_LAMBDA_FUNCTION_NAME", "undercover-app")
+    db.engine_for(POOLER)
+    [options] = made
+    assert options["poolclass"] is NullPool
+    assert options["connect_args"]["prepare_threshold"] is None
+    assert options["connect_args"]["options"] == f"-c search_path={db.schema()}"
+
+
+def test_off_lambda_the_pool_is_as_before(monkeypatch, made):
+    monkeypatch.delenv("AWS_LAMBDA_FUNCTION_NAME", raising=False)
+    db.engine_for(POOLER)
+    [options] = made
+    assert "poolclass" not in options
+    assert "prepare_threshold" not in options["connect_args"]
+    assert options["pool_size"] == 4

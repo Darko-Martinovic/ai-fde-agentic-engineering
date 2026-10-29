@@ -5,7 +5,7 @@ import {
   loadSettings,
   optionalSetting,
   setting,
-} from "../settings/settings.config";
+} from "../settings/settings.config.ts";
 
 export default defineConfig(({ mode }) => {
   // Tests read the committed defaults alone, never a developer's .env.
@@ -31,6 +31,24 @@ export default defineConfig(({ mode }) => {
       port: Number(setting("DASHBOARD_PORT")),
       strictPort: true,
       proxy: { "/api": setting("UNDERCOVER_API") },
+    },
+    // `npm run build`: the libraries in chunks of their own, each under the
+    // size Vite warns about, so the browser keeps them cached across builds
+    build: {
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            groups: [
+              {
+                name: "react",
+                test: /node_modules\/(react|react-dom|scheduler)\//,
+              },
+              { name: "supabase", test: /node_modules\/@supabase\// },
+              { name: "libraries", test: /node_modules\// },
+            ],
+          },
+        },
+      },
     },
     test: {
       environment: "jsdom",

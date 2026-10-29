@@ -1,7 +1,18 @@
 import shutil
 
 import pytest
-from sqlalchemy import Column, Integer, MetaData, Table, delete, func, inspect, select
+from sqlalchemy import (
+    Column,
+    Integer,
+    MetaData,
+    Table,
+    create_engine,
+    delete,
+    func,
+    inspect,
+    select,
+)
+from sqlalchemy.pool import NullPool
 
 from backend import db, seed
 from backend.store import evaluations
@@ -130,3 +141,13 @@ def test_on_a_free_model_it_is_version_1_and_the_only_model_allowed(
         0,
         0,
     )
+
+
+def test_nothing_seeds_the_database_on_lambda(monkeypatch, tmp_path):
+    monkeypatch.setenv("AWS_LAMBDA_FUNCTION_NAME", "undercover-app")
+    empty = create_engine(f"sqlite:///{tmp_path / 'empty.db'}", poolclass=NullPool)
+    seed.ready.cache_clear()
+    seed.ready(empty)
+    seed.ready.cache_clear()
+    with empty.connect() as conn:
+        assert inspect(conn).get_table_names() == []

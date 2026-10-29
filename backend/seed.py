@@ -12,6 +12,7 @@ from sqlalchemy import Connection, Engine
 
 from backend import db
 from backend.free_model import free_model
+from backend.lambda_runtime import on_lambda
 from backend.settings_models import SettingsIn
 from backend.store import (
     claims,
@@ -174,7 +175,10 @@ def fresh(conn: Connection) -> str:
 @cache
 def ready(engine: Engine) -> None:
     """Seed the records the first time this process finds a database without
-    them, or without any claims, as after a seed that failed partway."""
+    them, or without any claims, as after a seed that failed partway. Nothing
+    seeds on Lambda, where the database is seeded already."""
+    if on_lambda():
+        return
     with engine.begin() as conn:
         if not db.has_tables(conn) or claims.count(conn) == 0:
             fresh(conn)
