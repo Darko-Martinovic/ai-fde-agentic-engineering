@@ -63,6 +63,7 @@ qdrant_data/
 customer_notes/
 week1day2_runs.json
 week1day4_runs.json
+week3day2_lab1_runs.json
 
 # Claims desks made by the Week 1 Day 5 labs
 labs/*_desk/
