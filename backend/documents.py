@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
 
 from backend.api import Db
+from backend.callers import AGENT, AGENT_OR_HANDLER, HANDLER
 from backend.models import DocumentName, Section, SectionTitle
 from backend.store import records
 
@@ -80,6 +81,7 @@ def title_of(section: Section) -> SectionTitle:
 @router.get(
     "/policy-wording",
     operation_id="get_policy_wording",
+    dependencies=[HANDLER],
     response_class=PlainTextResponse,
 )
 def get_policy_wording(conn: Db) -> str:
@@ -87,13 +89,13 @@ def get_policy_wording(conn: Db) -> str:
     return records.stored(conn, STORED["wording"])
 
 
-@router.get("/documents/sections", operation_id="list_sections")
+@router.get("/documents/sections", operation_id="list_sections", dependencies=[AGENT])
 def list_sections(conn: Db) -> list[SectionTitle]:
     """List the sections of the policy wording and the claims manual, by title."""
     return [title_of(s) for s in every_section(conn)]
 
 
-@router.get("/documents/search", operation_id="search_documents")
+@router.get("/documents/search", operation_id="search_documents", dependencies=[AGENT])
 def search_documents(query: str, conn: Db) -> list[SectionTitle]:
     """Find the sections of the wording and the manual that best match a query."""
     wanted = words(query)
@@ -103,7 +105,11 @@ def search_documents(query: str, conn: Db) -> list[SectionTitle]:
     return [title_of(s) for _, s in ranked[:SEARCH_RESULTS]]
 
 
-@router.get("/documents/{document}/sections/{number}", operation_id="read_section")
+@router.get(
+    "/documents/{document}/sections/{number}",
+    operation_id="read_section",
+    dependencies=[AGENT_OR_HANDLER],
+)
 def read_section(document: DocumentName, number: int, conn: Db) -> Section:
     """Read one section of the policy wording or the claims manual."""
     found = next((s for s in sections(conn, document) if s.number == number), None)

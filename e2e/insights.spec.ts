@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
+import { AS_THE_AGENT } from "./agent-key";
 import { startClaim } from "./claim-starts";
 
 // The agent's steps and decisions are recorded through the API, so no model is called.
@@ -11,11 +12,13 @@ async function agentWorks(
   await startClaim(request, claimId);
   for (const [kind, text] of steps) {
     const response = await request.post(`/api/claims/${claimId}/steps`, {
+      headers: AS_THE_AGENT,
       data: { thread_id: `${claimId}-e2e`, kind, text },
     });
     expect(response.ok()).toBe(true);
   }
   const response = await request.post(`/api/claims/${claimId}/decision`, {
+    headers: AS_THE_AGENT,
     data: {
       ...decision,
       reasons: "Set up by the end-to-end test.",

@@ -11,6 +11,7 @@ from sqlalchemy import Connection
 
 from backend import agent_service, spending
 from backend.api import Db, now
+from backend.callers import AGENT, HANDLER
 from backend.evaluation_views import load_evaluation
 from backend.round_models import RoundEvaluationIn
 from backend.round_views import require_open
@@ -88,7 +89,9 @@ def record_evaluation(
     return load_run(conn, run_id)
 
 
-@router.post("/runs/evaluations", operation_id="create_evaluation")
+@router.post(
+    "/runs/evaluations", operation_id="create_evaluation", dependencies=[AGENT]
+)
 def create_evaluation(start: EvaluationIn, conn: Db) -> Run:
     """Record a new evaluation, running, on the current version, with its copies."""
     return record_evaluation(conn, start, versions.current(conn), None)
@@ -136,7 +139,9 @@ def refuse_unless_affordable(
 
 
 @router.post(
-    "/runs/rounds/{round_id}/evaluations", operation_id="create_round_evaluation"
+    "/runs/rounds/{round_id}/evaluations",
+    operation_id="create_round_evaluation",
+    dependencies=[AGENT],
 )
 def create_round_evaluation(round_id: int, start: RoundEvaluationIn, conn: Db) -> Run:
     """Record a round's next evaluation of a whole set, at its agents at once."""
@@ -149,13 +154,15 @@ def create_round_evaluation(round_id: int, start: RoundEvaluationIn, conn: Db) -
     return record_evaluation(conn, evaluation, version, round_id)
 
 
-@router.get("/evaluations", operation_id="list_evaluations")
+@router.get("/evaluations", operation_id="list_evaluations", dependencies=[HANDLER])
 def list_evaluations(conn: Db) -> list[Evaluation]:
     """List every evaluation, newest first, with its measures."""
     return [load_evaluation(conn, run_id) for run_id in runs.of_kind(conn, EVALUATION)]
 
 
-@router.get("/evaluations/{run_id}", operation_id="get_evaluation")
+@router.get(
+    "/evaluations/{run_id}", operation_id="get_evaluation", dependencies=[HANDLER]
+)
 def get_evaluation(run_id: int, conn: Db) -> Evaluation:
     """Get one evaluation with its measures and its copies beside the handlers'."""
     return load_evaluation(conn, run_id)

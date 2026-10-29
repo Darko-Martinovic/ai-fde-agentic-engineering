@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
+import { AS_THE_AGENT } from "./agent-key";
 import { started } from "./stand-in";
 
 // The dispatch is played out through the API, as the agent's service and its
@@ -9,7 +10,10 @@ async function send(
   path: string,
   data: object,
 ) {
-  const response = await request[method](path, { data });
+  const response = await request[method](path, {
+    data,
+    headers: AS_THE_AGENT,
+  });
   expect(response.ok()).toBe(true);
   return (await response.json()) as { run_id: number };
 }

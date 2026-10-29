@@ -16,7 +16,9 @@ from langgraph.checkpoint.memory import InMemorySaver  # noqa: E402
 from agent import checkpoints  # noqa: E402
 from backend import auth, judge  # noqa: E402
 from backend.tests.judge_answers import B  # noqa: E402
-from backend.tests.sign_ins import Keys  # noqa: E402
+from backend.tests.sign_ins import AGENT_KEY, Keys  # noqa: E402
+
+os.environ["UNDERCOVER_API_KEY"] = AGENT_KEY
 
 
 @pytest.fixture(autouse=True)

@@ -10,6 +10,7 @@ from fastapi import APIRouter
 
 from backend import agent_service, diffs
 from backend.api import Db, found, transaction
+from backend.callers import HANDLER
 from backend.models import Handler
 from backend.round_models import (
     Improvement,
@@ -33,7 +34,7 @@ Stopper = Annotated[Handler, senior("stop a round of improvement")]
 Reviewer = Annotated[Handler, senior("review the improver's proposals")]
 
 
-@router.get("", operation_id="get_improvement")
+@router.get("", operation_id="get_improvement", dependencies=[HANDLER])
 def get_improvement(conn: Db) -> Improvement:
     """Get every round, newest first, and every version of the recipe."""
     return Improvement(
@@ -43,7 +44,7 @@ def get_improvement(conn: Db) -> Improvement:
     )
 
 
-@router.get("/recipes/{number}", operation_id="get_recipe")
+@router.get("/recipes/{number}", operation_id="get_recipe", dependencies=[HANDLER])
 def get_recipe(number: int, conn: Db) -> RecipeDetails:
     """Get one version of the recipe with what it changed from the one before."""
     row = found(rounds.recipe(conn, number), "Recipe", str(number))

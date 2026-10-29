@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from backend import agent_service, grading
 from backend.api import Db, found, now, transaction
+from backend.callers import AGENT, HANDLER
 from backend.round_views import cut_short
 from backend.run_models import (
     DISPATCH,
@@ -48,7 +49,7 @@ def stop_run() -> Stopping:
     return Stopping.model_validate(agent_service.stop_run())
 
 
-@router.post("/runs/dispatches", operation_id="create_dispatch")
+@router.post("/runs/dispatches", operation_id="create_dispatch", dependencies=[AGENT])
 def create_dispatch(dispatch: DispatchIn, conn: Db) -> Run:
     """Record a new dispatch, running, with N claim agents on the current version."""
     started = (
@@ -59,7 +60,9 @@ def create_dispatch(dispatch: DispatchIn, conn: Db) -> Run:
     return load_run(conn, runs.add(conn, started))
 
 
-@router.put("/runs/{run_id}/claims", operation_id="record_run_claims")
+@router.put(
+    "/runs/{run_id}/claims", operation_id="record_run_claims", dependencies=[AGENT]
+)
 def record_run_claims(run_id: int, listed: RunClaimsIn, conn: Db) -> Run:
     """Record the claims a running dispatch works, in the order it takes them."""
     if require_running(conn, run_id).kind != DISPATCH:
@@ -72,7 +75,7 @@ def record_run_claims(run_id: int, listed: RunClaimsIn, conn: Db) -> Run:
     return load_run(conn, run_id)
 
 
-@router.post("/runs/{run_id}/finish", operation_id="finish_run")
+@router.post("/runs/{run_id}/finish", operation_id="finish_run", dependencies=[AGENT])
 def finish_run(run_id: int, finish: FinishIn) -> Run:
     """Finish a running run, grading an evaluation, or mark it stopped, as an
     evaluation its round cut short is."""
@@ -93,13 +96,15 @@ def finish_run(run_id: int, finish: FinishIn) -> Run:
         return load_run(conn, run_id)
 
 
-@router.post("/runs/stop-all", operation_id="stop_runs")
+@router.post("/runs/stop-all", operation_id="stop_runs", dependencies=[AGENT])
 def stop_runs(conn: Db) -> Stopped:
     """Mark every run still running as stopped, as when the agent's service starts."""
     return Stopped(run_ids=runs.stop_running(conn, now()))
 
 
-@router.get("/dispatches/latest", operation_id="get_latest_dispatch")
+@router.get(
+    "/dispatches/latest", operation_id="get_latest_dispatch", dependencies=[HANDLER]
+)
 def get_latest_dispatch(conn: Db) -> Run | None:
     """Get the newest dispatch with its claims, cost and time, or nothing yet."""
     run_id = runs.latest(conn, DISPATCH)

@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
+import { AS_THE_AGENT } from "./agent-key";
 import { SIGNED_IN } from "./signed-in";
 import { started } from "./stand-in";
 
@@ -16,7 +17,10 @@ const CHANGE = {
 const SETS = ["evaluation", "held_out", "held_out"];
 
 async function send(request: APIRequestContext, path: string, data = {}) {
-  const response = await request.post(path, { data });
+  const response = await request.post(path, {
+    data,
+    headers: AS_THE_AGENT,
+  });
   expect(response.ok(), await response.text()).toBe(true);
   return (await response.json()) as Record<string, unknown>;
 }
@@ -53,6 +57,7 @@ let roundId = 0;
 test.afterAll(async ({ request }) => {
   if (roundId === 0) return;
   await request.post(`/api/rounds/${String(roundId)}/finish`, {
+    headers: AS_THE_AGENT,
     data: { stopped: true, reason: "The end-to-end test is done with it" },
   });
 });

@@ -10,6 +10,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
 from agent import api, connection, dispatcher, graph
 from backend import agent_service
 from backend.main import app
+from backend.tests.sign_ins import both_sides
 
 
 @pytest.fixture(autouse=True)
@@ -21,7 +22,7 @@ def backend(tmp_path, monkeypatch):
     monkeypatch.setattr(connection, "client", lambda: TestClient(app))
     monkeypatch.setattr(graph, "RETRY_DELAY", 0)
     monkeypatch.setattr(agent_service, "resume_claim", lambda claim_id: None)
-    return TestClient(app)
+    return TestClient(app, headers=both_sides())
 
 
 @pytest.fixture(autouse=True)

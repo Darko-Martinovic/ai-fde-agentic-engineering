@@ -174,19 +174,19 @@ def test_an_approval_on_the_dashboard_goes_to_the_service(client, asked):
     ],
 )
 def test_a_handler_who_cant_sign_off_over_the_limit_cant_steer_rounds(
-    client, asked, path, body, action
+    agent_client, asked, path, body, action
 ):
-    round_id = a_round(client)
-    propose(client, round_id)
-    assert client.post(path, json=body).status_code == 401
-    refused = client.post(path, json=body, headers=headers(MARCUS))
+    round_id = a_round(agent_client)
+    propose(agent_client, round_id)
+    assert agent_client.post(path, json=body).status_code == 401
+    refused = agent_client.post(path, json=body, headers=headers(MARCUS))
     assert refused.status_code == 403
     assert refused.json()["detail"] == (
         f"Only a handler who can sign off payouts over $1,000.00 can {action}."
         " Marcus Oyelaran can't."
     )
     assert asked == []
-    assert client.get(f"/api/rounds/{round_id}").json()["status"] == "open"
+    assert agent_client.get(f"/api/rounds/{round_id}").json()["status"] == "open"
 
 
 def test_a_start_on_the_dashboard_is_refused_while_a_round_is_open(client, asked):

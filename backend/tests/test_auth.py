@@ -104,8 +104,8 @@ def test_a_signed_in_handler_is_found_by_their_email(client):
         "unsigned",
     ],
 )
-def test_without_a_valid_token_nobody_is_signed_in(client, sent):
-    refused = client.get("/api/me", headers=sent)
+def test_without_a_valid_token_nobody_is_signed_in(agent_client, sent):
+    refused = agent_client.get("/api/me", headers=sent)
     assert (refused.status_code, refused.json()["detail"]) == (
         401,
         "Sign in as a handler first",
@@ -149,7 +149,7 @@ def test_the_keys_are_fetched_from_the_supabase_project(monkeypatch):
 
 
 def test_every_handler_action_needs_a_sign_in_and_does_nothing_without(
-    client, resumed, monkeypatch
+    client, agent_client, resumed, monkeypatch
 ):
     asked = []
 
@@ -162,7 +162,7 @@ def test_every_handler_action_needs_a_sign_in_and_does_nothing_without(
     referred(client, "CLM-1010")
     before = client.get("/api/claims").json()
     for path, body in HANDLER_ACTIONS:
-        assert client.post(path, json=body).status_code == 401, path
+        assert agent_client.post(path, json=body).status_code == 401, path
     assert client.get("/api/claims").json() == before
     assert (asked, resumed) == ([], [])
 

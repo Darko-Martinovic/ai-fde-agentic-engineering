@@ -8,10 +8,11 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import Connection
 
 from backend.api import Db, found, load_claim, now
+from backend.callers import AGENT
 from backend.store import runs, usage
 from backend.usage_models import ModelCall, ModelCallIn, WorkTime, WorkTimeIn
 
-router = APIRouter(prefix="/api/claims/{claim_id}")
+router = APIRouter(prefix="/api/claims/{claim_id}", dependencies=[AGENT])
 
 
 def require_started(conn: Connection, claim_id: str) -> None:

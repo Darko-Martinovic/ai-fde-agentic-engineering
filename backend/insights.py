@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy import Connection, RowMapping
 
 from backend.api import Db
+from backend.callers import HANDLER
 from backend.models import FOR_A_HANDLER, ClaimStatus, DecisionKind
 from backend.store import claims, steps
 
@@ -220,7 +221,7 @@ def totals(records: Records, work: list[ClaimWork]) -> Totals:
     )
 
 
-@router.get("", operation_id="get_insights")
+@router.get("", operation_id="get_insights", dependencies=[HANDLER])
 def get_insights(conn: Db) -> Insights:
     """Sum up the agent's work on the queue: outcomes, time, tools and money."""
     records = Records.load(conn)
