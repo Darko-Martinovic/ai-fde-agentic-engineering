@@ -207,3 +207,4 @@ My contributions to Ed's repo, in `community_contributions/Darko-Martinovic/`:
 | [#67](https://github.com/ed-donner/undercover/pull/67) | Week 2 Day 4 | The swarm, with a graceful Stop and a model choice (`SWARM.md`) |
 | [#63](https://github.com/ed-donner/undercover/pull/63) | Week 2 Day 5 | Challenge: the short policy wording as a lever |
 | [#69](https://github.com/ed-donner/undercover/pull/69) | Week 2 Day 5 | The improver, with handlers who sign in and a rejection kept (`IMPROVE.md`) |
+| [#74](https://github.com/ed-donner/undercover/pull/74) | Week 3 Day 2 | Challenge: a payout check on what comes out of the model |
