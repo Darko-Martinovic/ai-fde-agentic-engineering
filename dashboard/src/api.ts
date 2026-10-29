@@ -118,7 +118,7 @@ export const api = {
     getJson<Step[]>(`/api/claims/${id}/steps`, signal),
   getPolicy: (id: string, signal?: AbortSignal) =>
     getJson<Policy>(`/api/policies/${id}`, signal),
-  getCustomer: (id: string, signal?: AbortSignal) =>
+  getClaimHistory: (id: string, signal?: AbortSignal) =>
     getJson<Customer>(`/api/customers/${id}`, signal),
   listHandlers: (signal?: AbortSignal) =>
     getJson<HandlerName[]>("/api/handlers", signal),

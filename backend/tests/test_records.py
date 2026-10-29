@@ -45,7 +45,7 @@ def test_get_policy_with_an_add_on(client):
     assert add_on["electronics_per_item_limit"] == 1200.0
 
 
-def test_get_customer(client):
+def test_get_claim_history(client):
     customer = client.get("/api/customers/CUS-3001").json()
     assert customer["name"] == "Maya Patel"
     assert [c["claim_id"] for c in customer["previous_claims"]] == ["CLM-0412"]
@@ -81,11 +81,12 @@ def test_operations_are_documented(client):
         "get_claim",
         "calculate_payout",
         "get_policy",
-        "get_customer",
+        "get_claim_history",
         "get_signed_in_handler",
         "get_policy_wording",
         "get_current_version",
         "get_screening_model",
+        "get_agent_document",
         "get_version",
         "get_configuration",
         "get_version_details",
@@ -100,7 +101,7 @@ def test_operations_are_documented(client):
         "record_work_time",
         "record_step",
         "list_steps",
-        "decide_claim",
+        "record_decision",
         "pay_claim",
         "review_payout",
         "decide_as_handler",

@@ -28,7 +28,7 @@ def test_work_claim_approves_and_the_graph_pays(backend, run, memory_saver):
     llm = stub(
         tool_call("get_claim"),
         tool_call("get_policy", policy_id="POL-2001"),
-        tool_call("get_customer", customer_id="CUS-3001"),
+        tool_call("get_claim_history", customer_id="CUS-3001"),
         decide("approve", 420.0),
     )
     report = harness.work_claim("CLM-1001", run, FREE, memory_saver, llm)
@@ -50,7 +50,7 @@ def test_work_claim_approves_and_the_graph_pays(backend, run, memory_saver):
 def test_a_tool_cannot_reach_another_claim(backend, run, memory_saver):
     """The claim comes from the run's context: a claim the model names is ignored."""
     elsewhere = tool_call(
-        "decide_claim",
+        "record_decision",
         claim_id="CLM-1001",
         decision="decline",
         payout=0,

@@ -70,7 +70,7 @@ def test_a_claim_named_is_a_trace_of_its_own(backend, monkeypatch, traces):
     generations = [s for s in spans if s.attributes[TYPE] == "generation"]
     assert len(generations) == 3  # the security check's, then the claim agent's two
     tools = [s.name for s in spans if s.attributes[TYPE] == "tool"]
-    assert tools == ["get_claim", "decide_claim"]
+    assert tools == ["get_claim", "record_decision"]
     assert {"agent", "tools", "pay"} <= {span.name for span in spans}
 
 

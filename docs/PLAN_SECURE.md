@@ -31,6 +31,7 @@ The student accepted every recommendation below on 2026-10-29.
 | The rejection with a note | Keep it: the claim graph still pauses for a held payout, so a handler can reject it with a note and the agent decides again. A sign-off now pays in the backend, and the resume after it ends the graph without paying | It's our addition since Week 2 Day 3, and the brief's step 3.6 expects a pause and a resume after the sign-off. The AGENT_GUIDE says Ed's build takes the pause out, because his build has no rejection |
 | The key | `secrets.token_hex(32)` (64 letters and digits), written into `.env` without printing it | The brief allows any random value of 32 characters or more, and the course guide says letters and digits are safest for AgentCore Identity on Day 2's Lab 2 |
 | Where the check's instructions live | In the agent, in a module of its own (`agent/screening.py`), with the lab's instructions and its two fields word for word. The backend names the check's model (`get_screening_model`) | The brief's step 2.8 keeps the check outside the versioned configuration, and the improver only changes versions. `MODEL_NAME` stays in `backend/free_model.py` alone (2.2) |
+| A payment over a limit lowered after its decision | Refused, as the brief's limit-first check asks, and recorded in STATUS's known gaps | The check comes before the claim is looked at, so it can't use the limit the decision was held to. It takes a restart between an approval and its payment, and a lower limit in between, which a handler can't then pay |
 | The full API document | `/openapi.json` and `/docs` stay open, as today | The brief doesn't ask to close them. They describe the routes and hold no data, and every route that holds data checks the key or the sign-in |
 
 ## Design
@@ -41,7 +42,7 @@ New:
 
 - `backend/agent_key.py`: the agent's key. FastAPI's `APIKeyHeader(KEY_HEADER, auto_error=False)` reads the `X-API-Key` header, and `secrets.compare_digest` compares it with `UNDERCOVER_API_KEY` (`is_agent`); `agent_key` refuses with a 401 ("This route needs the agent's key") unless the key is right. With no key set, every key is wrong.
 - `backend/callers.py`: who may call a route, as dependencies: `AGENT` (the key), `HANDLER` (a signed-in handler) and `AGENT_OR_HANDLER` (either). FastAPI has no dependency for one of two, so `agent_or_handler` calls the sign-in's own two in turn when the key isn't there.
-- `backend/agent_document.py`: the router for `GET /api/agent/openapi.json`. FastAPI's `get_openapi` over the app's routes whose `operation_id` is one of the eight, with no `servers` and no security schemes, so the Gateway sees no key input. It needs the key or a signed-in handler.
+- `backend/agent_document.py`: the router for `GET /api/agent/openapi.json`. Cut from the app's own document (`app.openapi()`): the paths of the eight operations, each without its `security`, and the schemas they refer to, with no `servers` and no security schemes, so the Gateway sees no key input. It needs the key or a signed-in handler.
 - `backend/dashboard_files.py`: serves the built dashboard when `dashboard/dist` exists: a file at its own path, `index.html` for any other path outside `/api/`, and the backend's usual JSON 404 for an unknown `/api/` path. A route outside the schema, added last, so every API route comes first.
 - `backend/lambda_runtime.py`: whether the backend runs on Lambda (`AWS_LAMBDA_FUNCTION_NAME` set), which `db.py` and `seed.py` ask.
 - `agent/screening.py`: the check for hidden instructions, in the lab's style: its instructions and `Screening` (reason first, then `instructions_found`) from `labs/week3day2_lab1.ipynb`, the customer's fields of a claim, and `screen_claim`, which asks the model with Structured Outputs (`include_raw=True`, for each call's cost) up to three times until it gets an answer it can read.
@@ -94,7 +95,7 @@ The node takes the claim as the claim agent's `get_claim` gives it (a copy reads
 
 - One way to each service (7, 15): the key is added in `agent/connection.py` alone and checked in `backend/agent_key.py` alone. `MODEL_NAME` stays in `backend/free_model.py`, and the check's model reaches the agent through `agent/api.py`'s `get_screening_model`.
 - One job a module (8, 11): the key, the agent's document, the dashboard's files and the check each get a module of their own. The graph's new node calls `screening.py` and `recording.py`, as its other nodes do.
-- The framework's own way (10): `APIKeyHeader` for the key, `get_openapi` for the document, Mangum for Lambda, `with_structured_output(include_raw=True)` for the check, a LangGraph node for running it once, `NullPool` for Lambda.
+- The framework's own way (10): `APIKeyHeader` for the key, the app's own document (FastAPI's `app.openapi()`, which `get_openapi` builds) for the agent's document, cut to the eight operations and the schemas they refer to, since FastAPI 0.141 keeps an included router's routes inside it, out of reach of a filter before `get_openapi`, Mangum for Lambda, `with_structured_output(include_raw=True)` for the check, a LangGraph node for running it once, `NullPool` for Lambda.
 - `main.py` only puts the app together (17): the new routes live in their routers, and `handler` is one line.
 - Configuration (22): `SCREEN_MODEL`, `SCREEN_REASONING_EFFORT` and `E2E_API_KEY` in `settings/.env.defaults`, the key in `.env`.
 - Instructions as goals (14): the claim agent's instructions don't change. The check's instructions are the lab's, which say what to look for, not steps.
@@ -133,14 +134,14 @@ Tests run with a key the root `conftest.py` sets for the test run, and none read
 
 ## Phase 3: The agent's own API, and a sign-off that pays
 
-- [ ] The renames: `record_decision` and `get_claim_history` everywhere (backend, `agent/api.py`, the claim agent's tools, `api.ts`, Postman, tests). `tests/test_standards.py` and `dashboard/src/standards.test.ts` still pass.
-- [ ] `GET /api/agent/openapi.json` returns exactly the eight operations, with their operation ids and docstrings, no `servers` and no key parameter; it needs the key or a signed-in handler. Tests check the set of operations, the missing `servers`, the missing key input and `amount` on the payment.
-- [ ] `pay_claim` refuses any amount over the approval limit with a 403 naming the limit, before it looks at the claim; a test pays $4,800 on CLM-1901, which was never approved, and gets the limit's 403.
-- [ ] A sign-off pays the claim: the payment records the handler and the time of the sign-off, the claim is decided, and nothing in the agent pays it again. Tests: a sign-off that pays once; a repeat of the sign-off refused; an agent resumed after a sign-off that makes no payment call and ends.
-- [ ] The rejection with a note works as before; its tests still pass.
-- [ ] The e2e sign-off test expects the claim paid at once.
-- [ ] `npm run check` is green.
-- [ ] Reviewed by a fresh subagent; findings fixed.
+- [x] The renames: `record_decision` and `get_claim_history` everywhere (backend, `agent/api.py`, the claim agent's tools, `api.ts`, Postman, tests). `tests/test_standards.py` and `dashboard/src/standards.test.ts` still pass.
+- [x] `GET /api/agent/openapi.json` returns exactly the eight operations, with their operation ids and docstrings, no `servers` and no key parameter; it needs the key or a signed-in handler. Tests check the set of operations, the missing `servers`, the missing key input and `amount` on the payment.
+- [x] `pay_claim` refuses any amount over the approval limit with a 403 naming the limit, before it looks at the claim; a test pays $4,800 on CLM-1901, which was never approved, and gets the limit's 403.
+- [x] A sign-off pays the claim: the payment records the handler and the time of the sign-off, the claim is decided, and nothing in the agent pays it again. Tests: a sign-off that pays once; a repeat of the sign-off refused; an agent resumed after a sign-off that makes no payment call and ends.
+- [x] The rejection with a note works as before; its tests still pass.
+- [x] The e2e sign-off test expects the claim paid at once.
+- [x] `npm run check` is green.
+- [x] Reviewed by a fresh subagent; findings fixed: the test of the resume after a sign-off now fails if the agent pays; the lowered-limit edge recorded as a decision and a known gap; the sign-off described as paying in `CLAUDE.md`, `README.md`, STATUS and the service; why the document is cut from the app's own; `pay_claim`'s one-line docstring and no dead branch; `DECIDED` named once. Not taken: a race test for two sign-offs at once (the claim's revision lets one through, as for the agent's moves), and refusing a repeat resume of a finished thread, which does nothing.
 
 ## Phase 4: Ready for Lambda
 

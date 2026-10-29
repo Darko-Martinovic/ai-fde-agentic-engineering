@@ -41,7 +41,7 @@ def worked(client):
         [
             (0, "tool_call", 'get_claim {"claim_id": "CLM-1001"}'),
             (2, "tool_result", "{}"),
-            (4, "tool_call", 'decide_claim {"claim_id": "CLM-1001"}'),
+            (4, "tool_call", 'record_decision {"claim_id": "CLM-1001"}'),
             (6, "tool_result", "{}"),
             (8, "tool_call", 'pay_claim {"claim_id": "CLM-1001"}'),
             (9, "tool_result", "{}"),
@@ -52,7 +52,7 @@ def worked(client):
         "CLM-1002",
         "CLM-1002-a",
         [
-            (0, "tool_call", 'decide_claim {"claim_id": "CLM-1002"}'),
+            (0, "tool_call", 'record_decision {"claim_id": "CLM-1002"}'),
             (1, "tool_result", "{}"),
             (2, "tool_call", 'pay_claim {"claim_id": "CLM-1002"}'),
             (4, "tool_result", REFUSAL),
@@ -120,7 +120,7 @@ def test_decisions_by_type(worked):
 
 def test_tools_and_refusals(worked):
     assert worked["tools"] == [
-        {"tool": "decide_claim", "calls": 2, "refused": 0},
+        {"tool": "record_decision", "calls": 2, "refused": 0},
         {"tool": "pay_claim", "calls": 2, "refused": 1},
         {"tool": "get_claim", "calls": 1, "refused": 0},
     ]

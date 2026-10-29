@@ -28,7 +28,7 @@ from agent import (
     versions,
 )
 from agent.connection import Refused, require_key
-from agent.reports import IN_PROGRESS
+from agent.reports import DECIDED, IN_PROGRESS
 from agent.run_lock import RunLock
 from agent.service_models import (
     Accepted,
@@ -52,6 +52,8 @@ Carrier = Callable[[str], str]
 Savers = Callable[[], BaseCheckpointSaver[Any]]
 
 NOTHING_RUNNING = "No dispatch or evaluation is running"
+# Where a claim stands when the service picks it up after a handler's review
+RESUMES_FROM = {"rejected": IN_PROGRESS, "signed_off": DECIDED}
 
 
 # One run or round at a time; a handler's request to stop a run; and the claims
@@ -91,7 +93,8 @@ def in_background(work: Callable[..., None], *args: Any) -> None:
 
 def carrier(new_saver: Annotated[Savers, Depends(savers)]) -> Carrier:
     """Carry claims on as the current version, outside any run, so a run's costs
-    are its own. A signed-off claim is only paid, so its model makes no call."""
+    are its own. A signed-off claim, which the sign-off paid, only finishes, so
+    its model makes no call."""
     return lambda claim_id: harness.carry_on(
         claim_id, None, harness.current_version(), new_saver()
     )
@@ -252,17 +255,19 @@ def resume_claim(
     claim_id: str,
     carry: Annotated[Carrier, Depends(carrier)],
 ) -> Accepted:
-    """Pick a claim back up after a handler's review."""
+    """Pick a claim back up after a handler's review: after a rejection the agent
+    decides again, and after a sign-off, which paid the claim, it finishes."""
     try:
         claim = api.get_claim(claim_id)
     except Refused as refused:
         raise HTTPException(refused.status, refused.detail) from refused
-    if claim["status"] != IN_PROGRESS:
-        raise HTTPException(
-            409, f"Claim {claim_id} is {claim['status']}, not in_progress"
-        )
-    if not claim["decisions"] or claim["decisions"][-1]["review"] is None:
+    review = claim["decisions"][-1]["review"] if claim["decisions"] else None
+    if review is None:
         raise HTTPException(409, f"Claim {claim_id} has no handler's review")
+    if claim["status"] != RESUMES_FROM[review]:
+        raise HTTPException(
+            409, f"Claim {claim_id} is {claim['status']} after its review"
+        )
     if claim_id in RESUMING:
         raise HTTPException(409, f"Claim {claim_id} is being picked up already")
     RESUMING.add(claim_id)

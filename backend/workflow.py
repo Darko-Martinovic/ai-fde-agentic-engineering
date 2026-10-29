@@ -31,6 +31,8 @@ router = APIRouter(prefix="/api/claims/{claim_id}")
 
 # A claim that fails this many times is left for a handler
 MAX_FAILURES = 2
+# The agent can never pay more than the approval limit: only a sign-off does
+OVER_THE_LIMIT = "A payment over ${limit:,.2f} needs a handler's sign-off"
 
 
 @router.post("/start", operation_id="start_claim", dependencies=[AGENT])
@@ -108,8 +110,8 @@ def repeated_decision(claim: Claim, decision: DecisionIn) -> Claim:
     return claim
 
 
-@router.post("/decision", operation_id="decide_claim", dependencies=[AGENT])
-def decide_claim(claim_id: str, decision: DecisionIn, conn: Db) -> Claim:
+@router.post("/decision", operation_id="record_decision", dependencies=[AGENT])
+def record_decision(claim_id: str, decision: DecisionIn, conn: Db) -> Claim:
     """Approve, decline or refer a claim in progress, with the payout and reasons."""
     seen = found(claims.revision(conn, claim_id), "Claim", claim_id)
     claim = load_claim(conn, claim_id)
@@ -128,8 +130,8 @@ def decide_claim(claim_id: str, decision: DecisionIn, conn: Db) -> Claim:
 
 @router.post("/payment", operation_id="pay_claim", dependencies=[AGENT])
 def pay_claim(claim_id: str, payment: PaymentIn, conn: Db) -> Claim:
-    """Pay an approved claim its payout, once a handler has signed it off if it
-    needs that. A payment already made, as after a restart, is done."""
+    """Pay an approved claim its payout, up to the approval limit, once only."""
+    refuse_over_the_limit(conn, payment.amount)
     seen = found(claims.revision(conn, claim_id), "Claim", claim_id)
     claim = load_claim(conn, claim_id)
     approval = claim.decisions[-1] if claim.decisions else None
@@ -144,11 +146,17 @@ def pay_claim(claim_id: str, payment: PaymentIn, conn: Db) -> Claim:
         raise HTTPException(409, f"The approved payout is ${approval.payout:,.2f}")
     if not claims.move(conn, claim_id, seen, "decided"):
         return repeated_payment(load_claim(conn, claim_id), payment)
-    signed_off = approval.reviewed_at.isoformat() if approval.reviewed_at else None
-    add_payment(
-        conn, claim_id, approval.payout, approval.reviewed_by or "agent", signed_off
-    )
+    # A sign-off pays the claim itself, so only the agent pays here
+    add_payment(conn, claim_id, approval.payout, "agent", None)
     return load_claim(conn, claim_id)
+
+
+def refuse_over_the_limit(conn: Connection, amount: float) -> None:
+    """Refuse a payment over the approval limit, whatever the claim, with a 403
+    that names the limit: only a handler's sign-off pays one."""
+    limit = approval_limit(conn)
+    if round(amount, 2) > limit:
+        raise HTTPException(403, OVER_THE_LIMIT.format(limit=limit))
 
 
 def repeated_payment(claim: Claim, payment: PaymentIn) -> Claim:

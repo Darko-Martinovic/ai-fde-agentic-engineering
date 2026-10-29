@@ -64,7 +64,7 @@ function ClaimView({
   );
   const customer = usePoll(
     useCallback(
-      (signal: AbortSignal) => api.getCustomer(customerId, signal),
+      (signal: AbortSignal) => api.getClaimHistory(customerId, signal),
       [customerId],
     ),
     null,

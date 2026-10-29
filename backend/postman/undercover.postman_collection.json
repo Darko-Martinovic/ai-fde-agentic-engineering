@@ -473,7 +473,7 @@
           ]
         },
         {
-          "name": "Get customer",
+          "name": "Get the claim history",
           "request": {
             "method": "GET",
             "header": [
@@ -493,7 +493,7 @@
                 "{{customerId}}"
               ]
             },
-            "description": "`get_customer`: one customer with their claim history."
+            "description": "`get_claim_history`: one customer with their claim history."
           },
           "event": [
             {
@@ -868,6 +868,45 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"status is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The claim agent's API document",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent/openapi.json",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "agent",
+                "openapi.json"
+              ]
+            },
+            "description": "`get_agent_document`: the OpenAPI document of the claim agent's eight operations, for the AgentCore Gateway, with no servers."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const document = pm.response.json();",
+                  "const operations = Object.values(document.paths).flatMap((methods) => Object.values(methods).map((operation) => operation.operationId)).sort();",
+                  "pm.test(\"the eight operations\", () => pm.expect(operations).to.eql([\"calculate_payout\", \"get_claim\", \"get_claim_history\", \"get_policy\", \"pay_claim\", \"read_section\", \"record_decision\", \"search_documents\"]));",
+                  "pm.test(\"no servers\", () => pm.expect(document.servers).to.be.undefined);"
                 ]
               }
             }
@@ -1461,7 +1500,7 @@
                 "decision"
               ]
             },
-            "description": "`decide_claim`: an approval at or under $1,000 stays in progress until it is paid.",
+            "description": "`record_decision`: an approval at or under $1,000 stays in progress until it is paid.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"decision\": \"approve\",\n  \"payout\": 420,\n  \"reasons\": \"The agent's reasons, in two or three sentences.\",\n  \"policy_section\": \"Section 3, Trip Delay\"\n}"
@@ -1646,7 +1685,7 @@
                 "decision"
               ]
             },
-            "description": "`decide_claim`: the same decision again, as after a restart, is done: it returns the claim with one decision.",
+            "description": "`record_decision`: the same decision again, as after a restart, is done: it returns the claim with one decision.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"decision\": \"approve\",\n  \"payout\": 420,\n  \"reasons\": \"The agent's reasons, in two or three sentences.\",\n  \"policy_section\": \"Section 3, Trip Delay\"\n}"
@@ -1776,7 +1815,7 @@
                 "decision"
               ]
             },
-            "description": "`decide_claim`: an approval over $1,000 waits for sign-off.",
+            "description": "`record_decision`: an approval over $1,000 waits for sign-off.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"decision\": \"approve\",\n  \"payout\": 1150,\n  \"reasons\": \"The agent's reasons, in two or three sentences.\",\n  \"policy_section\": \"Section 5, Baggage and Personal Effects\"\n}"
@@ -1822,7 +1861,7 @@
                 "payment"
               ]
             },
-            "description": "`pay_claim` is refused over $1,000, even if the agent tries.",
+            "description": "`pay_claim` is refused over $1,000 with a 403, before the claim is looked at, even if the agent tries.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"amount\": 1150\n}"
@@ -1834,8 +1873,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"status is 409\", () => pm.response.to.have.status(409));",
-                  "pm.test(\"refused\", () => pm.expect(pm.response.json().detail).to.eql(\"A payout over $1,000.00 waits for a handler's sign-off\"));"
+                  "pm.test(\"status is 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"names the limit\", () => pm.expect(pm.response.json().detail).to.eql(\"A payment over $1,000.00 needs a handler's sign-off\"));"
                 ]
               }
             }
@@ -1956,7 +1995,7 @@
                 "review"
               ]
             },
-            "description": "`review_payout`: a handler signs off the held payout. The claim goes back in progress for the agent to pay, and the backend asks the agent's service to pick it up.",
+            "description": "`review_payout`: a handler signs off the held payout, which pays it: the claim is decided, and the payment records who signed it off and when.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"approved\": true,\n  \"note\": \"\"\n}"
@@ -1970,15 +2009,15 @@
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "const claim = pm.response.json();",
-                  "pm.test(\"back in progress for the agent\", () => pm.expect([\"in_progress\", \"decided\"]).to.include(claim.status));",
-                  "pm.test(\"signed off by Dana Whitfield\", () => { const d = claim.decisions[claim.decisions.length - 1]; pm.expect(d.review).to.eql(\"signed_off\"); pm.expect(d.reviewed_by).to.eql(\"HND-01\"); });"
+                  "pm.test(\"paid and decided\", () => pm.expect([claim.status, claim.payment.amount]).to.eql([\"decided\", 1150]));",
+                  "pm.test(\"signed off by Dana\", () => pm.expect(claim.payment.authorized_by).to.eql(\"HND-01\"));"
                 ]
               }
             }
           ]
         },
         {
-          "name": "Pay CLM-1002 after the sign-off",
+          "name": "Pay CLM-1002 again after the sign-off",
           "request": {
             "method": "POST",
             "header": [
@@ -2003,7 +2042,7 @@
                 "payment"
               ]
             },
-            "description": "`pay_claim`: the agent pays the signed-off payout, and the payment records the sign-off. If the agent's service paid it first, the same payment is a repeat and returns the claim.",
+            "description": "`pay_claim`: still refused over the limit after the sign-off, which paid the claim already.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"amount\": 1150\n}"
@@ -2015,10 +2054,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
-                  "const claim = pm.response.json();",
-                  "pm.test(\"claim is decided\", () => pm.expect(claim.status).to.eql(\"decided\"));",
-                  "pm.test(\"authorized by Dana Whitfield, with the sign-off's time\", () => { pm.expect(claim.payment.authorized_by).to.eql(\"HND-01\"); pm.expect(claim.payment.signed_off_at).to.be.a(\"string\"); });"
+                  "pm.test(\"status is 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"names the limit\", () => pm.expect(pm.response.json().detail).to.eql(\"A payment over $1,000.00 needs a handler's sign-off\"));"
                 ]
               }
             }
@@ -2096,7 +2133,7 @@
                 "decision"
               ]
             },
-            "description": "`decide_claim`: a referral waits for a handler.",
+            "description": "`record_decision`: a referral waits for a handler.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"decision\": \"refer\",\n  \"payout\": 0,\n  \"reasons\": \"The agent's reasons, in two or three sentences.\",\n  \"policy_section\": \"Section 7, Emergency Medical\"\n}"

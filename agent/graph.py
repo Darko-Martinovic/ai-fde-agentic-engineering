@@ -1,9 +1,10 @@
 """The claim agent as a LangGraph graph of our own, as in labs/week2day3.ipynb:
 its state, its nodes and its edges. A security check reads the claim first and
 refers one that tries to instruct whoever handles it; otherwise the agent works
-the claim with its tools, and the graph pays an approval, straight after the
-decision or after a handler's sign-off, which it waits for with interrupt()
-when the backend says a claim needs one. Its nodes record each step and each
+the claim with its tools, and the graph pays an approval the backend can pay at
+once, or waits with interrupt() for a handler's review of one held for
+sign-off: the sign-off pays it in the backend, and a rejection comes back to
+the agent. Its nodes record each step and each
 model call on the claim."""
 
 import time
@@ -89,7 +90,7 @@ def screen(
     recording.check(context, found.instructions_found, found.reason)
     if not found.instructions_found:
         return {}
-    referred = api.decide_claim(
+    referred = api.record_decision(
         context.claim_id,
         {
             "decision": "refer",
@@ -152,14 +153,15 @@ def record_result(
 
 def wait_for_sign_off(state: ClaimState) -> Command[Any]:
     """Wait for a handler's review of the held payout, which the graph is resumed
-    with: a sign-off goes on to the payment, and a rejection takes the handler's
-    note back to the agent, which decides again. Nothing comes before the
-    interrupt, as a resumed node runs again from the top."""
+    with: a sign-off ends the work, as the backend paid the claim when it was
+    signed off, and a rejection takes the handler's note back to the agent,
+    which decides again. Nothing comes before the interrupt, as a resumed node
+    runs again from the top."""
     review = interrupt(
         {"decision": state.get("decision"), "status": state.get("status")}
     )
     if review["approved"]:
-        return Command(goto="pay")
+        return Command(goto=END)
     note = HumanMessage(f"A handler rejected the payout: {review['note']}")
     # The agent works the claim again with a fresh allowance of model calls
     return Command(
@@ -238,7 +240,7 @@ def claim_graph(
         ToolNode(CLAIM_TOOLS, handle_tool_errors=refusal, wrap_tool_call=record_result),
     )
     builder.add_node(
-        "wait_for_sign_off", wait_for_sign_off, destinations=("pay", "agent")
+        "wait_for_sign_off", wait_for_sign_off, destinations=(END, "agent")
     )
     builder.add_node("pay", pay)
     builder.add_edge(START, "screen")

@@ -7,6 +7,7 @@ from anyio import to_thread
 from fastapi import FastAPI
 
 from backend import (
+    agent_document,
     claims,
     configuration,
     documents,
@@ -54,6 +55,7 @@ for module in (
     improvement,
     rounds,
     insights,
+    agent_document,
 ):
     app.include_router(module.router)
 

@@ -68,7 +68,7 @@ def test_decide_needs_a_claim_in_progress(client):
         ("approve", 1150, "awaiting_sign_off"),
     ],
 )
-def test_decide_claim(client, decision, payout, status):
+def test_record_decision(client, decision, payout, status):
     start(client, "CLM-1001")
     claim = decide(client, "CLM-1001", decision, payout).json()
     assert claim["status"] == status
@@ -143,13 +143,24 @@ def test_pay_a_claim_not_approved(client, decision):
 def test_payment_over_the_limit_waits_for_sign_off(client):
     approved(client, "CLM-1002", 1150)
     response = pay(client, "CLM-1002", 1150)
-    assert response.status_code == 409
-    assert response.json()["detail"] == (
-        "A payout over $1,000.00 waits for a handler's sign-off"
+    assert (response.status_code, response.json()["detail"]) == (
+        403,
+        "A payment over $1,000.00 needs a handler's sign-off",
     )
     claim = client.get("/api/claims/CLM-1002").json()
     assert claim["status"] == "awaiting_sign_off"
     assert claim["payment"] is None
+
+
+def test_a_payment_over_the_limit_is_refused_before_the_claim_is_looked_at(client):
+    """CLM-1901 was never approved, and the payment gets the limit's answer, as
+    it would on any claim: the same answer the Gateway's Policy gives."""
+    response = pay(client, "CLM-1901", 4800)
+    assert (response.status_code, response.json()["detail"]) == (
+        403,
+        "A payment over $1,000.00 needs a handler's sign-off",
+    )
+    assert client.get("/api/claims/CLM-1901").json()["payment"] is None
 
 
 @pytest.mark.parametrize(

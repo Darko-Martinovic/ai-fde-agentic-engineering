@@ -20,7 +20,7 @@ def get_policy(policy_id: str) -> dict[str, Any]:
     return send("GET", f"/api/policies/{policy_id}").json()
 
 
-def get_customer(customer_id: str) -> dict[str, Any]:
+def get_claim_history(customer_id: str) -> dict[str, Any]:
     return send("GET", f"/api/customers/{customer_id}").json()
 
 
@@ -95,7 +95,7 @@ def record_step(claim_id: str, thread_id: str, kind: str, text: str) -> None:
     )
 
 
-def decide_claim(claim_id: str, decision: dict[str, Any]) -> dict[str, Any]:
+def record_decision(claim_id: str, decision: dict[str, Any]) -> dict[str, Any]:
     return send("POST", f"/api/claims/{claim_id}/decision", decision).json()
 
 

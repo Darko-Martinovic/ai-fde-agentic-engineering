@@ -79,7 +79,7 @@ REASONS = "The delay was covered and the costs were reasonable."
 def decide(decision, payout):
     """A reply that decides the claim, against the Trip Delay section."""
     return tool_call(
-        "decide_claim",
+        "record_decision",
         decision=decision,
         payout=payout,
         reasons=REASONS,

@@ -20,10 +20,10 @@ def get_policy(policy_id: str, conn: Db) -> Policy:
 
 @router.get(
     "/customers/{customer_id}",
-    operation_id="get_customer",
+    operation_id="get_claim_history",
     dependencies=[AGENT_OR_HANDLER],
 )
-def get_customer(customer_id: str, conn: Db) -> Customer:
+def get_claim_history(customer_id: str, conn: Db) -> Customer:
     """Get one customer with their claim history."""
     record = found(records.customer(conn, customer_id), "Customer", customer_id)
     return Customer.model_validate_json(record)

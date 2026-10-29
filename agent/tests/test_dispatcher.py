@@ -247,7 +247,7 @@ def test_a_claim_another_process_started_is_reported_and_the_rest_worked(
 def test_the_next_dispatch_carries_on_what_a_stopped_one_left(backend, memory_saver):
     """A dispatch killed partway leaves its claims as a restart does: CLM-1001
     in progress after a step, and CLM-1003 signed off while the service was
-    away."""
+    away, which the sign-off paid, so the dispatch leaves it alone."""
     settle_all_but(backend, "CLM-1001", "CLM-1003")
     killed = scripted(
         {"CLM-1001": [tool_call("get_claim"), KeyboardInterrupt()]}, Flaky
@@ -266,6 +266,7 @@ def test_the_next_dispatch_carries_on_what_a_stopped_one_left(backend, memory_sa
     assert len(carried["decisions"]) == 1
     paid = claim(backend, "CLM-1003")
     assert (paid["status"], paid["payment"]["authorized_by"]) == ("decided", "HND-01")
+    assert "CLM-1003" not in [c["claim_id"] for c in latest(backend)["claims"]]
 
 
 def test_a_claim_the_service_is_carrying_on_is_left_alone(backend, memory_saver):
@@ -384,10 +385,11 @@ def test_a_claim_with_nothing_saved_to_carry_on_never_stops_a_dispatch(
     backend, memory_saver
 ):
     """CLM-1003's decision was made through the API, so the graph saved
-    nothing: the dispatch reports it and works the rest."""
+    nothing: after a handler's rejection the dispatch reports it and works the
+    rest."""
     settle_all_but(backend, "CLM-1003", "CLM-1005")
     api.start_claim("CLM-1003", None, "CLM-1003-api")
-    api.decide_claim(
+    api.record_decision(
         "CLM-1003",
         {
             "decision": "approve",
@@ -396,7 +398,7 @@ def test_a_claim_with_nothing_saved_to_carry_on_never_stops_a_dispatch(
             "policy_section": "Section 7, Emergency Medical",
         },
     )
-    body = {"approved": True, "note": ""}
+    body = {"approved": False, "note": "Check the bill again."}
     backend.post("/api/claims/CLM-1003/review", json=body, headers=headers(DANA))
     reports = dispatch(scripted({"CLM-1005": DECLINE}), memory_saver)
     assert any(line.startswith("CLM-1003: not picked up") for line in reports)

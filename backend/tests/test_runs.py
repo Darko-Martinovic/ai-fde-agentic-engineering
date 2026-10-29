@@ -92,6 +92,7 @@ def worked_every_way(client, run_id):
         start(client, "CLM-1012")
         fail(client, "CLM-1012")
     start(client, "CLM-1004")
+    # Signed off, which pays it
     approved(client, "CLM-1003", 3750.0)
     review(client, "CLM-1003")
     approved(client, "CLM-1011", 1150.0)
@@ -118,12 +119,12 @@ def test_finishing_builds_the_summary_from_the_records(client):
     assert run["finished_at"] is not None
     assert run["seconds"] >= 0
     assert run["summary"] == {
-        "approved": 2,
+        "approved": 3,
         "declined": 1,
         "referred": 1,
         "waiting_for_sign_off": [{"claim_id": "CLM-1008", "payout": 2240.0}],
         "left_for_handler": ["CLM-1012"],
-        "unfinished": ["CLM-1004", "CLM-1003", "CLM-1011", "CLM-1013"],
+        "unfinished": ["CLM-1004", "CLM-1011", "CLM-1013"],
     }
     again = client.post(f"/api/runs/{run_id}/finish", json={"stopped": False})
     assert again.status_code == 409
