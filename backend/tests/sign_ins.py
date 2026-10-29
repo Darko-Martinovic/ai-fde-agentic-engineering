@@ -8,6 +8,8 @@ import jwt
 from cryptography.hazmat.primitives.asymmetric import ec
 from jwt.algorithms import ECAlgorithm
 
+from backend.agent_key import KEY_HEADER
+
 KEY = ec.generate_private_key(ec.SECP256R1())
 KEY_ID = "test-key"
 DANA = "dana.whitfield@undercover.example"
@@ -56,6 +58,21 @@ def bearer(access_token: str) -> dict[str, str]:
 def headers(email: str) -> dict[str, str]:
     """The headers a signed-in handler's requests carry."""
     return bearer(token(email))
+
+
+# The agent's key for the test run, which the root conftest.py sets
+AGENT_KEY = "test-agent-key"
+
+
+def agent_headers() -> dict[str, str]:
+    """The headers the agent's side sends: its key."""
+    return {KEY_HEADER: AGENT_KEY}
+
+
+def both_sides(email: str = DANA) -> dict[str, str]:
+    """The agent's key and a handler's sign-in at once, for a test client that
+    plays the agent's moves and reads the dashboard's pages."""
+    return agent_headers() | headers(email)
 
 
 class Keys(jwt.PyJWKClient):

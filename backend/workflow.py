@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import Connection
 
 from backend.api import Db, found, load_claim, now
+from backend.callers import AGENT, HANDLER
 from backend.claim_rules import (
     add_decision,
     add_payment,
@@ -32,7 +33,7 @@ router = APIRouter(prefix="/api/claims/{claim_id}")
 MAX_FAILURES = 2
 
 
-@router.post("/start", operation_id="start_claim")
+@router.post("/start", operation_id="start_claim", dependencies=[AGENT])
 def start_claim(claim_id: str, start: StartIn, conn: Db) -> Claim:
     """Start work on a waiting claim, in a running run or on its own."""
     claim = load_claim(conn, claim_id)
@@ -58,7 +59,7 @@ def refuse_cut_short(conn: Connection, claim: Claim) -> None:
         raise HTTPException(409, why)
 
 
-@router.post("/failure", operation_id="fail_claim")
+@router.post("/failure", operation_id="fail_claim", dependencies=[AGENT])
 def fail_claim(claim_id: str, failure: FailureIn, conn: Db) -> Claim:
     """Record that work on a claim failed before it was decided: the claim goes
     back in the queue, or is left for a handler when it has failed twice. A claim
@@ -77,7 +78,7 @@ def fail_claim(claim_id: str, failure: FailureIn, conn: Db) -> Claim:
     return load_claim(conn, claim_id)
 
 
-@router.post("/steps", operation_id="record_step")
+@router.post("/steps", operation_id="record_step", dependencies=[AGENT])
 def record_step(claim_id: str, step: StepIn, conn: Db) -> Step:
     """Record one step the agent took on a claim."""
     load_claim(conn, claim_id)
@@ -86,7 +87,7 @@ def record_step(claim_id: str, step: StepIn, conn: Db) -> Step:
     return Step.model_validate(row)
 
 
-@router.get("/steps", operation_id="list_steps")
+@router.get("/steps", operation_id="list_steps", dependencies=[HANDLER])
 def list_steps(claim_id: str, conn: Db) -> list[Step]:
     """List the steps the agent took on a claim, in order."""
     load_claim(conn, claim_id)
@@ -107,7 +108,7 @@ def repeated_decision(claim: Claim, decision: DecisionIn) -> Claim:
     return claim
 
 
-@router.post("/decision", operation_id="decide_claim")
+@router.post("/decision", operation_id="decide_claim", dependencies=[AGENT])
 def decide_claim(claim_id: str, decision: DecisionIn, conn: Db) -> Claim:
     """Approve, decline or refer a claim in progress, with the payout and reasons."""
     seen = found(claims.revision(conn, claim_id), "Claim", claim_id)
@@ -125,7 +126,7 @@ def decide_claim(claim_id: str, decision: DecisionIn, conn: Db) -> Claim:
     return load_claim(conn, claim_id)
 
 
-@router.post("/payment", operation_id="pay_claim")
+@router.post("/payment", operation_id="pay_claim", dependencies=[AGENT])
 def pay_claim(claim_id: str, payment: PaymentIn, conn: Db) -> Claim:
     """Pay an approved claim its payout, once a handler has signed it off if it
     needs that. A payment already made, as after a restart, is done."""

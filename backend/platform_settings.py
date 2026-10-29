@@ -11,6 +11,7 @@ from fastapi import APIRouter
 from sqlalchemy import Connection
 
 from backend.api import Db, now
+from backend.callers import HANDLER
 from backend.models import Handler
 from backend.settings_models import PlatformSettings, SettingsIn, SettingsView
 from backend.signed_in import senior
@@ -31,7 +32,7 @@ def view(conn: Connection) -> SettingsView:
     )
 
 
-@router.get("/settings", operation_id="get_settings")
+@router.get("/settings", operation_id="get_settings", dependencies=[HANDLER])
 def get_settings(conn: Db) -> SettingsView:
     """Get the platform's settings as they stand, and the models allowed."""
     return view(conn)

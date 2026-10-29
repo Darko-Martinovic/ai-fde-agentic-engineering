@@ -59,8 +59,8 @@ def test_a_handler_who_cant_sign_off_over_the_limit_cant_change_them(client):
     assert client.get("/api/settings").json()["settings"]["number"] == 1
 
 
-def test_changing_them_needs_a_sign_in(client):
-    assert client.put("/api/settings", json=FIRST).status_code == 401
+def test_changing_them_needs_a_sign_in(agent_client):
+    assert agent_client.put("/api/settings", json=FIRST).status_code == 401
 
 
 @pytest.mark.parametrize(

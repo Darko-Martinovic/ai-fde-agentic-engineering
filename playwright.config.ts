@@ -45,6 +45,7 @@ export default defineConfig({
         VITE_SUPABASE_URL: setting("E2E_AUTH_URL"),
         JUDGE_URL: setting("E2E_JUDGE_URL"),
         OPENROUTER_API_KEY: "e2e-key",
+        UNDERCOVER_API_KEY: setting("E2E_API_KEY"),
       },
     },
     {

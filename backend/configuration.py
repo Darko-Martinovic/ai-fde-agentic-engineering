@@ -7,6 +7,7 @@ from sqlalchemy import Connection, RowMapping
 
 from backend import diffs
 from backend.api import Db, found
+from backend.callers import AGENT, HANDLER
 from backend.store import platform_settings, versions
 from backend.version_models import (
     NO_EFFORT,
@@ -94,19 +95,21 @@ def runs_as(conn: Connection, number: int) -> VersionConfig:
     )
 
 
-@router.get("/versions/current", operation_id="get_current_version")
+@router.get(
+    "/versions/current", operation_id="get_current_version", dependencies=[AGENT]
+)
 def get_current_version(conn: Db) -> VersionConfig:
     """Get the current version of the claim agent's configuration, as it runs."""
     return runs_as(conn, versions.current(conn))
 
 
-@router.get("/versions/{number}", operation_id="get_version")
+@router.get("/versions/{number}", operation_id="get_version", dependencies=[AGENT])
 def get_version(number: int, conn: Db) -> VersionConfig:
     """Get one version of the claim agent's configuration, as it runs."""
     return runs_as(conn, number)
 
 
-@router.get("/configuration", operation_id="get_configuration")
+@router.get("/configuration", operation_id="get_configuration", dependencies=[HANDLER])
 def get_configuration(conn: Db) -> Configuration:
     """Get every version of the configuration, newest first, and the models allowed."""
     current = versions.current(conn)
@@ -117,7 +120,11 @@ def get_configuration(conn: Db) -> Configuration:
     )
 
 
-@router.get("/configuration/versions/{number}", operation_id="get_version_details")
+@router.get(
+    "/configuration/versions/{number}",
+    operation_id="get_version_details",
+    dependencies=[HANDLER],
+)
 def get_version_details(number: int, conn: Db) -> VersionDetails:
     """Get one version with what it changed from the version it was based on."""
     row = load(conn, number)

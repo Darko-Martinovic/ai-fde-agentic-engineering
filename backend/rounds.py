@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import Connection
 
 from backend.api import Db, found, now
+from backend.callers import AGENT
 from backend.free_model import free_model
 from backend.improver_models import ImproverView
 from backend.improver_view import improver_view
@@ -49,7 +50,7 @@ from backend.version_models import ModelAllowed
 from backend.version_scores import evaluations_needed
 from settings import setting
 
-router = APIRouter(prefix="/api/rounds")
+router = APIRouter(prefix="/api/rounds", dependencies=[AGENT])
 
 IMPROVER = Path(__file__).parent / "instructions" / "improver.md"
 RESTARTED = "The agent's service restarted while the round was working"

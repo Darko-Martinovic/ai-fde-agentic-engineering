@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 from backend import agent_service
 from backend.main import app
+from backend.tests.sign_ins import agent_headers, both_sides
 
 
 @pytest.fixture(autouse=True)
@@ -13,7 +14,14 @@ def database(tmp_path, monkeypatch):
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    """A client that plays the agent's moves and reads as Dana Whitfield."""
+    return TestClient(app, headers=both_sides())
+
+
+@pytest.fixture
+def agent_client():
+    """A client with only the agent's key, signed in as nobody."""
+    return TestClient(app, headers=agent_headers())
 
 
 @pytest.fixture(autouse=True)

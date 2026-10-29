@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
+import { AS_THE_AGENT } from "./agent-key";
 import { startClaim } from "./claim-starts";
 import { SIGNED_IN } from "./signed-in";
 import { resumed } from "./stand-in";
@@ -12,6 +13,7 @@ async function agentDecides(
 ) {
   await startClaim(request, claimId);
   const response = await request.post(`/api/claims/${claimId}/decision`, {
+    headers: AS_THE_AGENT,
     data: {
       decision,
       payout,
@@ -50,6 +52,7 @@ test("a sign-off reaches the agent, which pays the claim", async ({
   expect(
     (
       await request.post("/api/claims/CLM-1020/payment", {
+        headers: AS_THE_AGENT,
         data: { amount: 1350 },
       })
     ).status(),
@@ -62,6 +65,7 @@ test("a sign-off reaches the agent, which pays the claim", async ({
   await expect.poll(() => resumed(request)).toContain("CLM-1020");
   // The test plays the agent's part and pays, as the graph would
   const paid = await request.post("/api/claims/CLM-1020/payment", {
+    headers: AS_THE_AGENT,
     data: { amount: 1350 },
   });
   expect(paid.ok()).toBe(true);

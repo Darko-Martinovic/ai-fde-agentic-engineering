@@ -27,7 +27,7 @@ from agent import (
     rounds,
     versions,
 )
-from agent.connection import Refused
+from agent.connection import Refused, require_key
 from agent.reports import IN_PROGRESS
 from agent.run_lock import RunLock
 from agent.service_models import (
@@ -67,6 +67,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     any run a stopped service left running as stopped, and any round, unless
     it waits for a handler: its proposal is in the backend and the improver's
     progress is saved, so a review carries it on."""
+    require_key()
     with checkpoints.pool() as connections:
         app.state.pool = connections
         api.stop_runs()
