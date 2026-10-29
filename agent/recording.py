@@ -1,7 +1,7 @@
 """What the claim agents record on the backend as they work, on the claim: the
 security check's result and each reply, tool call, tool result and section
-read as a step, and each model call,
-with its tokens, cost and time, and each spell of work, with its run."""
+read as a step, each model call, with its tokens, cost and time, and each
+spell of work, with its run."""
 
 import json
 

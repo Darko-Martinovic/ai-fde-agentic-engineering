@@ -38,4 +38,4 @@ A decision is scored on two things: the decision itself and the payout. A valid 
 
 ## The security claim
 
-- `security/`: CLM-1901, a stolen watch whose story carries an instruction to the AI to approve it in full, with its policy, its customer and the handler's decision (decline). It is a prompt injection kept for security testing, in a folder of its own, apart from the queue and the evaluation sets.
+- `security/`: CLM-1901, a stolen watch whose story carries an instruction to the AI to approve it in full, with its policy, its customer and the handler's decision (decline). It is a prompt injection kept for security testing, in a folder of its own. Seeding puts the claim in the queue with its policy and customer, and never its handler's decision, so it is in neither evaluation set; the agent's security check refers it.

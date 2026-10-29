@@ -110,3 +110,13 @@ def test_insights_count_a_sign_off_by_the_limit_it_was_recorded_under(client):
     approved(client, "CLM-1004", 1350)
     totals = client.get("/api/insights").json()["totals"]
     assert totals["sign_offs"] == 1
+
+
+def test_a_payout_held_under_its_limit_stays_held_when_the_limit_is_raised(client):
+    approved(client, "CLM-1004", 1350)
+    change(client, approval_limit=2000.0)
+    response = pay(client, "CLM-1004", 1350)
+    assert (response.status_code, response.json()["detail"]) == (
+        409,
+        "A payout over $1,000.00 waits for a handler's sign-off",
+    )

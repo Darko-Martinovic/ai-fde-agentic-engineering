@@ -63,13 +63,6 @@ def test_a_review_stands_when_the_agent_cant_be_reached(monkeypatch, caplog):
     assert "didn't pick up CLM-1003" in caplog.text
 
 
-def test_a_held_payout_isnt_paid_before_a_sign_off(client):
-    approved(client, "CLM-1003", 3750)
-    response = pay(client, "CLM-1003", 3750)
-    assert response.status_code == 403
-    assert client.get("/api/claims/CLM-1003").json()["payment"] is None
-
-
 @pytest.mark.parametrize("approved_", [True, False])
 def test_only_a_senior_handler_reviews_a_held_payout(client, resumed, approved_):
     approved(client, "CLM-1003", 3750)

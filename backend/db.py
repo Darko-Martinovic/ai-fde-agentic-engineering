@@ -248,12 +248,13 @@ def engine() -> Engine:
 
 @cache
 def engine_for(url: str) -> Engine:
-    """One engine for each database. Postgres keeps a small pool, as Supabase's
-    free plan allows 15 connections across every process, but on Lambda opens a
-    connection for each request, on the transaction pooler, which can't keep
-    prepared statements; SQLite opens one for each request, holding no file."""
+    """One engine for each database. Postgres keeps a small pool (Supabase's free
+    plan allows 15 connections in all), but on Lambda a connection a request, on
+    the transaction pooler, with no prepared statements; SQLite opens one for
+    each request, holding no file, waiting as the pool would for its writer."""
+    wait = int(setting("DATABASE_WAIT_SECONDS"))
     if url.startswith("sqlite"):
-        return create_engine(url, poolclass=NullPool)
+        return create_engine(url, poolclass=NullPool, connect_args={"timeout": wait})
     args = {"options": f"-c search_path={schema()}"}
     if on_lambda():
         args = args | {"prepare_threshold": None}
@@ -264,7 +265,7 @@ def engine_for(url: str) -> Engine:
         pool_size=int(setting("DATABASE_CONNECTIONS")),
         max_overflow=0,
         # Many claim agents at once share the pool: wait for a connection
-        pool_timeout=int(setting("DATABASE_WAIT_SECONDS")),
+        pool_timeout=wait,
         pool_pre_ping=True,
     )
 
