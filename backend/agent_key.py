@@ -11,6 +11,7 @@ from fastapi.security import APIKeyHeader
 from settings import optional_setting
 
 KEY_HEADER = "X-API-Key"
+KEY_SETTING = "UNDERCOVER_API_KEY"
 NEEDS_THE_KEY = "This route needs the agent's key"
 
 # A missing key is ours to refuse, with a 401
@@ -20,7 +21,7 @@ Key = Annotated[str | None, Security(key_header)]
 
 def is_agent(key: str | None) -> bool:
     """Whether a request's key is the agent's, compared in constant time."""
-    expected = optional_setting("UNDERCOVER_API_KEY")
+    expected = optional_setting(KEY_SETTING)
     if expected is None or key is None:
         return False
     return secrets.compare_digest(key.encode(), expected.encode())

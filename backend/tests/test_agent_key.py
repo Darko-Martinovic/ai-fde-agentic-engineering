@@ -169,6 +169,8 @@ def test_a_shared_read_takes_the_key_or_a_sign_in():
         401,
         "Sign in as a handler first",
     )
+    wrong = TestClient(app, headers={KEY_HEADER: "not-the-key"}).get(path)
+    assert (wrong.status_code, wrong.json()["detail"]) == (401, NEEDS_THE_KEY)
 
 
 def test_the_key_never_stands_in_for_a_handler():

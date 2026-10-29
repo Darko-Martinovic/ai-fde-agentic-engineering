@@ -359,7 +359,8 @@ def test_a_claim_worked_alone_records_its_calls_and_its_spell_with_no_run(
     assert {(c["run_id"], c["thread_id"]) for c in calls} == {(None, thread_id)}
     [spell] = work_times("CLM-1001")
     assert (spell["run_id"], spell["thread_id"]) == (None, thread_id)
-    assert 0 <= spell["seconds"] < 1
+    # Stub models answer at once; the security check adds three calls
+    assert 0 <= spell["seconds"] < 2
 
 
 def test_both_attempts_of_a_claim_count_on_its_run(backend, run, memory_saver):

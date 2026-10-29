@@ -28,7 +28,8 @@ The agent works the queue in dispatches, with many claim agents at once:
 - When the agent approves a payout over the approval limit ($1,000 to begin with), it stops and waits for a handler, keeping everything it has worked out. The handler's sign-off pays the claim, recording who signed off and when, and the agent then finishes its work on it. Or the handler rejects the payout with a note that says what's wrong: the agent looks at the claim again in its light and decides again, and that decision always goes back to a handler. A payout rejected twice is referred to a handler. If the agent isn't running at the time, the next dispatch picks the claim up.
 - Work survives a restart. If the agent is stopped partway through a claim, by a crash or a restart, the claim stays in progress and the next dispatch carries it on from where it got to, which doesn't count as a new attempt. Stop on the dashboard starts no more claims, lets those working finish, and shows the dispatch as stopped.
 - The tokens and the cost of every model call, and the time the agent spends working on each claim, leaving out any wait for a handler, are recorded with the dispatch or evaluation they happened in.
-- Evaluations check the agent's work against our handlers' decisions: an evaluation works its own copies of a labelled set's claims, the queue's 25 or the held-out ones, all of them or their five `tiny` ones, through the same dispatcher and claim agent. The copies never show in the queue, a dispatch never carries them on, and nobody can sign them off or decide them.
+- Our customers write the claims, and a claim can carry text meant to instruct whoever handles it. Before the agent works a claim, a security check reads what the customer wrote, and a claim that tries to instruct its handler is referred to a handler with the check's reason, unread by the agent. CLM-1901, the security team's claim in `data/security/`, is in the queue for this.
+- Evaluations check the agent's work against our handlers' decisions: an evaluation works its own copies of a labelled set's claims, the queue's 25 with a handler's decision or the held-out ones, all of them or their five `tiny` ones, through the same dispatcher and claim agent. The copies never show in the queue, a dispatch never carries them on, and nobody can sign them off or decide them.
 
 ## Improving the agent
 
@@ -64,6 +65,8 @@ Handlers sign in to the dashboard with their email. Anyone signed in sees everyt
 - Decisions follow the policy wording and the claims manual. The wording comes first, and the manual says how to read it.
 - Our handlers' own decisions on these claims are in `data/evals/`. We use them to check the agent's work. The claim agent must never see them; the improver sees those on the evaluation set, never the held-out set's.
 - Nothing the improver proposes takes effect until a senior handler approves it.
+- The agent identifies itself with its key on every request, and only the agent's side may record its moves on a claim; the key never stands in for a handler. Every page of the dashboard, and everything else it reads, needs a signed-in handler.
+- The agent never pays more than the approval limit: a payment over it is refused whatever the claim, and only a handler's sign-off pays one.
 - Amounts are in US dollars.
 
 ## Our records

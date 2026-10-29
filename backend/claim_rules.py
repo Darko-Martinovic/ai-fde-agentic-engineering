@@ -55,10 +55,9 @@ def status_after(claim: Claim, decision: DecisionIn, limit: float) -> ClaimStatu
 
 
 def held(claim: Claim, approval: Decision) -> str | None:
-    """Why an approval can't be paid without a handler's sign-off, or None when it
-    can: it's over the limit, or follows a rejection, and isn't signed off."""
-    if approval.review == "signed_off":
-        return None
+    """Why the agent can't pay an approval, which then waits for a handler's
+    sign-off, or None when it can: it's over the limit it was decided under, or
+    follows a rejection. A sign-off pays the claim itself."""
     limit = approval.approval_limit
     if approval.payout > limit:
         return f"A payout over ${limit:,.2f} waits for a handler's sign-off"

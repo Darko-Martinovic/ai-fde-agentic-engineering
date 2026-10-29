@@ -27,7 +27,7 @@ The student accepted every recommendation below on 2026-10-29.
 | | Recommended | Why |
 |---|---|---|
 | The operation names | Rename `decide_claim` to `record_decision` and `get_customer` to `get_claim_history` (operation ids, `agent/api.py`, the claim agent's tools, `api.ts`'s keys, Postman and the tests). Paths stay as they are | The brief names the eight operations, the Gateway names its tools after them, Lab 2's challenge writes its Cedar policy for `record_decision`, and the Day 3 lab and brief use both names. Keeping ours would mean editing the labs every day |
-| `settings/` in the Lambda package | The package holds `settings/` (its `__init__.py` and `.env.defaults`) beside `backend/`, `data/` and `dashboard/dist/`, and `python-dotenv` joins the `server` group. Lab 2's packaging cell then copies `settings` as well, a one-word change when we run the lab | The brief's step 4.6 needs every other setting to have a default, and ours come from `settings/.env.defaults`. Moving them into the backend would give Python two ways to read settings (`docs/CODE_STANDARDS.md` 7 and 22) |
+| `settings/` in the Lambda package | The package holds `settings/` (its `__init__.py` and `.env.defaults`) beside `backend/`, `data/` and `dashboard/dist/`, and `python-dotenv` joins the `server` group. Lab 2's packaging cell then copies `settings` as well, and so must the Day 3 lab and `labs/week3day4_aws.py`, which pack the app the same way (a known gap in STATUS) | The brief's step 4.6 needs every other setting to have a default, and ours come from `settings/.env.defaults`. Moving them into the backend would give Python two ways to read settings (`docs/CODE_STANDARDS.md` 7 and 22) |
 | The rejection with a note | Keep it: the claim graph still pauses for a held payout, so a handler can reject it with a note and the agent decides again. A sign-off now pays in the backend, and the resume after it ends the graph without paying | It's our addition since Week 2 Day 3, and the brief's step 3.6 expects a pause and a resume after the sign-off. The AGENT_GUIDE says Ed's build takes the pause out, because his build has no rejection |
 | The key | `secrets.token_hex(32)` (64 letters and digits), written into `.env` without printing it | The brief allows any random value of 32 characters or more, and the course guide says letters and digits are safest for AgentCore Identity on Day 2's Lab 2 |
 | Where the check's instructions live | In the agent, in a module of its own (`agent/screening.py`), with the lab's instructions and its two fields word for word. The backend names the check's model (`get_screening_model`) | The brief's step 2.8 keeps the check outside the versioned configuration, and the improver only changes versions. `MODEL_NAME` stays in `backend/free_model.py` alone (2.2) |
@@ -164,16 +164,16 @@ Tests run with a key the root `conftest.py` sets for the test run, and none read
 
 After one `uv run -m backend.seed`, with `npm run dev` running on the default model and `MODEL_NAME` out of `.env`. The estimate: CLM-1001 on the command line, about $0.001; a dispatch of the other 25 claims on Luna at low, with 26 checks at about $0.0001 each, about $0.03; the evaluation set's five tiny claims with the judge, about $0.01. About $0.05 in all, $0.06 with retries.
 
-- [ ] `uv run -m agent CLM-1001` works the claim with the key, and a dispatch from the queue page works the rest as before.
-- [ ] The dispatch refers CLM-1901 with the check's reason, which its claim page shows as the first step, and decides the other claims as before.
-- [ ] An evaluation of the evaluation set's five tiny claims, started on the Scoreboard, flags none of them.
-- [ ] Dana Whitfield signs off a held payout on the dashboard and it's paid once, at the sign-off.
-- [ ] `curl` to an agent route without the key gets a 401.
-- [ ] What the runs spent, from the backend's records and the OpenRouter key's usage, is reported in `docs/STATUS.md`.
-- [ ] `docs/SPEC.md` (the key, the check, the sign-off that pays, CLM-1901 seeded from `data/security/`), `docs/TECH_STACK.md`, `docs/PROCESS.md`, `docs/STATUS.md`, `docs/CODE_STANDARDS.md` (the new modules in 13 and 15) and `data/README.md` describe the product as it now is.
-- [ ] The whole branch is reviewed against `main` by a fresh subagent; findings fixed.
-- [ ] `npm run check` is green, with `.env` moved out of the way.
-- [ ] `week3day2-end` is cut from `main` after the last merge and locked like the earlier end branches, and `CLAUDE.md` lists it.
+- [x] `uv run -m agent CLM-1001` works the claim with the key, and a dispatch from the queue page works the rest as before.
+- [x] The dispatch refers CLM-1901 with the check's reason, which its claim page shows as the first step, and decides the other claims as before.
+- [x] An evaluation of the evaluation set's five tiny claims, started on the Scoreboard, flags none of them.
+- [x] Dana Whitfield signs off a held payout on the dashboard and it's paid once, at the sign-off.
+- [x] `curl` to an agent route without the key gets a 401.
+- [x] What the runs spent, from the backend's records and the OpenRouter key's usage, is reported in `docs/STATUS.md`.
+- [x] `docs/SPEC.md` (the key, the check, the sign-off that pays, CLM-1901 seeded from `data/security/`), `docs/TECH_STACK.md`, `docs/PROCESS.md`, `docs/STATUS.md`, `docs/CODE_STANDARDS.md` (the new modules in 13 and 15) and `data/README.md` describe the product as it now is.
+- [x] The whole build is reviewed against the product before it by a fresh subagent; nothing blocked, and its findings are fixed: the Postman commands with the key, the course's packaging scripts that leave out `settings/` (a known gap), the signed-off branch left in `held`, a test of the hold that the limit had taken over, the command table, the key's setting named once, a wrong key on a shared read refused as the key, and the queue's count in SPEC. Not taken: moving `main.handler`'s tests and the backend-wide import test into files of their own.
+- [x] `npm run check` is green, with `.env` moved out of the way.
+- [x] `week3day2-end` is cut from `main` after the last merge and locked like the earlier end branches, and `CLAUDE.md` lists it.
 
 ## Not in this plan
 

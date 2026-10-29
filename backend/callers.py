@@ -4,15 +4,18 @@ as SignedIn or senior(action), or nothing when it's open, as health is."""
 
 from fastapi import Depends
 
-from backend.agent_key import Key, agent_key, is_agent
+from backend.agent_key import Key, agent_key
 from backend.signed_in import Credentials, signed_in, signed_in_email
 
 
 def agent_or_handler(key: Key, credentials: Credentials) -> None:
     """Let the agent's side through with its key, and anyone else only once
-    they've signed in as a handler. FastAPI has no dependency for one of two, so
-    this calls the sign-in's own two in turn when the key isn't there."""
-    if not is_agent(key):
+    they've signed in as a handler. A key that isn't the agent's is refused as
+    the key. FastAPI has no dependency for one of two, so this calls the key's
+    and the sign-in's own in turn."""
+    if key is not None:
+        agent_key(key)
+    else:
         signed_in(signed_in_email(credentials))
 
 

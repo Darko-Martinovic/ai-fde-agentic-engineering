@@ -1,12 +1,14 @@
 # Process
 
-`uv sync` and `npm install` at the repo root install everything, including a git pre-commit hook. `npm run dev` starts the backend, the agent's service and the dashboard. With `DATABASE_URL` in `.env`, the records and the agent's saved progress are on Supabase, and `uv run -m backend.seed` reseeds Supabase. The tests never read `.env` and need no network: they use SQLite and save the agent's progress in memory, sign handlers in with a key made for the test run, stand in a fixed grade for the judge, and run the improver and the claim agents on stub models. The end-to-end tests start stand-ins for the agent's service, Supabase Auth and the judge (`e2e/agent-stand-in.ts`, `auth-stand-in.ts`, `judge-stand-in.ts`), so they reach none of the real ones.
+`uv sync` and `npm install` at the repo root install everything, including a git pre-commit hook. `npm run dev` starts the backend, the agent's service and the dashboard. `.env` needs `UNDERCOVER_API_KEY`, the agent's key, without which the agent's service won't start. With `DATABASE_URL` in `.env`, the records and the agent's saved progress are on Supabase, and `uv run -m backend.seed` reseeds Supabase. The tests never read `.env` and need no network: they use SQLite and save the agent's progress in memory, sign handlers in with a key made for the test run, stand in a fixed grade for the judge, and run the improver and the claim agents on stub models. The end-to-end tests start stand-ins for the agent's service, Supabase Auth and the judge (`e2e/agent-stand-in.ts`, `auth-stand-in.ts`, `judge-stand-in.ts`), so they reach none of the real ones.
 
 `npm run check` runs every check:
 
-- Python: ruff (lint and format), pyright, and pytest with 80% coverage
+- Python: ruff (lint and format), pyright, pytest with 80% coverage, and the backend imported with the `server` dependency group alone (`npm run check:server`)
 - TypeScript: ESLint, Prettier, tsc, and vitest with 80% coverage
 - Playwright end-to-end tests
+
+`npm run build` builds the dashboard into `dashboard/dist`, which the backend then serves beside the API; `docs/TECH_STACK.md`'s Deployment section says what goes to AWS Lambda.
 
 The pre-commit hook runs the format, lint, type and unit test checks on every commit.
 

@@ -4,8 +4,7 @@ refers one that tries to instruct whoever handles it; otherwise the agent works
 the claim with its tools, and the graph pays an approval the backend can pay at
 once, or waits with interrupt() for a handler's review of one held for
 sign-off: the sign-off pays it in the backend, and a rejection comes back to
-the agent. Its nodes record each step and each
-model call on the claim."""
+the agent. Its nodes record each step and each model call on the claim."""
 
 import time
 from collections.abc import Callable

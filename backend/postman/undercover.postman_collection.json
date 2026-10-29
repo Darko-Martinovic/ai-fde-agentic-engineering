@@ -68,7 +68,7 @@
                 "exec": [
                   "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
                   "const claims = pm.response.json();",
-                  "pm.test(\"25 claims\", () => pm.expect(claims).to.have.lengthOf(25));",
+                  "pm.test(\"26 claims: the queue's 25 and CLM-1901\", () => pm.expect(claims).to.have.lengthOf(26));",
                   "pm.test(\"first claim is CLM-1001 for Maya Patel\", () => {",
                   "    pm.expect(claims[0].claim_id).to.eql(\"CLM-1001\");",
                   "    pm.expect(claims[0].customer_name).to.eql(\"Maya Patel\");",
@@ -2800,7 +2800,7 @@
                 "claims"
               ]
             },
-            "description": "`list_claims`: the queue holds its 25 claims and no copy."
+            "description": "`list_claims`: the queue holds its 26 claims and no copy."
           },
           "event": [
             {
