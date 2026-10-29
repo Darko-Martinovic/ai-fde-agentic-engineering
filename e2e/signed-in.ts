@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { setting } from "../settings/settings.config";
+import { setting } from "../settings/settings.config.ts";
 
 // Each handler's browser storage, with their session, which the sign-in
 // setup keeps for the tests (git-ignored).

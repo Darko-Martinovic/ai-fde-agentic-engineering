@@ -28,6 +28,7 @@ from sqlalchemy.schema import CreateSchema
 # The tables for improving the claim agent are part of the same schema
 from backend import db_improvement  # noqa: F401
 from backend.config import database_path
+from backend.lambda_runtime import on_lambda
 from backend.schema import counter, metadata, text_column
 from settings import optional_setting, setting
 
@@ -40,8 +41,7 @@ claims = Table(
     text_column("customer_id"),
     text_column("status"),
     text_column("data"),
-    # Counts the changes to the claim's decision and payment, so two at once
-    # can't both be recorded
+    # Counts changes to the decision and payment, so two at once record once
     Column("revision", Integer, nullable=False, default=0),
     # An evaluation's copy of a claim: the evaluation, and the claim it copies.
     # Copies stay out of the queue.
@@ -125,12 +125,10 @@ decisions = Table(
     text_column("review_note", nullable=True),
     sqlite_autoincrement=True,
 )
-# A dispatch or an evaluation: N claim agents at once on the claims of the
-# queue, or on copies of a labelled set's claims (all of them, or its tiny
-# ones), on a version of the claim agent's configuration, whose model and
-# reasoning effort it keeps too, and an evaluation in a round of improvement
-# names its round. Its summary, built from the records when it finishes, is
-# kept as JSON.
+# A dispatch or an evaluation: N claim agents at once, on the queue's claims or
+# copies of a labelled set's (all, or its tiny ones), on a version of the claim
+# agent's configuration with its model and reasoning effort, and its round if a
+# round runs it. Its summary, built from the records as it finishes, is JSON.
 runs = Table(
     "runs",
     metadata,
@@ -251,13 +249,18 @@ def engine() -> Engine:
 @cache
 def engine_for(url: str) -> Engine:
     """One engine for each database. Postgres keeps a small pool, as Supabase's
-    free plan allows 15 connections across every process; SQLite opens a
-    connection for each request, so no file is held open."""
+    free plan allows 15 connections across every process, but on Lambda opens a
+    connection for each request, on the transaction pooler, which can't keep
+    prepared statements; SQLite opens one for each request, holding no file."""
     if url.startswith("sqlite"):
         return create_engine(url, poolclass=NullPool)
+    args = {"options": f"-c search_path={schema()}"}
+    if on_lambda():
+        args = args | {"prepare_threshold": None}
+        return create_engine(url, connect_args=args, poolclass=NullPool)
     return create_engine(
         url,
-        connect_args={"options": f"-c search_path={schema()}"},
+        connect_args=args,
         pool_size=int(setting("DATABASE_CONNECTIONS")),
         max_overflow=0,
         # Many claim agents at once share the pool: wait for a connection

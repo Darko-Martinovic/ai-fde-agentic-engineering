@@ -3,7 +3,7 @@ import {
   DEFAULTS_ONLY,
   loadSettings,
   setting,
-} from "./settings/settings.config";
+} from "./settings/settings.config.ts";
 import { SIGNED_IN } from "./e2e/signed-in";
 
 // The end-to-end tests run on their own ports and their own SQLite database, seeded

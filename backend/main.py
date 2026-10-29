@@ -5,11 +5,13 @@ from contextlib import asynccontextmanager
 
 from anyio import to_thread
 from fastapi import FastAPI
+from mangum import Mangum
 
 from backend import (
     agent_document,
     claims,
     configuration,
+    dashboard_files,
     documents,
     evaluations,
     handlers,
@@ -64,3 +66,11 @@ for module in (
 def health() -> dict[str, str]:
     """Check that the backend is running."""
     return {"status": "ok"}
+
+
+# The dashboard's build, after every API route
+app.include_router(dashboard_files.router)
+
+# AWS Lambda's entry point, through a Function URL. The startup hook never runs
+# there, so nothing waits on it
+handler = Mangum(app, lifespan="off")

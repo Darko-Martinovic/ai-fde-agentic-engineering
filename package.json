@@ -11,9 +11,11 @@
     "dev:backend": "uv run -m backend",
     "dev:agent": "uv run -m agent.service",
     "dev:dashboard": "vite dashboard",
+    "build": "vite build dashboard",
     "format": "uv run ruff format && prettier --write -u dashboard e2e settings *.config.*",
     "check": "npm run check:python && npm run check:ts && npm run e2e",
-    "check:python": "uv run ruff format --check && uv run ruff check && pyright && uv run pytest -q",
+    "check:python": "uv run ruff format --check && uv run ruff check && pyright && uv run pytest -q && npm run check:server",
+    "check:server": "uv run --isolated --only-group server python -c \"import os; os.environ['UNDERCOVER_ENV_FILES'] = 'settings/.env.defaults'; import backend.main\"",
     "check:ts": "prettier --check -u dashboard e2e settings *.config.* && eslint dashboard e2e settings *.config.* && tsc && vitest run --root dashboard --coverage",
     "e2e": "playwright test"
   },
