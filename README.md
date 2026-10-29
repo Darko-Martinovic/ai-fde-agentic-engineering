@@ -208,3 +208,4 @@ My contributions to Ed's repo, in `community_contributions/Darko-Martinovic/`:
 | [#63](https://github.com/ed-donner/undercover/pull/63) | Week 2 Day 5 | Challenge: the short policy wording as a lever |
 | [#69](https://github.com/ed-donner/undercover/pull/69) | Week 2 Day 5 | The improver, with handlers who sign in and a rejection kept (`IMPROVE.md`) |
 | [#74](https://github.com/ed-donner/undercover/pull/74) | Week 3 Day 2 | Challenge: a payout check on what comes out of the model |
+| [#76](https://github.com/ed-donner/undercover/pull/76) | Week 3 Day 2 | The agent's key, a check for hidden instructions, and the app ready for Lambda (`SECURE.md`) |
