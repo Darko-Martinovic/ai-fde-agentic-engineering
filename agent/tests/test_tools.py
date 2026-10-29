@@ -18,11 +18,11 @@ def test_the_claim_agents_tools_are_named_after_operations():
     assert names == [
         "get_claim",
         "get_policy",
-        "get_customer",
+        "get_claim_history",
         "search_documents",
         "read_section",
         "calculate_payout",
-        "decide_claim",
+        "record_decision",
     ]
 
 

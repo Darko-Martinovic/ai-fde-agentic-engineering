@@ -187,7 +187,7 @@ export const INSIGHTS: Insights = {
     { claim_type: "trip_delay", approve: 1, decline: 0, refer: 0 },
   ],
   tools: [
-    { tool: "decide_claim", calls: 2, refused: 0 },
+    { tool: "record_decision", calls: 2, refused: 0 },
     { tool: "pay_claim", calls: 2, refused: 1 },
     { tool: "get_claim", calls: 1, refused: 0 },
   ],

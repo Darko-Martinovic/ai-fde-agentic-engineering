@@ -84,9 +84,9 @@ def get_policy(policy_id: str) -> dict[str, Any]:
 
 
 @tool
-def get_customer(customer_id: str) -> dict[str, Any]:
+def get_claim_history(customer_id: str) -> dict[str, Any]:
     """Get a customer, by the claim's customer_id, with their earlier claims."""
-    return api.get_customer(customer_id)
+    return api.get_claim_history(customer_id)
 
 
 @tool
@@ -125,7 +125,7 @@ def calculate_payout(
 
 
 @tool
-def decide_claim(
+def record_decision(
     decision: Literal["approve", "decline", "refer"],
     payout: float,
     reasons: str,
@@ -135,7 +135,7 @@ def decide_claim(
     """Record your decision on the claim: the payout, two or three sentences of
     reasons and the section of the policy wording it rests on. It's the last
     thing you do on the claim."""
-    claim = api.decide_claim(
+    claim = api.record_decision(
         runtime.context.claim_id,
         {
             "decision": decision,
@@ -146,7 +146,7 @@ def decide_claim(
     )
     recorded = ToolMessage(
         json.dumps(claim, ensure_ascii=False),
-        name=decide_claim.name,
+        name=record_decision.name,
         tool_call_id=runtime.tool_call_id,
     )
     return Command(
@@ -161,9 +161,9 @@ def decide_claim(
 CLAIM_TOOLS = [
     get_claim,
     get_policy,
-    get_customer,
+    get_claim_history,
     search_documents,
     read_section,
     calculate_payout,
-    decide_claim,
+    record_decision,
 ]

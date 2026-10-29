@@ -19,19 +19,25 @@ from backend.tests.workflow_steps import (
 NOTE = "The suit is limited to $300.00 under the per-item limit."
 
 
-def test_a_sign_off_hands_the_claim_back_to_the_agent(client, resumed):
+def test_a_sign_off_pays_the_claim_and_the_agent_finishes(client, resumed):
     approved(client, "CLM-1003", 3750)
     claim = review(client, "CLM-1003").json()
-    assert (claim["status"], claim["payment"]) == ("in_progress", None)
+    assert claim["status"] == "decided"
     signed = claim["decisions"][-1]
     assert (signed["review"], signed["reviewed_by"]) == ("signed_off", "HND-01")
-    assert signed["reviewed_at"]
+    assert claim["payment"]["amount"] == 3750
+    assert claim["payment"]["authorized_by"] == "HND-01"
+    assert claim["payment"]["signed_off_at"] == signed["reviewed_at"]
     assert resumed == ["CLM-1003"]
 
-    paid = pay(client, "CLM-1003", 3750).json()
-    assert paid["status"] == "decided"
-    assert paid["payment"]["authorized_by"] == "HND-01"
-    assert paid["payment"]["signed_off_at"] == signed["reviewed_at"]
+
+def test_a_signed_off_claim_is_paid_once(client):
+    approved(client, "CLM-1003", 3750)
+    review(client, "CLM-1003")
+    again = review(client, "CLM-1003")
+    assert again.status_code == 409
+    assert pay(client, "CLM-1003", 3750).status_code == 403
+    assert client.get("/api/claims/CLM-1003").json()["payment"]["amount"] == 3750
 
 
 def test_the_agent_is_told_once_the_review_is_saved(client, monkeypatch):
@@ -60,7 +66,7 @@ def test_a_review_stands_when_the_agent_cant_be_reached(monkeypatch, caplog):
 def test_a_held_payout_isnt_paid_before_a_sign_off(client):
     approved(client, "CLM-1003", 3750)
     response = pay(client, "CLM-1003", 3750)
-    assert response.status_code == 409
+    assert response.status_code == 403
     assert client.get("/api/claims/CLM-1003").json()["payment"] is None
 
 

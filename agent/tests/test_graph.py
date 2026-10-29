@@ -60,7 +60,7 @@ def test_the_graph_has_the_nodes_and_edges_of_the_plan(backend, memory_saver):
         ("tools", "wait_for_sign_off"),
         ("tools", "pay"),
         ("tools", "__end__"),
-        ("wait_for_sign_off", "pay"),
+        ("wait_for_sign_off", "__end__"),
         ("wait_for_sign_off", "agent"),
         ("pay", "__end__"),
     }
@@ -187,8 +187,8 @@ def test_two_decisions_at_once_are_recorded_once(backend, run, memory_saver):
     """ToolNode runs a reply's tool calls side by side; the backend lets one
     decision through and treats the same one again as done."""
     twice = calls(
-        call("decide_claim", **DECISION, payout=420.0),
-        {**call("decide_claim", **DECISION, payout=420.0), "id": "second"},
+        call("record_decision", **DECISION, payout=420.0),
+        {**call("record_decision", **DECISION, payout=420.0), "id": "second"},
     )
     report = harness.work_claim("CLM-1001", run, FREE, memory_saver, stub(twice))
     assert report == "CLM-1001: approved $420.00, paid"

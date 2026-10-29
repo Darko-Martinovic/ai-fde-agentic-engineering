@@ -97,7 +97,7 @@ dashboard ──/api──> backend (FastAPI) ──SQLAlchemy Core──> Supab
 
 | | Ed's build | Mine |
 |---|---|---|
-| A held payout | A handler signs it off and the agent pays | Sign off, or reject with a note. After a rejection the agent looks at the claim again with the note and decides again, and that decision always goes back to a handler; a payout rejected twice is referred |
+| A held payout | A handler signs it off, which pays it | Sign off, or reject with a note. After a rejection the agent looks at the claim again with the note and decides again, and that decision always goes back to a handler; a payout rejected twice is referred |
 | Repeats | A repeated decision or payment counts as done; a claim has one decision, and the agent makes one tool call at a time | The same for repeats, but a rejection means a claim can have several decisions, so each claim has a `revision`: two decisions or payments at the same moment are recorded once, and the one that loses gets a repeat or a refusal |
 | Stop | Command line only, with no Stop | Run and Stop on the dashboard. Stop leaves the claim in progress with its saved progress, and the next run, or Carry on on the claim's page, carries on every claim left in progress |
 | Code | The graph, the checkpointer, the runs and the queue agent in one `harness.py`; every route in `main.py` | `graph.py`, `checkpoints.py`, `harness.py`, `queue_agent.py` and `service.py`; the claim rules in `claim_rules.py`, the handlers' reviews in `reviews.py`, all SQL in `backend/store/` |

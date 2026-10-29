@@ -67,7 +67,7 @@ def decision(decided: str, payout: float) -> AIMessage:
         content="",
         tool_calls=[
             call(
-                "decide_claim",
+                "record_decision",
                 decision=decided,
                 payout=payout,
                 reasons="The wording settles it.",

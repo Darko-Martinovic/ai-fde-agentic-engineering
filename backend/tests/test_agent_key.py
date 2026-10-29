@@ -24,7 +24,7 @@ GUARDS = {
             "start_claim",
             "fail_claim",
             "record_step",
-            "decide_claim",
+            "record_decision",
             "pay_claim",
             "calculate_payout",
             "record_model_call",
@@ -56,7 +56,14 @@ GUARDS = {
         AGENT_ONLY,
     ),
     **dict.fromkeys(
-        ["list_claims", "get_claim", "get_policy", "get_customer", "read_section"],
+        [
+            "list_claims",
+            "get_claim",
+            "get_policy",
+            "get_claim_history",
+            "read_section",
+            "get_agent_document",
+        ],
         EITHER,
     ),
     **dict.fromkeys(

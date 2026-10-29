@@ -93,13 +93,15 @@ def test_a_lowered_limit_holds_the_next_payout(client):
     change(client, approval_limit=500.0)
     claim = approved(client, "CLM-1004", 600).json()
     assert claim["status"] == "awaiting_sign_off"
-    assert pay(client, "CLM-1004", 600).status_code == 409
+    assert pay(client, "CLM-1004", 600).status_code == 403
 
 
-def test_a_decision_before_the_limit_is_lowered_keeps_its_limit(client):
-    approved(client, "CLM-1004", 600)
+def test_a_payment_follows_the_limit_now_whatever_its_decision_was_held_to(client):
+    claim = approved(client, "CLM-1004", 600).json()
     change(client, approval_limit=500.0)
-    assert pay(client, "CLM-1004", 600).json()["status"] == "decided"
+    assert claim["decisions"][-1]["approval_limit"] == 1000.0
+    # The payment follows the limit now, whatever the decision was held to
+    assert pay(client, "CLM-1004", 600).status_code == 403
 
 
 def test_insights_count_a_sign_off_by_the_limit_it_was_recorded_under(client):

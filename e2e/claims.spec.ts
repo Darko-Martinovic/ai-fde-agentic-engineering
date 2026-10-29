@@ -45,7 +45,7 @@ test("a claim opens from the queue", async ({ page }) => {
 });
 
 /** The claims the stand-in for the agent's service was asked to pick back up. */
-test("a sign-off reaches the agent, which pays the claim", async ({
+test("a sign-off pays the claim, and the agent is told", async ({
   page,
   request,
 }) => {
@@ -57,23 +57,15 @@ test("a sign-off reaches the agent, which pays the claim", async ({
         data: { amount: 1350 },
       })
     ).status(),
-  ).toBe(409);
+  ).toBe(403);
   await page.goto("/#/claims/CLM-1020");
   await expect(page.getByText("Awaiting sign-off").first()).toBeVisible();
   await page.getByRole("button", { name: "Sign off $1,350.00" }).click();
-  await expect(page.getByText(/Signed off by Dana Whitfield/)).toBeVisible();
-  await expect(page.getByText("In progress").first()).toBeVisible();
-  await expect.poll(() => resumed(request)).toContain("CLM-1020");
-  // The test plays the agent's part and pays, as the graph would
-  const paid = await request.post("/api/claims/CLM-1020/payment", {
-    headers: AS_THE_AGENT,
-    data: { amount: 1350 },
-  });
-  expect(paid.ok()).toBe(true);
   await expect(
     page.getByText(/Paid \$1,350\.00, signed off by Dana Whitfield at/),
   ).toBeVisible();
   await expect(page.getByText("Decided").first()).toBeVisible();
+  await expect.poll(() => resumed(request)).toContain("CLM-1020");
 });
 
 test("a rejection goes back to the agent with its note", async ({

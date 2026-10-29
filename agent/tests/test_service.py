@@ -6,8 +6,9 @@ import threading
 import pytest
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.runnables import RunnableConfig
 
-from agent import api, dispatcher, harness, service
+from agent import api, dispatcher, graph, harness, service
 from agent.tests.stub import FREE, ByClaim, StubModel, decide, stub
 from backend.tests.direct_changes import set_status
 from backend.tests.new_versions import GEMINI, add_version
@@ -51,22 +52,25 @@ def test_health(agent_service):
     assert client.get("/api/health").json() == {"status": "ok"}
 
 
-def test_a_sign_off_is_picked_up_and_paid_once(
-    backend, run, memory_saver, agent_service
+def test_after_a_sign_off_the_agent_finishes_and_pays_nothing(
+    backend, run, memory_saver, agent_service, monkeypatch
 ):
     client, replies = agent_service
     held(backend, run, memory_saver)
     review(backend, approved=True)
-    replies["llm"] = StubModel(messages=iter([]))  # never called: paying needs no model
+    replies["llm"] = StubModel(messages=iter([]))  # never called: the work is done
+    paid = []
+    monkeypatch.setattr(graph.api, "pay_claim", lambda *payment: paid.append(payment))
     assert client.post("/api/claims/CLM-1003/resume").status_code == 202
+    assert paid == []
     claim = backend.get("/api/claims/CLM-1003").json()
     assert claim["status"] == "decided"
     assert claim["payment"]["amount"] == 3750.0
     assert claim["payment"]["authorized_by"] == "HND-01"
     assert claim["attempts"] == 1
-    again = client.post("/api/claims/CLM-1003/resume")
-    assert again.status_code == 409
-    assert backend.get("/api/claims/CLM-1003").json()["payment"]["amount"] == 3750.0
+    finished = harness.claim_graph(FREE, memory_saver, StubModel(messages=iter([])))
+    thread: RunnableConfig = {"configurable": {"thread_id": claim["thread_id"]}}
+    assert finished.get_state(thread).next == ()
 
 
 def test_a_claim_still_waiting_for_its_review_isnt_picked_up(
@@ -148,7 +152,8 @@ def test_a_decision_the_graph_never_saved_isnt_worked_again(
     replies["llm"] = StubModel(messages=iter([]))
     assert client.post("/api/claims/CLM-1003/resume").status_code == 202
     assert "CLM-1003: not picked up (RuntimeError" in capsys.readouterr().out
-    assert backend.get("/api/claims/CLM-1003").json()["payment"] is None
+    # The sign-off paid it; the agent had nothing to finish
+    assert backend.get("/api/claims/CLM-1003").json()["payment"]["amount"] == 3750.0
 
 
 def declines(monkeypatch, *claim_ids):

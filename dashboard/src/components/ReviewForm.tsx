@@ -5,8 +5,8 @@ import { useHandler } from "../handler";
 import { useAction } from "../hooks";
 import { NotAllowed } from "./NotAllowed";
 
-/** The signed-in handler's review of a held payout: sign it off, and the agent
- *  pays it, or reject it with a note, which goes back to the agent. Only a
+/** The signed-in handler's review of a held payout: sign it off, which pays
+ *  it, or reject it with a note, which goes back to the agent. Only a
  *  handler who can sign off payouts over the limit reviews one. */
 export function ReviewForm({
   claim,
@@ -33,8 +33,8 @@ export function ReviewForm({
       <h3>Review the payout</h3>
       <p>
         The agent approved {money(payout)}, which waits for a handler. Sign it
-        off and the agent pays it, or reject it with a note that says what's
-        wrong, and the agent looks at the claim again.
+        off and it's paid, or reject it with a note that says what's wrong, and
+        the agent looks at the claim again.
       </p>
       <label className="field">
         <span>Note for the agent</span>
